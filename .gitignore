@@ -61,3 +61,7 @@ htmlcov/
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# agents
+.agents
+
