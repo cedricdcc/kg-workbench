@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Bot, Cpu, Loader2, Sparkles } from "lucide-react"
+import { Cpu, Loader2, Sparkles } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"

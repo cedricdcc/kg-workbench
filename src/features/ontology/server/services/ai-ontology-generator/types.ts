@@ -1,5 +1,3 @@
-import type { GeneratedOntologyDraft } from "@/features/ontology/schemas/ai-generation"
-
 export type CompetencyQuestionInput = {
   id: string
   question: string

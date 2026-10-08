@@ -10,6 +10,7 @@ scope:
   - class, relation, relation attribute, and attribute CRUD
   - browser/detail views and React Flow canvas state
   - persisted layout and class-position state for visual mode and JSON round-trips
+  - AI-assisted ontology draft generation and staged review from competency questions
 entry_points:
   - path: src/app/ontology/page.tsx
     purpose: Server route that resolves the active ontology document and initial data.
@@ -20,6 +21,8 @@ server_entry_points:
     purpose: Focused read layer and client-callable query functions for ontology documents, structure, metadata, and saved layout state.
   - path: src/features/ontology/server/actions/
     purpose: Focused write actions for ontology CRUD, JSON import/export, module transfer, and visual layout persistence.
+  - path: src/features/ontology/server/actions/generate-ontology.ts
+    purpose: AI-assisted ontology draft generation from competency questions and transactional persistence.
 update_this_readme_when:
   - route composition changes
   - shell or canvas flow changes

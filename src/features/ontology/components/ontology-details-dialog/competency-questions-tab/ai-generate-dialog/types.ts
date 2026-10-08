@@ -1,5 +1,3 @@
-import type { GeneratedOntologyDraft } from "@/features/ontology/schemas/ai-generation"
-
 export type AiGenerateDialogStep = "config" | "review"
 export type ProviderType = "gemini" | "ollama"
 

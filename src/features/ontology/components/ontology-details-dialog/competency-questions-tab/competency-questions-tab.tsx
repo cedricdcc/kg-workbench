@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo, useState, useTransition } from "react"
-import { Plus } from "lucide-react"
+import { Plus, Sparkles } from "lucide-react"
 import { toast } from "sonner"
 
 import type {
@@ -30,6 +30,7 @@ import { MultiSelectDropdown } from "@/components/shared/multi-select-dropdown"
 import { EmptyState } from "@/features/ontology/components/shared/empty-state"
 import { SearchInput } from "@/features/ontology/components/shared/search-input"
 
+import { AiGenerateOntologyDialog } from "./ai-generate-dialog/ai-generate-dialog"
 import { CompetencyQuestionsTable } from "./competency-questions-table/competency-questions-table"
 
 interface CompetencyQuestionsTabProps {
@@ -66,6 +67,7 @@ export function CompetencyQuestionsTab({
     null
   )
   const [isDeleting, startDelete] = useTransition()
+  const [isAiDialogOpen, setIsAiDialogOpen] = useState(false)
 
   const classMap = useMemo(
     () => new Map(classes.map((c) => [c.id, c])),
@@ -168,10 +170,27 @@ export function CompetencyQuestionsTab({
           }}
           onClear={() => setModuleFilter(new Set())}
         />
-        <Button size="sm" onClick={handleAdd} className="ml-auto shrink-0">
-          <Plus className="mr-1.5 size-4" />
-          Add CQ
-        </Button>
+        <div className="ml-auto flex items-center gap-2 shrink-0">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setIsAiDialogOpen(true)}
+            disabled={cqs.length === 0}
+            className="gap-1.5 text-xs"
+            title={
+              cqs.length === 0
+                ? "Add at least one competency question first"
+                : "Draft modules, classes, and relations from competency questions using AI"
+            }
+          >
+            <Sparkles className="size-3.5 text-primary" />
+            AI Generate
+          </Button>
+          <Button size="sm" onClick={handleAdd}>
+            <Plus className="mr-1.5 size-4" />
+            Add CQ
+          </Button>
+        </div>
       </div>
 
       {/* Table or empty states */}
@@ -254,6 +273,13 @@ export function CompetencyQuestionsTab({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <AiGenerateOntologyDialog
+        open={isAiDialogOpen}
+        onOpenChange={setIsAiDialogOpen}
+        ontologyId={ontology.id}
+        cqCount={cqs.length}
+      />
     </div>
   )
 }
