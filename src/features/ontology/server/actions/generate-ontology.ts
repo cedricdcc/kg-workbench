@@ -50,11 +50,11 @@ export async function generateOntologyDraft(
   await assertOntologyDocumentAccess(trimmedId, db)
 
   const [document, modules, classes, relations, cqs] = await Promise.all([
-    getOntologyDocument(trimmedId, db),
-    getOntologyModules(trimmedId, db),
-    getOntologyClasses(trimmedId, db),
-    getOntologyRelations(trimmedId, db),
-    getOntologyCQs(trimmedId, db),
+    getOntologyDocument(trimmedId),
+    getOntologyModules(trimmedId),
+    getOntologyClasses(trimmedId),
+    getOntologyRelations(trimmedId),
+    getOntologyCQs(trimmedId),
   ])
 
   if (!document) {
