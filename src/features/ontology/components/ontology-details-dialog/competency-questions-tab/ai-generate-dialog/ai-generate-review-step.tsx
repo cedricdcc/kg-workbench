@@ -1,19 +1,81 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { ArrowLeft, Check, Layers, Link2, Loader2, Network, Tag } from "lucide-react"
+import { ArrowLeft, Check, ChevronDown, ChevronRight, Layers, Link2, Loader2, Network, Sparkles, Tag } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import type { GeneratedOntologyDraft } from "@/features/ontology/schemas/ai-generation"
+import type { EntityAlignment, GeneratedOntologyDraft } from "@/features/ontology/schemas/ai-generation"
+import { ContextualExpansionSection } from "./contextual-expansion-section"
 
 interface ReviewStepProps {
   draft: GeneratedOntologyDraft
   isApplying: boolean
   onBack: () => void
   onApply: (filteredDraft: GeneratedOntologyDraft) => void
+}
+
+function AlignmentBadgeView({ alignment }: { alignment?: EntityAlignment }) {
+  const [showRationale, setShowRationale] = useState(false)
+
+  if (!alignment) return null
+
+  const isReuse = alignment.mode === "reuse"
+  const isSubClassOf = alignment.mode === "subClassOf"
+
+  return (
+    <div className="space-y-1 pt-1">
+      <div className="flex flex-wrap items-center gap-1.5">
+        <Badge
+          variant={isReuse ? "secondary" : "outline"}
+          className={`gap-1 font-mono text-[10px] ${
+            isReuse
+              ? "border-primary/30 bg-primary/10 text-primary"
+              : isSubClassOf
+                ? "border-amber-500/30 bg-amber-500/5 text-amber-600 dark:text-amber-400"
+                : "border-emerald-500/30 bg-emerald-500/5 text-emerald-600 dark:text-emerald-400"
+          }`}
+        >
+          <Sparkles className="h-2.5 w-2.5" />
+          {isReuse && `re-uses ${alignment.targetCurie}`}
+          {isSubClassOf && `subClassOf ${alignment.targetCurie}`}
+          {alignment.mode === "equivalentClass" && `≡ ${alignment.targetCurie}`}
+        </Badge>
+
+        {typeof alignment.similarityScore === "number" && (
+          <span className="text-[10px] text-muted-foreground font-mono">
+            {Math.round(alignment.similarityScore * 100)}% match
+          </span>
+        )}
+
+        {alignment.rationale && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              setShowRationale(!showRationale)
+            }}
+            className="flex items-center gap-0.5 text-[10px] text-primary hover:underline"
+          >
+            {showRationale ? (
+              <ChevronDown className="h-3 w-3" />
+            ) : (
+              <ChevronRight className="h-3 w-3" />
+            )}
+            Rationale
+          </button>
+        )}
+      </div>
+
+      {showRationale && alignment.rationale && (
+        <div className="rounded border-l-2 border-primary/40 bg-muted/40 p-1.5 text-[11px] italic text-muted-foreground">
+          {alignment.rationale}
+        </div>
+      )}
+    </div>
+  )
 }
 
 export function AiGenerateReviewStep({
@@ -39,6 +101,9 @@ export function AiGenerateReviewStep({
   )
   const [selectedCQs, setSelectedCQs] = useState<Set<string>>(
     () => new Set(draft.cqMappings.map((m) => m.cqId))
+  )
+  const [selectedContextualCuries, setSelectedContextualCuries] = useState<Set<string>>(
+    () => new Set((draft.suggestedContext || []).map((c) => c.curie.toLowerCase()))
   )
 
   const [activeTab, setActiveTab] = useState("modules")
@@ -73,6 +138,23 @@ export function AiGenerateReviewStep({
     setSelectedCQs(next)
   }
 
+  function toggleContextual(curie: string) {
+    const key = curie.toLowerCase()
+    const next = new Set(selectedContextualCuries)
+    if (next.has(key)) next.delete(key)
+    else next.add(key)
+    setSelectedContextualCuries(next)
+  }
+
+  function toggleAllContextual() {
+    const all = draft.suggestedContext || []
+    if (selectedContextualCuries.size === all.length) {
+      setSelectedContextualCuries(new Set())
+    } else {
+      setSelectedContextualCuries(new Set(all.map((c) => c.curie.toLowerCase())))
+    }
+  }
+
   const filteredDraft = useMemo<GeneratedOntologyDraft>(() => {
     return {
       modules: draft.modules.filter((m) =>
@@ -86,14 +168,24 @@ export function AiGenerateReviewStep({
         return selectedRelations.has(key)
       }),
       cqMappings: draft.cqMappings.filter((m) => selectedCQs.has(m.cqId)),
+      suggestedContext: (draft.suggestedContext || []).filter((ctx) =>
+        selectedContextualCuries.has(ctx.curie.toLowerCase())
+      ),
     }
-  }, [draft, selectedModules, selectedClasses, selectedRelations, selectedCQs])
+  }, [
+    draft,
+    selectedModules,
+    selectedClasses,
+    selectedRelations,
+    selectedCQs,
+    selectedContextualCuries,
+  ])
 
   return (
     <div className="flex flex-col space-y-4">
       <div className="flex items-center justify-between border-b pb-2 text-xs text-muted-foreground">
         <span>Review and adjust the proposed elements before saving.</span>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Badge variant="secondary" className="text-[11px]">
             {filteredDraft.modules.length} Modules
           </Badge>
@@ -106,6 +198,11 @@ export function AiGenerateReviewStep({
           <Badge variant="secondary" className="text-[11px]">
             {filteredDraft.cqMappings.length} CQ Links
           </Badge>
+          {filteredDraft.suggestedContext && filteredDraft.suggestedContext.length > 0 && (
+            <Badge variant="outline" className="border-primary/40 bg-primary/10 text-[11px] text-primary">
+              +{filteredDraft.suggestedContext.length} Contextual
+            </Badge>
+          )}
         </div>
       </div>
 
@@ -216,6 +313,7 @@ export function AiGenerateReviewStep({
                           ))}
                         </div>
                       )}
+                      <AlignmentBadgeView alignment={cls.alignment} />
                     </div>
                   </div>
                 )
@@ -264,6 +362,7 @@ export function AiGenerateReviewStep({
                           {rel.description}
                         </div>
                       )}
+                      <AlignmentBadgeView alignment={rel.alignment} />
                     </div>
                   </div>
                 )
@@ -334,6 +433,14 @@ export function AiGenerateReviewStep({
           </ScrollArea>
         </TabsContent>
       </Tabs>
+
+      {/* Option B: Contextual Expansion Section */}
+      <ContextualExpansionSection
+        items={draft.suggestedContext || []}
+        selectedCurieSet={selectedContextualCuries}
+        onToggle={toggleContextual}
+        onToggleAll={toggleAllContextual}
+      />
 
       <div className="flex items-center justify-between pt-2">
         <Button

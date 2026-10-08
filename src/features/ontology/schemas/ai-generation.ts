@@ -64,6 +64,8 @@ export const GeneratedOntologyDraftSchema = z.object({
   suggestedContext: z.array(ContextualConnectionSchema).default([]),
 })
 
+export type EntityAlignment = z.infer<typeof EntityAlignmentSchema>
+export type ContextualConnection = z.infer<typeof ContextualConnectionSchema>
 export type GeneratedAttribute = z.infer<typeof GeneratedAttributeSchema>
 export type GeneratedClass = z.infer<typeof GeneratedClassSchema>
 export type GeneratedModule = z.infer<typeof GeneratedModuleSchema>

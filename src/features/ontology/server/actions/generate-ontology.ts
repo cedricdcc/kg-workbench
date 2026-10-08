@@ -258,6 +258,34 @@ export async function applyOntologyDraft(
         }
       }
 
+      // Option B Contextual Graph Closure: Incorporate selected suggestedContext parent classes
+      if (draft.suggestedContext && draft.suggestedContext.length > 0) {
+        for (const ctx of draft.suggestedContext) {
+          if (ctx.type === "parentClass") {
+            const name = ctx.label || ctx.curie
+            const lower = name.toLowerCase()
+            const curieLower = ctx.curie.toLowerCase()
+            if (!classMap.has(lower) && !classMap.has(curieLower)) {
+              const [inserted] = await tx
+                .insert(ontologyClasses)
+                .values({
+                  ontology_id: trimmedId,
+                  module_id: null,
+                  name,
+                  description: `Standard parent class (${ctx.curie})`,
+                })
+                .returning()
+
+              if (inserted) {
+                classMap.set(lower, inserted.id)
+                classMap.set(curieLower, inserted.id)
+                createdClasses++
+              }
+            }
+          }
+        }
+      }
+
       // 3. Process Relations
       const existingRelations = await tx
         .select()
@@ -295,6 +323,39 @@ export async function applyOntologyDraft(
               relationKeyMap.set(key, inserted.id)
               relationNameMap.set(rel.name.toLowerCase(), inserted.id)
               createdRelations++
+            }
+          }
+        }
+      }
+
+      // Option B: Establish subClassOf relations for classes mapped via subClassOf
+      for (const cls of draft.classes) {
+        if (cls.alignment?.mode === "subClassOf" && cls.alignment.targetCurie) {
+          const domainId = classMap.get(cls.name.toLowerCase())
+          const targetCurieLower = cls.alignment.targetCurie.toLowerCase()
+          const rangeId =
+            classMap.get(targetCurieLower) ||
+            classMap.get((cls.alignment.targetCurie.split(":")[1] || "").toLowerCase())
+
+          if (domainId && rangeId) {
+            const key = `subclassof:${domainId}:${rangeId}`
+            if (!relationKeyMap.has(key)) {
+              const [inserted] = await tx
+                .insert(ontologyRelations)
+                .values({
+                  ontology_id: trimmedId,
+                  name: "subClassOf",
+                  domain_class_id: domainId,
+                  range_class_id: rangeId,
+                  description: `Inherits from standard vocabulary class ${cls.alignment.targetCurie}`,
+                })
+                .returning()
+
+              if (inserted) {
+                relationKeyMap.set(key, inserted.id)
+                relationNameMap.set("subclassof", inserted.id)
+                createdRelations++
+              }
             }
           }
         }
