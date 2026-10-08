@@ -33,6 +33,10 @@ import {
   type GeneratedOntologyDraftInput,
 } from "@/features/ontology/schemas/ai-generation"
 import { normalizeOntologyDataTypeOrDefault } from "@/features/ontology/utils/data-types"
+import { getActiveReferenceTerms } from "@/features/ontology/server/queries/reference-vocabularies"
+import { getLocalEmbedding } from "@/server/embedding/local-embedder"
+import { rankTermsBySimilarity } from "@/features/ontology/server/services/vector-similarity"
+import { expandContextualConnections } from "@/features/ontology/server/services/ai-ontology-generator/contextual-expansion"
 
 export type ApplyDraftResult = {
   createdModules: number
@@ -72,6 +76,39 @@ export async function generateOntologyDraft(
     )
   }
 
+  // 1. Retrieve active reference terms and pre-filter candidates via local vector embeddings
+  let candidateReferenceTerms: Array<{
+    curie: string
+    label: string
+    description: string
+    iri: string
+    type: string
+  }> = []
+
+  const activeReferenceTerms = await getActiveReferenceTerms().catch(() => [])
+
+  if (activeReferenceTerms.length > 0) {
+    const candidateMap = new Map<string, (typeof activeReferenceTerms)[0]>()
+    for (const cq of validCQs) {
+      const cqEmbedding = await getLocalEmbedding(cq.question)
+      const matches = rankTermsBySimilarity(cqEmbedding, activeReferenceTerms, {
+        minSimilarity: 0.1,
+        topK: 3,
+      })
+      for (const match of matches) {
+        candidateMap.set(match.curie.toLowerCase(), match)
+      }
+    }
+    candidateReferenceTerms = Array.from(candidateMap.values()).map((t) => ({
+      curie: t.curie,
+      label: t.label,
+      description: t.description,
+      iri: t.iri,
+      type: t.type,
+    }))
+  }
+
+  // 2. Generate initial draft from LLM
   const draft = await executeAiGeneration(
     {
       ontologyName: document.name,
@@ -83,9 +120,46 @@ export async function generateOntologyDraft(
         id: cq.id,
         question: cq.question,
       })),
+      candidateReferenceTerms,
     },
     options
   )
+
+  // 3. Contextual Graph Expansion (Option B): Resolve parent classes and related properties
+  if (activeReferenceTerms.length > 0) {
+    const adoptedCuries: string[] = []
+    for (const cls of draft.classes) {
+      if (cls.alignment?.targetCurie) {
+        adoptedCuries.push(cls.alignment.targetCurie)
+      }
+    }
+    for (const rel of draft.relations) {
+      if (rel.alignment?.targetCurie) {
+        adoptedCuries.push(rel.alignment.targetCurie)
+      }
+    }
+
+    if (adoptedCuries.length > 0) {
+      const expansion = expandContextualConnections(
+        adoptedCuries,
+        activeReferenceTerms
+      )
+      draft.suggestedContext = [
+        ...expansion.suggestedParents.map((p) => ({
+          curie: p.curie,
+          iri: p.iri,
+          label: p.label,
+          type: "parentClass" as const,
+        })),
+        ...expansion.suggestedProperties.map((p) => ({
+          curie: p.curie,
+          iri: p.iri,
+          label: p.label,
+          type: "relatedProperty" as const,
+        })),
+      ]
+    }
+  }
 
   return draft
 }

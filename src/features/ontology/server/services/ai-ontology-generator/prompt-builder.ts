@@ -21,8 +21,28 @@ Guidelines:
    - objectClassName: The target entity class representing the object.
    - moduleNames: An array of 1 or more module names relevant to this question.
 5. Reuse & Alignment: If existing modules, classes, or relations are provided, reuse matching names whenever appropriate rather than introducing redundant aliases.
+6. Standard Vocabularies & Alignment: If candidate standard terms are provided below, leverage them where appropriate by specifying the optional "alignment" object on classes or relations:
+   - mode: "reuse" (directly adopt the standard term name), "subClassOf" (create a domain-specific subclass linked to standard parent), or "equivalentClass".
+   - targetCurie: Standard CURIE (e.g. "sosa:Observation", "sosa:Platform").
+   - targetIri: Standard canonical IRI.
+   - rationale: A concise sentence explaining why this standard concept fits the Competency Question.
 
 Output MUST be strictly valid JSON conforming to the requested schema. Return JSON only.`
+
+  const candidateTermsSection =
+    context.candidateReferenceTerms && context.candidateReferenceTerms.length > 0
+      ? `\nCandidate Standard Vocabulary Terms (from active reference ontologies):\n${JSON.stringify(
+          context.candidateReferenceTerms.map((t) => ({
+            curie: t.curie,
+            label: t.label,
+            type: t.type,
+            description: t.description,
+            iri: t.iri,
+          })),
+          null,
+          2
+        )}\n`
+      : ""
 
   const userPrompt = `Ontology Document Name: "${context.ontologyName}"
 Ontology Usecase/Description: "${context.usecase || "Not specified"}"
@@ -42,7 +62,7 @@ Existing Relations: ${
       ? JSON.stringify(context.existingRelations)
       : "None"
   }
-
+${candidateTermsSection}
 Competency Questions to analyze:
 ${JSON.stringify(validCQs, null, 2)}
 

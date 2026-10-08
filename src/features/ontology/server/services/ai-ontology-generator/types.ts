@@ -10,6 +10,13 @@ export type PromptContext = {
   existingClasses: string[]
   existingRelations: string[]
   competencyQuestions: CompetencyQuestionInput[]
+  candidateReferenceTerms?: Array<{
+    curie: string
+    label: string
+    description: string
+    iri: string
+    type: string
+  }>
 }
 
 export type GeminiGenerationOptions = {

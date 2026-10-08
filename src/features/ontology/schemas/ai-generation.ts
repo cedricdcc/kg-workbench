@@ -12,11 +12,20 @@ export const GeneratedAttributeSchema = z.object({
   description: z.string().default(""),
 })
 
+export const EntityAlignmentSchema = z.object({
+  mode: z.enum(["reuse", "subClassOf", "equivalentClass"]),
+  targetCurie: z.string().trim().min(1),
+  targetIri: z.string().trim().min(1),
+  similarityScore: z.number().optional(),
+  rationale: z.string().default(""),
+})
+
 export const GeneratedClassSchema = z.object({
   name: z.string().trim().min(1),
   description: z.string().default(""),
   moduleName: z.string().trim().min(1),
   attributes: z.array(GeneratedAttributeSchema).default([]),
+  alignment: EntityAlignmentSchema.optional(),
 })
 
 export const GeneratedModuleSchema = z.object({
@@ -29,6 +38,7 @@ export const GeneratedRelationSchema = z.object({
   description: z.string().default(""),
   domainClassName: z.string().trim().min(1),
   rangeClassName: z.string().trim().min(1),
+  alignment: EntityAlignmentSchema.optional(),
 })
 
 export const GeneratedCQMappingSchema = z.object({
@@ -39,11 +49,19 @@ export const GeneratedCQMappingSchema = z.object({
   moduleNames: z.array(z.string().trim()).default([]),
 })
 
+export const ContextualConnectionSchema = z.object({
+  curie: z.string(),
+  iri: z.string(),
+  label: z.string(),
+  type: z.enum(["parentClass", "relatedProperty"]),
+})
+
 export const GeneratedOntologyDraftSchema = z.object({
   modules: z.array(GeneratedModuleSchema),
   classes: z.array(GeneratedClassSchema),
   relations: z.array(GeneratedRelationSchema),
   cqMappings: z.array(GeneratedCQMappingSchema),
+  suggestedContext: z.array(ContextualConnectionSchema).default([]),
 })
 
 export type GeneratedAttribute = z.infer<typeof GeneratedAttributeSchema>
