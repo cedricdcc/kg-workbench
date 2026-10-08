@@ -303,3 +303,39 @@ export const ontologyExamples = pgTable("ontology_examples", {
   target_relation_attribute_id: uuid("target_relation_attribute_id"),
   target_cq_id: uuid("target_cq_id"),
 })
+
+export const referenceOntologies = pgTable("reference_ontologies", {
+  id: generatedId(),
+  prefix: text("prefix").notNull(),
+  name: text("name").notNull(),
+  base_iri: text("base_iri").notNull(),
+  source_registry: text("source_registry").notNull(),
+  source_id: text("source_id").notNull(),
+  version: text("version").default(""),
+  synced_at: created_at(),
+  group_key: text("group_key").notNull().default("shared"),
+  created_at: created_at(),
+})
+
+export const referenceOntologyTerms = pgTable("reference_ontology_terms", {
+  id: generatedId(),
+  reference_ontology_id: uuid("reference_ontology_id")
+    .notNull()
+    .references(() => referenceOntologies.id, { onDelete: "cascade" }),
+  curie: text("curie").notNull(),
+  iri: text("iri").notNull(),
+  label: text("label").notNull(),
+  type: text("type").notNull(), // 'class' | 'property' | 'individual'
+  description: text("description").notNull().default(""),
+  synonyms: text("synonyms")
+    .array()
+    .default(sql`'{}'::text[]`),
+  parent_iris: text("parent_iris")
+    .array()
+    .default(sql`'{}'::text[]`),
+  related_property_iris: text("related_property_iris")
+    .array()
+    .default(sql`'{}'::text[]`),
+  embedding: real("embedding").array(),
+  group_key: text("group_key").notNull().default("shared"),
+})
