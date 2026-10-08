@@ -1,10 +1,14 @@
 import { z } from "zod"
 
+import { normalizeOntologyDataTypeOrDefault } from "@/features/ontology/utils/data-types"
+
 export const GeneratedAttributeSchema = z.object({
   name: z.string().trim().min(1),
   dataType: z
-    .enum(["xsd:string", "xsd:integer", "xsd:decimal", "xsd:boolean", "xsd:date"])
-    .default("xsd:string"),
+    .string()
+    .trim()
+    .default("xsd:string")
+    .transform((val) => normalizeOntologyDataTypeOrDefault(val)),
   description: z.string().default(""),
 })
 
@@ -48,6 +52,9 @@ export type GeneratedModule = z.infer<typeof GeneratedModuleSchema>
 export type GeneratedRelation = z.infer<typeof GeneratedRelationSchema>
 export type GeneratedCQMapping = z.infer<typeof GeneratedCQMappingSchema>
 export type GeneratedOntologyDraft = z.infer<typeof GeneratedOntologyDraftSchema>
+export type GeneratedOntologyDraftInput = z.input<
+  typeof GeneratedOntologyDraftSchema
+>
 
 /**
  * Strips markdown code blocks and whitespace from raw LLM responses.

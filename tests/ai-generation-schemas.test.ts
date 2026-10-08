@@ -76,3 +76,31 @@ test("GeneratedOntologyDraftSchema rejects invalid CQ uuid", () => {
   }
   assert.throws(() => GeneratedOntologyDraftSchema.parse(invalid))
 })
+
+test("GeneratedAttributeSchema normalizes xsd:date and common aliases to valid database datatypes", () => {
+  const dateAttr = GeneratedOntologyDraftSchema.parse({
+    modules: [],
+    classes: [
+      {
+        name: "Event",
+        moduleName: "Core",
+        attributes: [
+          { name: "dateAttr", dataType: "xsd:date" },
+          { name: "legacyDate", dataType: "date" },
+          { name: "numAttr", dataType: "number" },
+          { name: "intAttr", dataType: "xsd:integer" },
+          { name: "boolAttr", dataType: "boolean" },
+        ],
+      },
+    ],
+    relations: [],
+    cqMappings: [],
+  })
+
+  const attrs = dateAttr.classes[0].attributes
+  assert.equal(attrs[0].dataType, "xsd:dateTime")
+  assert.equal(attrs[1].dataType, "xsd:dateTime")
+  assert.equal(attrs[2].dataType, "xsd:decimal")
+  assert.equal(attrs[3].dataType, "xsd:integer")
+  assert.equal(attrs[4].dataType, "xsd:boolean")
+})

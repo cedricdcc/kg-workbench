@@ -78,8 +78,17 @@ const ONTOLOGY_DATATYPE_GROUPS = [
 
 const LEGACY_ONTOLOGY_DATA_TYPE_MAP = {
   boolean: "xsd:boolean",
+  bool: "xsd:boolean",
   date: "xsd:dateTime",
+  "xsd:date": "xsd:dateTime",
+  datetime: "xsd:dateTime",
+  "xsd:datetime": "xsd:dateTime",
   number: "xsd:decimal",
+  int: "xsd:integer",
+  integer: "xsd:integer",
+  decimal: "xsd:decimal",
+  float: "xsd:float",
+  double: "xsd:double",
   string: "xsd:string",
   text: "xsd:string",
 } as const

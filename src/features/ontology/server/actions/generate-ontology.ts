@@ -30,7 +30,9 @@ import {
 import {
   GeneratedOntologyDraftSchema,
   type GeneratedOntologyDraft,
+  type GeneratedOntologyDraftInput,
 } from "@/features/ontology/schemas/ai-generation"
+import { normalizeOntologyDataTypeOrDefault } from "@/features/ontology/utils/data-types"
 
 export type ApplyDraftResult = {
   createdModules: number
@@ -90,7 +92,7 @@ export async function generateOntologyDraft(
 
 export async function applyOntologyDraft(
   ontologyId: string,
-  rawDraft: GeneratedOntologyDraft
+  rawDraft: GeneratedOntologyDraft | GeneratedOntologyDraftInput
 ): Promise<ApplyDraftResult> {
   const trimmedId = ontologyId?.trim()
   if (!trimmedId) {
@@ -106,166 +108,183 @@ export async function applyOntologyDraft(
   let createdRelations = 0
   let updatedCQs = 0
 
-  await db.transaction(async (tx) => {
-    // 1. Process Modules
-    const existingModules = await tx
-      .select()
-      .from(ontologyModules)
-      .where(eq(ontologyModules.ontology_id, trimmedId))
+  try {
+    await db.transaction(async (tx) => {
+      // 1. Process Modules
+      const existingModules = await tx
+        .select()
+        .from(ontologyModules)
+        .where(eq(ontologyModules.ontology_id, trimmedId))
 
-    const moduleMap = new Map<string, string>()
-    for (const mod of existingModules) {
-      moduleMap.set(mod.name.toLowerCase(), mod.id)
-    }
-
-    for (const mod of draft.modules) {
-      const lower = mod.name.toLowerCase()
-      if (!moduleMap.has(lower)) {
-        const [inserted] = await tx
-          .insert(ontologyModules)
-          .values({
-            ontology_id: trimmedId,
-            name: mod.name,
-            description: mod.description || "",
-          })
-          .returning()
-        if (inserted) {
-          moduleMap.set(lower, inserted.id)
-          createdModules++
-        }
+      const moduleMap = new Map<string, string>()
+      for (const mod of existingModules) {
+        moduleMap.set(mod.name.toLowerCase(), mod.id)
       }
-    }
 
-    // 2. Process Classes & Attributes
-    const existingClasses = await tx
-      .select()
-      .from(ontologyClasses)
-      .where(eq(ontologyClasses.ontology_id, trimmedId))
-
-    const classMap = new Map<string, string>()
-    for (const cls of existingClasses) {
-      classMap.set(cls.name.toLowerCase(), cls.id)
-    }
-
-    for (const cls of draft.classes) {
-      const lower = cls.name.toLowerCase()
-      const targetModuleId = moduleMap.get(cls.moduleName.toLowerCase()) ?? null
-
-      if (!classMap.has(lower)) {
-        const [inserted] = await tx
-          .insert(ontologyClasses)
-          .values({
-            ontology_id: trimmedId,
-            module_id: targetModuleId,
-            name: cls.name,
-            description: cls.description || "",
-          })
-          .returning()
-
-        if (inserted) {
-          classMap.set(lower, inserted.id)
-          createdClasses++
-
-          // Insert attributes if any
-          if (cls.attributes && cls.attributes.length > 0) {
-            await tx.insert(ontologyAttributes).values(
-              cls.attributes.map((attr) => ({
-                class_id: inserted.id,
-                name: attr.name,
-                data_type: attr.dataType,
-                description: attr.description || "",
-              }))
-            )
+      for (const mod of draft.modules) {
+        const lower = mod.name.toLowerCase()
+        if (!moduleMap.has(lower)) {
+          const [inserted] = await tx
+            .insert(ontologyModules)
+            .values({
+              ontology_id: trimmedId,
+              name: mod.name,
+              description: mod.description || "",
+            })
+            .returning()
+          if (inserted) {
+            moduleMap.set(lower, inserted.id)
+            createdModules++
           }
         }
       }
-    }
 
-    // 3. Process Relations
-    const existingRelations = await tx
-      .select()
-      .from(ontologyRelations)
-      .where(eq(ontologyRelations.ontology_id, trimmedId))
+      // 2. Process Classes & Attributes
+      const existingClasses = await tx
+        .select()
+        .from(ontologyClasses)
+        .where(eq(ontologyClasses.ontology_id, trimmedId))
 
-    const relationKeyMap = new Map<string, string>()
-    const relationNameMap = new Map<string, string>()
+      const classMap = new Map<string, string>()
+      for (const cls of existingClasses) {
+        classMap.set(cls.name.toLowerCase(), cls.id)
+      }
 
-    for (const rel of existingRelations) {
-      const key = `${rel.name.toLowerCase()}:${rel.domain_class_id}:${rel.range_class_id}`
-      relationKeyMap.set(key, rel.id)
-      relationNameMap.set(rel.name.toLowerCase(), rel.id)
-    }
+      for (const cls of draft.classes) {
+        const lower = cls.name.toLowerCase()
+        const targetModuleId = moduleMap.get(cls.moduleName.toLowerCase()) ?? null
 
-    for (const rel of draft.relations) {
-      const domainId = classMap.get(rel.domainClassName.toLowerCase())
-      const rangeId = classMap.get(rel.rangeClassName.toLowerCase())
-
-      if (domainId && rangeId) {
-        const key = `${rel.name.toLowerCase()}:${domainId}:${rangeId}`
-        if (!relationKeyMap.has(key)) {
+        if (!classMap.has(lower)) {
           const [inserted] = await tx
-            .insert(ontologyRelations)
+            .insert(ontologyClasses)
             .values({
               ontology_id: trimmedId,
-              name: rel.name,
-              domain_class_id: domainId,
-              range_class_id: rangeId,
-              description: rel.description || "",
+              module_id: targetModuleId,
+              name: cls.name,
+              description: cls.description || "",
             })
             .returning()
 
           if (inserted) {
-            relationKeyMap.set(key, inserted.id)
-            relationNameMap.set(rel.name.toLowerCase(), inserted.id)
-            createdRelations++
+            classMap.set(lower, inserted.id)
+            createdClasses++
+
+            // Insert attributes if any
+            if (cls.attributes && cls.attributes.length > 0) {
+              await tx.insert(ontologyAttributes).values(
+                cls.attributes.map((attr) => ({
+                  class_id: inserted.id,
+                  name: attr.name,
+                  data_type: normalizeOntologyDataTypeOrDefault(attr.dataType),
+                  description: attr.description || "",
+                }))
+              )
+            }
           }
         }
       }
-    }
 
-    // 4. Update CQ Mappings
-    for (const mapping of draft.cqMappings) {
-      const subjectClassId =
-        classMap.get(mapping.subjectClassName.toLowerCase()) ?? null
-      const predicateRelationId =
-        relationNameMap.get(mapping.predicateRelationName.toLowerCase()) ?? null
-      const objectClassId =
-        classMap.get(mapping.objectClassName.toLowerCase()) ?? null
+      // 3. Process Relations
+      const existingRelations = await tx
+        .select()
+        .from(ontologyRelations)
+        .where(eq(ontologyRelations.ontology_id, trimmedId))
 
-      if (subjectClassId || predicateRelationId || objectClassId) {
-        await tx
-          .update(ontologyCompetencyQuestions)
-          .set({
-            subject_class_id: subjectClassId,
-            predicate_relation_id: predicateRelationId,
-            object_class_id: objectClassId,
-          })
-          .where(
-            and(
-              eq(ontologyCompetencyQuestions.id, mapping.cqId),
-              eq(ontologyCompetencyQuestions.ontology_id, trimmedId)
-            )
-          )
-        updatedCQs++
+      const relationKeyMap = new Map<string, string>()
+      const relationNameMap = new Map<string, string>()
+
+      for (const rel of existingRelations) {
+        const key = `${rel.name.toLowerCase()}:${rel.domain_class_id}:${rel.range_class_id}`
+        relationKeyMap.set(key, rel.id)
+        relationNameMap.set(rel.name.toLowerCase(), rel.id)
       }
 
-      // Link modules
-      if (mapping.moduleNames && mapping.moduleNames.length > 0) {
-        for (const modName of mapping.moduleNames) {
-          const modId = moduleMap.get(modName.toLowerCase())
-          if (modId) {
-            await tx
-              .insert(ontologyCompetencyQuestionModules)
+      for (const rel of draft.relations) {
+        const domainId = classMap.get(rel.domainClassName.toLowerCase())
+        const rangeId = classMap.get(rel.rangeClassName.toLowerCase())
+
+        if (domainId && rangeId) {
+          const key = `${rel.name.toLowerCase()}:${domainId}:${rangeId}`
+          if (!relationKeyMap.has(key)) {
+            const [inserted] = await tx
+              .insert(ontologyRelations)
               .values({
-                cq_id: mapping.cqId,
-                module_id: modId,
+                ontology_id: trimmedId,
+                name: rel.name,
+                domain_class_id: domainId,
+                range_class_id: rangeId,
+                description: rel.description || "",
               })
-              .onConflictDoNothing()
+              .returning()
+
+            if (inserted) {
+              relationKeyMap.set(key, inserted.id)
+              relationNameMap.set(rel.name.toLowerCase(), inserted.id)
+              createdRelations++
+            }
           }
         }
       }
-    }
-  })
+
+      // 4. Update CQ Mappings
+      const existingCQs = await tx
+        .select({ id: ontologyCompetencyQuestions.id })
+        .from(ontologyCompetencyQuestions)
+        .where(eq(ontologyCompetencyQuestions.ontology_id, trimmedId))
+
+      const existingCqIdSet = new Set(existingCQs.map((cq) => cq.id))
+
+      for (const mapping of draft.cqMappings) {
+        // Skip mappings pointing to CQs that do not exist in this ontology
+        if (!existingCqIdSet.has(mapping.cqId)) {
+          continue
+        }
+
+        const subjectClassId =
+          classMap.get(mapping.subjectClassName.toLowerCase()) ?? null
+        const predicateRelationId =
+          relationNameMap.get(mapping.predicateRelationName.toLowerCase()) ?? null
+        const objectClassId =
+          classMap.get(mapping.objectClassName.toLowerCase()) ?? null
+
+        if (subjectClassId || predicateRelationId || objectClassId) {
+          await tx
+            .update(ontologyCompetencyQuestions)
+            .set({
+              subject_class_id: subjectClassId,
+              predicate_relation_id: predicateRelationId,
+              object_class_id: objectClassId,
+            })
+            .where(
+              and(
+                eq(ontologyCompetencyQuestions.id, mapping.cqId),
+                eq(ontologyCompetencyQuestions.ontology_id, trimmedId)
+              )
+            )
+          updatedCQs++
+        }
+
+        // Link modules
+        if (mapping.moduleNames && mapping.moduleNames.length > 0) {
+          for (const modName of mapping.moduleNames) {
+            const modId = moduleMap.get(modName.toLowerCase())
+            if (modId) {
+              await tx
+                .insert(ontologyCompetencyQuestionModules)
+                .values({
+                  cq_id: mapping.cqId,
+                  module_id: modId,
+                })
+                .onConflictDoNothing()
+            }
+          }
+        }
+      }
+    })
+  } catch (error) {
+    console.error("applyOntologyDraft failed:", error)
+    throw error
+  }
 
   revalidatePath(routes.ontology.document(trimmedId))
   revalidatePath(routes.ontology.root)

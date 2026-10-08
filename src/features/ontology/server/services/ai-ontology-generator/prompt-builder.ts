@@ -13,7 +13,7 @@ Your task is to analyze a set of Competency Questions (CQs) for an ontology and 
 
 Guidelines:
 1. Modules: Identify logical cohesive functional domain packages (e.g. "OrderManagement", "Catalog", "UserAccount").
-2. Classes: Extract core domain entities. Every class must be assigned to exactly one moduleName. Identify essential primitive attributes (with dataType from xsd:string, xsd:integer, xsd:decimal, xsd:boolean, xsd:date).
+2. Classes: Extract core domain entities. Every class must be assigned to exactly one moduleName. Identify essential primitive attributes (with dataType from xsd:string, xsd:integer, xsd:decimal, xsd:boolean, xsd:dateTime).
 3. Relations: Identify direct relationships between classes (domainClassName -> predicate relation name -> rangeClassName).
 4. Competency Question Mappings: For every competency question provided, map:
    - subjectClassName: The primary entity class representing the subject.
