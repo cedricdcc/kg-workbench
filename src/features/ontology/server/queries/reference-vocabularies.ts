@@ -17,7 +17,9 @@ export type ReferenceOntologySummary = {
   termCount: number
 }
 
-export async function getReferenceOntologies(): Promise<ReferenceOntologySummary[]> {
+export async function getReferenceOntologies(): Promise<
+  ReferenceOntologySummary[]
+> {
   const db = getDb()
   const groupKey = await getCurrentGroupKeyOrThrow().catch(() => "shared")
 
@@ -52,21 +54,21 @@ export async function getReferenceOntologies(): Promise<ReferenceOntologySummary
   return termCounts
 }
 
-export async function getActiveReferenceTerms(
-  ontologyIds?: string[]
-): Promise<Array<{
-  id: string
-  referenceOntologyId: string
-  curie: string
-  iri: string
-  label: string
-  type: string
-  description: string
-  synonyms: string[]
-  parentIris: string[]
-  relatedPropertyIris: string[]
-  embedding: number[] | null
-}>> {
+export async function getActiveReferenceTerms(ontologyIds?: string[]): Promise<
+  Array<{
+    id: string
+    referenceOntologyId: string
+    curie: string
+    iri: string
+    label: string
+    type: string
+    description: string
+    synonyms: string[]
+    parentIris: string[]
+    relatedPropertyIris: string[]
+    embedding: number[] | null
+  }>
+> {
   const db = getDb()
   const groupKey = await getCurrentGroupKeyOrThrow().catch(() => "shared")
 
@@ -96,4 +98,49 @@ export async function getActiveReferenceTerms(
     relatedPropertyIris: r.related_property_iris || [],
     embedding: r.embedding,
   }))
+}
+
+export type ReferenceOntologyTermItem = {
+  id: string
+  referenceOntologyId: string
+  curie: string
+  iri: string
+  label: string
+  type: string
+  description: string
+  synonyms: string[]
+  parentIris: string[]
+  relatedPropertyIris: string[]
+}
+
+export async function getReferenceOntologyTerms(
+  ontologyId: string
+): Promise<ReferenceOntologyTermItem[]> {
+  if (!ontologyId?.trim()) return []
+  const terms = await getActiveReferenceTerms([ontologyId])
+  return terms.map(
+    ({
+      id,
+      referenceOntologyId,
+      curie,
+      iri,
+      label,
+      type,
+      description,
+      synonyms,
+      parentIris,
+      relatedPropertyIris,
+    }) => ({
+      id,
+      referenceOntologyId,
+      curie,
+      iri,
+      label,
+      type,
+      description,
+      synonyms,
+      parentIris,
+      relatedPropertyIris,
+    })
+  )
 }

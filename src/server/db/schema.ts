@@ -312,7 +312,10 @@ export const referenceOntologies = pgTable("reference_ontologies", {
   source_registry: text("source_registry").notNull(),
   source_id: text("source_id").notNull(),
   version: text("version").default(""),
-  synced_at: created_at(),
+  synced_at: timestamp("synced_at", {
+    withTimezone: true,
+    mode: "string",
+  }).defaultNow(),
   group_key: text("group_key").notNull().default("shared"),
   created_at: created_at(),
 })

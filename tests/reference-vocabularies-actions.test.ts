@@ -37,3 +37,11 @@ test("findNearestStandardTerms returns empty array for empty query string", asyn
   const result = await findNearestStandardTerms("")
   assert.deepEqual(result, [])
 })
+
+test("getReferenceOntologyTerms returns an empty array for empty ontologyId", async () => {
+  const { getReferenceOntologyTerms } =
+    await import("../src/features/ontology/server/queries/reference-vocabularies")
+  const terms = await getReferenceOntologyTerms("")
+  assert.ok(Array.isArray(terms))
+  assert.equal(terms.length, 0)
+})

@@ -9,8 +9,10 @@ interface LeftBrowserPanelProps {
   onTypeChange: (type: EntityType) => void
   classCount: number
   relationCount: number
+  referenceCount?: number
   classBrowser: ReactNode
   relationBrowser: ReactNode
+  referenceBrowser?: ReactNode
 }
 
 export function LeftBrowserPanel({
@@ -18,8 +20,10 @@ export function LeftBrowserPanel({
   onTypeChange,
   classCount,
   relationCount,
+  referenceCount = 0,
   classBrowser,
   relationBrowser,
+  referenceBrowser,
 }: LeftBrowserPanelProps) {
   return (
     <div className="flex w-80 shrink-0 flex-col overflow-hidden border-r">
@@ -28,8 +32,10 @@ export function LeftBrowserPanel({
         onTypeChange={onTypeChange}
         classCount={classCount}
         relationCount={relationCount}
+        referenceCount={referenceCount}
         classBrowser={classBrowser}
         relationBrowser={relationBrowser}
+        referenceBrowser={referenceBrowser}
       />
     </div>
   )

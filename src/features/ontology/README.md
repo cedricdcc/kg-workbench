@@ -58,7 +58,7 @@ update_this_readme_when:
 1. `src/app/ontology/page.tsx` resolves the active ontology document and its related data on the server.
 2. `OntologyShell` switches between browser mode and visual mode while keeping module and selection state local.
 3. `module-tab-bar.tsx` handles module switching plus module-scoped overview, create/import, rename, duplicate, export, and delete actions.
-4. `left-browser-panel.tsx` wraps class and relation browsing through `EntityTypeTabs` when the shell is in browser mode.
+4. `left-browser-panel.tsx` wraps class, relation, and reference standard vocabulary browsing through `EntityTypeTabs` when the shell is in browser mode.
 5. `visual-region.tsx` renders `OntologyCanvas` for React Flow editing and selection when the shell is in visual mode, including class example previews on nodes and selected relation example previews on edges.
    Manual node and module moves stay local in the canvas state immediately and persist in the background without re-fitting the viewport on each drag save.
 6. `ontology-header.tsx` handles ontology creation, JSON import, import-format guidance, and export dialog entry points.

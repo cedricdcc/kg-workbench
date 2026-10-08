@@ -61,17 +61,19 @@ export function VocabularySearchTab({
       )
       onAdded()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to add ontology.")
+      toast.error(
+        err instanceof Error ? err.message : "Failed to add ontology."
+      )
     } finally {
       setAddingPrefix(null)
     }
   }
 
   return (
-    <div className="space-y-4 pt-2">
-      <form onSubmit={handleSearch} className="flex gap-2">
+    <div className="flex h-full min-h-0 flex-1 flex-col space-y-3 pt-1">
+      <form onSubmit={handleSearch} className="flex shrink-0 gap-2">
         <div className="relative flex-1">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Search className="absolute top-2.5 left-2.5 h-4 w-4 text-muted-foreground" />
           <Input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
@@ -94,13 +96,16 @@ export function VocabularySearchTab({
         </Button>
       </form>
 
-      <ScrollArea className="h-[320px] rounded-md border p-3">
+      <ScrollArea className="min-h-0 flex-1 rounded-md border p-3">
         {results.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center p-8 text-center text-xs text-muted-foreground">
             <Globe className="mb-2 h-8 w-8 opacity-40" />
-            <p>Search public registries (EBI OLS4 and Linked Open Vocabularies).</p>
+            <p>
+              Search public registries (EBI OLS4 and Linked Open Vocabularies).
+            </p>
             <p className="text-[11px] opacity-75">
-              Popular standards: SOSA (sensors & observations), ENVO (environment), QUDT (units), DWC (biodiversity).
+              Popular standards: SOSA (sensors & observations), ENVO
+              (environment), QUDT (units), DWC (biodiversity).
             </p>
           </div>
         ) : (
@@ -119,12 +124,15 @@ export function VocabularySearchTab({
                       <span className="text-sm font-semibold text-foreground">
                         {res.name}
                       </span>
-                      <Badge variant="outline" className="text-[10px] uppercase font-mono">
+                      <Badge
+                        variant="outline"
+                        className="font-mono text-[10px] uppercase"
+                      >
                         {res.prefix}
                       </Badge>
                       <Badge
                         variant="secondary"
-                        className="text-[9px] uppercase tracking-wider"
+                        className="text-[9px] tracking-wider uppercase"
                       >
                         {res.source.toUpperCase()}
                       </Badge>
@@ -134,7 +142,7 @@ export function VocabularySearchTab({
                         {res.description}
                       </p>
                     )}
-                    <div className="font-mono text-[10px] text-muted-foreground/80 truncate">
+                    <div className="truncate font-mono text-[10px] text-muted-foreground/80">
                       {res.baseIri}
                     </div>
                   </div>
@@ -144,7 +152,7 @@ export function VocabularySearchTab({
                     variant={isAdded ? "secondary" : "default"}
                     disabled={isAdded || isAdding}
                     onClick={() => handleAdd(res)}
-                    className="gap-1 text-xs shrink-0"
+                    className="shrink-0 gap-1 text-xs"
                   >
                     {isAdding ? (
                       <Loader2 className="h-3.5 w-3.5 animate-spin" />

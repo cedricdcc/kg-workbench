@@ -43,6 +43,14 @@ import {
   filterLocalizedTexts,
   filterNotes,
 } from "../shared/metadata-target"
+import { useQuery } from "@tanstack/react-query"
+import { getReferenceOntologies } from "@/features/ontology/server/queries/reference-vocabularies"
+import { ReferenceBrowser } from "../reference-browser/reference-browser"
+import {
+  ReferenceTermDetail,
+  type SelectedReferenceTerm,
+} from "../reference-browser/reference-term-detail"
+import { ReferenceVocabulariesDialog } from "../reference-vocabularies-dialog/reference-vocabularies-dialog"
 
 export interface OntologyShellProps {
   documents: OntologyDocument[]
@@ -93,6 +101,14 @@ export function OntologyShell({
   const [cqCreateRequestId, setCqCreateRequestId] = useState(0)
   const [cqFilterModuleId, setCqFilterModuleId] = useState<string | null>(null)
   const [cqFilterRequestId, setCqFilterRequestId] = useState(0)
+  const [selectedReferenceTerm, setSelectedReferenceTerm] =
+    useState<SelectedReferenceTerm | null>(null)
+  const [referenceDialogOpen, setReferenceDialogOpen] = useState(false)
+
+  const { data: referenceVocabularies = [] } = useQuery({
+    queryKey: ["reference-ontologies"],
+    queryFn: () => getReferenceOntologies(),
+  })
   const currentModuleIds = useMemo(
     () =>
       new Set(
@@ -177,13 +193,16 @@ export function OntologyShell({
         (ontologyModule) => ontologyModule.id === selectedModuleDetailId
       ) ?? null)
     : null
-  const detailPanelTitle = getDetailPanelTitle({
-    selectedClass,
-    selectedRelation,
-    selectedModule,
-  })
+  const detailPanelTitle = selectedReferenceTerm
+    ? `${selectedReferenceTerm.label} (${selectedReferenceTerm.curie})`
+    : getDetailPanelTitle({
+        selectedClass,
+        selectedRelation,
+        selectedModule,
+      })
 
   function handleSelectClass(id: string) {
+    setSelectedReferenceTerm(null)
     setSelectedModuleDetailId(null)
     setSelectedEntityKind("class")
     setSelectedEntityId(id)
@@ -191,6 +210,7 @@ export function OntologyShell({
   }
 
   function handleSelectRelation(id: string) {
+    setSelectedReferenceTerm(null)
     setSelectedModuleDetailId(null)
     setSelectedEntityKind("relation")
     setSelectedEntityId(id)
@@ -198,6 +218,7 @@ export function OntologyShell({
   }
 
   function handleSelectModuleOverview(moduleId: string) {
+    setSelectedReferenceTerm(null)
     if (!currentModuleIds.has(moduleId)) return
     setSelectedEntityKind(null)
     setSelectedEntityId(null)
@@ -206,6 +227,7 @@ export function OntologyShell({
   }
 
   function handleNavigateToRelation(relationId: string) {
+    setSelectedReferenceTerm(null)
     if (isVisual) {
       handleSelectRelation(relationId)
     } else {
@@ -219,11 +241,13 @@ export function OntologyShell({
   }
 
   function handleClassCreated(classId: string) {
+    setSelectedReferenceTerm(null)
     if (!isVisual) setActiveEntityType("classes")
     handleSelectClass(classId)
   }
 
   function handleRelationCreated(relationId: string) {
+    setSelectedReferenceTerm(null)
     if (!isVisual) setActiveEntityType("relations")
     handleSelectRelation(relationId)
   }
@@ -233,6 +257,7 @@ export function OntologyShell({
     setSelectedEntityId(null)
     setSelectedEntityKind(null)
     setSelectedModuleDetailId(null)
+    setSelectedReferenceTerm(null)
   }
 
   function openOntologyDetails(tab: OntologyDetailsTab = "overview") {
@@ -266,72 +291,79 @@ export function OntologyShell({
     ? ({ type: "relation", id: selectedRelation.id } as const)
     : null
 
-  const detailContent =
-    selectedClass && classTarget ? (
-      <ClassDetail
-        cls={selectedClass}
-        modules={currentDocument.modules}
-        allClasses={classes}
-        relations={relations}
-        onNavigateToRelation={handleNavigateToRelation}
-        ontologyId={currentDocument.id}
-        languages={languages}
-        defaultLanguage={currentDocument.default_language}
-        localizedTexts={filterLocalizedTexts(allLocalizedTexts, classTarget)}
-        notes={filterNotes(notes, classTarget)}
-        examples={filterExamples(examples, classTarget)}
-        attributeMetadata={{
-          localizedTexts: allLocalizedTexts,
-          notes,
-          examples,
-          languages,
-          defaultLanguage: currentDocument.default_language,
-        }}
-      />
-    ) : selectedRelation && relationTarget ? (
-      <RelationDetail
-        relation={selectedRelation}
-        allClasses={classes}
-        modules={currentDocument.modules}
-        currentModuleId={resolvedActiveModuleId}
-        ontologyId={currentDocument.id}
-        languages={languages}
-        defaultLanguage={currentDocument.default_language}
-        localizedTexts={filterLocalizedTexts(allLocalizedTexts, relationTarget)}
-        notes={filterNotes(notes, relationTarget)}
-        examples={filterExamples(examples, relationTarget)}
-        relationAttributes={
-          relationAttributesByRelation[selectedRelation.id] ?? []
-        }
-        attributeMetadata={{
-          localizedTexts: allLocalizedTexts,
-          notes,
-          examples,
-          languages,
-          defaultLanguage: currentDocument.default_language,
-        }}
-      />
-    ) : selectedModule ? (
-      <ModuleDetail
-        module={selectedModule}
-        ontologyId={currentDocument.id}
-        defaultLanguage={currentDocument.default_language}
-        languages={languages}
-        localizedTexts={allLocalizedTexts}
-        notes={notes}
-        cqs={cqs}
-        classes={classes}
-        relations={relations}
-        examples={examples}
-        onAddCQ={openCQEditorForModule}
-        onManageCQs={openCQManagerForModule}
-      />
-    ) : (
-      <EmptyState
-        title="No item selected"
-        description={getDetailEmptyStateDescription(isVisual)}
-      />
-    )
+  const detailContent = selectedReferenceTerm ? (
+    <ReferenceTermDetail
+      term={selectedReferenceTerm}
+      ontologyId={currentDocument.id}
+      modules={currentDocument.modules}
+      activeModuleId={resolvedActiveModuleId}
+      onClassCreated={handleClassCreated}
+    />
+  ) : selectedClass && classTarget ? (
+    <ClassDetail
+      cls={selectedClass}
+      modules={currentDocument.modules}
+      allClasses={classes}
+      relations={relations}
+      onNavigateToRelation={handleNavigateToRelation}
+      ontologyId={currentDocument.id}
+      languages={languages}
+      defaultLanguage={currentDocument.default_language}
+      localizedTexts={filterLocalizedTexts(allLocalizedTexts, classTarget)}
+      notes={filterNotes(notes, classTarget)}
+      examples={filterExamples(examples, classTarget)}
+      attributeMetadata={{
+        localizedTexts: allLocalizedTexts,
+        notes,
+        examples,
+        languages,
+        defaultLanguage: currentDocument.default_language,
+      }}
+    />
+  ) : selectedRelation && relationTarget ? (
+    <RelationDetail
+      relation={selectedRelation}
+      allClasses={classes}
+      modules={currentDocument.modules}
+      currentModuleId={resolvedActiveModuleId}
+      ontologyId={currentDocument.id}
+      languages={languages}
+      defaultLanguage={currentDocument.default_language}
+      localizedTexts={filterLocalizedTexts(allLocalizedTexts, relationTarget)}
+      notes={filterNotes(notes, relationTarget)}
+      examples={filterExamples(examples, relationTarget)}
+      relationAttributes={
+        relationAttributesByRelation[selectedRelation.id] ?? []
+      }
+      attributeMetadata={{
+        localizedTexts: allLocalizedTexts,
+        notes,
+        examples,
+        languages,
+        defaultLanguage: currentDocument.default_language,
+      }}
+    />
+  ) : selectedModule ? (
+    <ModuleDetail
+      module={selectedModule}
+      ontologyId={currentDocument.id}
+      defaultLanguage={currentDocument.default_language}
+      languages={languages}
+      localizedTexts={allLocalizedTexts}
+      notes={notes}
+      cqs={cqs}
+      classes={classes}
+      relations={relations}
+      examples={examples}
+      onAddCQ={openCQEditorForModule}
+      onManageCQs={openCQManagerForModule}
+    />
+  ) : (
+    <EmptyState
+      title="No item selected"
+      description={getDetailEmptyStateDescription(isVisual)}
+    />
+  )
 
   return (
     <div className="flex h-screen flex-col">
@@ -366,6 +398,7 @@ export function OntologyShell({
             onTypeChange={handleTypeChange}
             classCount={filteredClasses.length}
             relationCount={filteredRelations.length}
+            referenceCount={referenceVocabularies.length}
             classBrowser={
               <ClassBrowser
                 classes={filteredClasses}
@@ -398,6 +431,19 @@ export function OntologyShell({
                 selectedId={resolvedSelectedEntityId}
                 onSelect={handleSelectRelation}
                 onCreated={handleRelationCreated}
+              />
+            }
+            referenceBrowser={
+              <ReferenceBrowser
+                onOpenManage={() => setReferenceDialogOpen(true)}
+                selectedTermId={selectedReferenceTerm?.curie}
+                onSelectTerm={(term) => {
+                  setSelectedEntityKind(null)
+                  setSelectedEntityId(null)
+                  setSelectedModuleDetailId(null)
+                  setSelectedReferenceTerm(term)
+                  setIsDetailCollapsed(false)
+                }}
               />
             }
           />
@@ -456,6 +502,11 @@ export function OntologyShell({
         cqCreateRequestId={cqCreateRequestId}
         cqFilterModuleId={cqFilterModuleId}
         cqFilterRequestId={cqFilterRequestId}
+      />
+
+      <ReferenceVocabulariesDialog
+        open={referenceDialogOpen}
+        onOpenChange={setReferenceDialogOpen}
       />
     </div>
   )

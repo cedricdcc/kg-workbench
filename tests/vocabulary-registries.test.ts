@@ -1,6 +1,9 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
-import { parseOlsTerm, parseLovTerm } from "../src/features/ontology/server/services/vocabulary-registries"
+import {
+  parseOlsTerm,
+  parseLovTerm,
+} from "../src/features/ontology/server/services/vocabulary-registries"
 
 test("parseOlsTerm extracts canonical curie, label, and parent IRIs", () => {
   const raw = {
@@ -31,4 +34,17 @@ test("parseLovTerm extracts canonical curie, label, and namespace", () => {
   assert.equal(parsed.curie, "dc:title")
   assert.equal(parsed.label, "Title")
   assert.equal(parsed.description, "A name given to the resource.")
+  assert.equal(parsed.type, "property")
+})
+
+test("parseLovTerm derives label from curie suffix when label is empty", () => {
+  const raw = {
+    prefixedName: "sosa:ActuatableProperty",
+    uri: "http://www.w3.org/ns/sosa/ActuatableProperty",
+    type: "class",
+  }
+  const parsed = parseLovTerm(raw)
+  assert.equal(parsed.curie, "sosa:ActuatableProperty")
+  assert.equal(parsed.label, "ActuatableProperty")
+  assert.equal(parsed.type, "class")
 })
