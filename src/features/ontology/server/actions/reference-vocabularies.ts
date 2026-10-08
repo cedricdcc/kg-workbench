@@ -1,17 +1,23 @@
 "use server"
 
-import { eq } from "drizzle-orm"
+import { and, eq, or } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 import { routes } from "@/lib/routes"
 import { getDb } from "@/server/database"
-import { referenceOntologies, referenceOntologyTerms } from "@/server/db/schema"
-import { getCurrentGroupKeyOrThrow } from "@/server/group-access"
+import { ontologyClasses, referenceOntologies, referenceOntologyTerms } from "@/server/db/schema"
+import {
+  assertOntologyDocumentAccess,
+  assertOntologyRecordAccess,
+  getCurrentGroupKeyOrThrow,
+} from "@/server/group-access"
 import {
   fetchRegistryTerms,
   searchRegistries,
   type RegistrySearchResult,
 } from "@/features/ontology/server/services/vocabulary-registries"
-import { getLocalBatchEmbeddings } from "@/server/embedding/local-embedder"
+import { getLocalBatchEmbeddings, getLocalEmbedding } from "@/server/embedding/local-embedder"
+import { rankTermsBySimilarity } from "@/features/ontology/server/services/vector-similarity"
+import { getActiveReferenceTerms } from "@/features/ontology/server/queries/reference-vocabularies"
 
 export type AddReferenceOntologyInput = {
   prefix: string
@@ -24,6 +30,15 @@ export type AddReferenceOntologyInput = {
 
 export type SyncResult = {
   termsSynced: number
+}
+
+export type TermAlignmentCandidate = {
+  curie: string
+  iri: string
+  label: string
+  type: string
+  description: string
+  similarity: number
 }
 
 export async function addReferenceOntology(
@@ -157,4 +172,101 @@ export async function searchExternalRegistries(
   query: string
 ): Promise<RegistrySearchResult[]> {
   return searchRegistries(query)
+}
+
+export async function findNearestStandardTerms(
+  query: string,
+  type?: "class" | "property",
+  limit = 3
+): Promise<TermAlignmentCandidate[]> {
+  const trimmed = query?.trim()
+  if (!trimmed) return []
+
+  const activeTerms = await getActiveReferenceTerms()
+  if (activeTerms.length === 0) return []
+
+  const filtered = type ? activeTerms.filter((t) => t.type === type) : activeTerms
+  if (filtered.length === 0) return []
+
+  const queryVector = await getLocalEmbedding(trimmed)
+
+  const ranked = rankTermsBySimilarity(queryVector, filtered, {
+    minSimilarity: 0.05,
+    topK: limit,
+  })
+
+  return ranked.map((r) => ({
+    curie: r.curie,
+    iri: r.iri,
+    label: r.label,
+    type: r.type,
+    description: r.description,
+    similarity: r.similarity,
+  }))
+}
+
+export async function mapClassToStandardParent(
+  ontologyId: string,
+  classId: string,
+  candidate: { curie: string; label: string; description?: string }
+): Promise<{ parentClassId: string }> {
+  const db = getDb()
+  await assertOntologyDocumentAccess(ontologyId, db)
+  await assertOntologyRecordAccess("ontology_classes", classId, db)
+
+  const parentName = candidate.label || candidate.curie
+
+  // Find if parent already exists in this ontology
+  const [existingParent] = await db
+    .select()
+    .from(ontologyClasses)
+    .where(
+      and(
+        eq(ontologyClasses.ontology_id, ontologyId),
+        or(
+          eq(ontologyClasses.name, parentName),
+          eq(ontologyClasses.name, candidate.curie)
+        )
+      )
+    )
+    .limit(1)
+
+  let parentId: string
+
+  if (existingParent) {
+    parentId = existingParent.id
+  } else {
+    // Get target class to determine module_id
+    const [targetClass] = await db
+      .select()
+      .from(ontologyClasses)
+      .where(eq(ontologyClasses.id, classId))
+      .limit(1)
+
+    const [createdParent] = await db
+      .insert(ontologyClasses)
+      .values({
+        ontology_id: ontologyId,
+        module_id: targetClass?.module_id ?? null,
+        name: parentName,
+        description: candidate.description || `Standard vocabulary class (${candidate.curie})`,
+      })
+      .returning()
+
+    if (!createdParent) {
+      throw new Error("Failed to create parent standard class.")
+    }
+    parentId = createdParent.id
+  }
+
+  // Update target class parent_class_id
+  await db
+    .update(ontologyClasses)
+    .set({ parent_class_id: parentId })
+    .where(eq(ontologyClasses.id, classId))
+
+  revalidatePath(routes.ontology.document(ontologyId))
+  revalidatePath(routes.ontology.root)
+
+  return { parentClassId: parentId }
 }

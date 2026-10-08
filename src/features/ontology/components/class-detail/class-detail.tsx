@@ -24,6 +24,7 @@ import { ClassDetailRelations } from "./class-detail-relations"
 import { EntityInstances } from "../shared/entity-instances/entity-instances"
 import { LocalizedTextEditor } from "../shared/localized-text-editor/localized-text-editor"
 import { NotesEditor } from "../shared/notes-editor/notes-editor"
+import { SemanticAlignmentsCard } from "../shared/semantic-alignments-card/semantic-alignments-card"
 
 interface ClassDetailProps {
   cls: OntologyClassWithAttributes
@@ -128,6 +129,15 @@ export function ClassDetail({
                   updateClass(cls.id, { description }),
               },
             ]}
+          />
+        </section>
+
+        <section>
+          <SemanticAlignmentsCard
+            ontologyId={ontologyId}
+            entityId={cls.id}
+            entityName={cls.name}
+            entityType="class"
           />
         </section>
 

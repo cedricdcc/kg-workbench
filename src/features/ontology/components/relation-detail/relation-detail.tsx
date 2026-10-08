@@ -30,6 +30,7 @@ import { ClassPicker } from "@/components/shared/class-picker"
 import { EntityInstances } from "../shared/entity-instances/entity-instances"
 import { LocalizedTextEditor } from "../shared/localized-text-editor/localized-text-editor"
 import { NotesEditor } from "../shared/notes-editor/notes-editor"
+import { SemanticAlignmentsCard } from "../shared/semantic-alignments-card/semantic-alignments-card"
 import { RelationAttributes } from "./relation-attributes/relation-attributes"
 
 const CARDINALITY_OPTIONS = [
@@ -213,6 +214,15 @@ export function RelationDetail({
                   }),
               },
             ]}
+          />
+        </section>
+
+        <section>
+          <SemanticAlignmentsCard
+            ontologyId={ontologyId}
+            entityId={relation.id}
+            entityName={relation.name}
+            entityType="relation"
           />
         </section>
 

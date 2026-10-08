@@ -1,6 +1,9 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
-import { addReferenceOntology } from "../src/features/ontology/server/actions/reference-vocabularies"
+import {
+  addReferenceOntology,
+  findNearestStandardTerms,
+} from "../src/features/ontology/server/actions/reference-vocabularies"
 
 test("addReferenceOntology rejects invalid or empty prefix", async () => {
   await assert.rejects(
@@ -28,4 +31,9 @@ test("addReferenceOntology rejects missing baseIri", async () => {
       }),
     /Base IRI is required/
   )
+})
+
+test("findNearestStandardTerms returns empty array for empty query string", async () => {
+  const result = await findNearestStandardTerms("")
+  assert.deepEqual(result, [])
 })
