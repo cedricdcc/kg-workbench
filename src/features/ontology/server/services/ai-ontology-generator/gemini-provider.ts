@@ -101,7 +101,10 @@ export async function requestGeminiDraft(
     )
   }
 
-  const model = options?.model?.trim() || "gemini-2.0-flash"
+  let model = options?.model?.trim() || "gemini-3.8-flash"
+  if (model === "gemini-2.0-flash") {
+    model = "gemini-3.8-flash"
+  }
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`
 
   const requestBody = {

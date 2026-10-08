@@ -25,7 +25,7 @@ export function AiGenerateConfigStep({
 }: ConfigStepProps) {
   const [provider, setProvider] = useState<ProviderType>("gemini")
   const [geminiApiKey, setGeminiApiKey] = useState("")
-  const [geminiModel, setGeminiModel] = useState("gemini-2.0-flash")
+  const [geminiModel, setGeminiModel] = useState("gemini-3.8-flash")
   const [ollamaBaseUrl, setOllamaBaseUrl] = useState("http://localhost:11434")
   const [ollamaModel, setOllamaModel] = useState("qwen2.5")
 
@@ -35,7 +35,7 @@ export function AiGenerateConfigStep({
       onGenerate({
         provider: "gemini",
         apiKey: geminiApiKey.trim() || undefined,
-        model: geminiModel.trim() || "gemini-2.0-flash",
+        model: geminiModel.trim() || "gemini-3.8-flash",
       })
     } else {
       onGenerate({
@@ -107,7 +107,7 @@ export function AiGenerateConfigStep({
               value={geminiModel}
               onChange={(e) => setGeminiModel(e.target.value)}
               className="text-xs"
-              placeholder="gemini-2.0-flash"
+              placeholder="gemini-3.8-flash"
             />
           </div>
         </div>
