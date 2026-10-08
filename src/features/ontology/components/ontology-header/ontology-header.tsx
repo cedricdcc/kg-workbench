@@ -2,12 +2,13 @@
 
 import { useRef, useState, type ChangeEvent } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { Settings2 } from "lucide-react"
+import { BookMarked, Settings2 } from "lucide-react"
 import { toast } from "sonner"
 
 import { CreateOntologyDialog } from "@/features/ontology/components/dialogs/create-ontology-dialog"
 import { ExportOntologyDialog } from "@/features/ontology/components/export-ontology-dialog/export-ontology-dialog"
 import { ImportFormatDialog } from "@/features/ontology/components/import-format-dialog/import-format-dialog"
+import { ReferenceVocabulariesDialog } from "@/features/ontology/components/reference-vocabularies-dialog/reference-vocabularies-dialog"
 import type { ExportOntologyMode } from "@/features/ontology/components/export-ontology-dialog/types"
 import { deleteOntologyDocument } from "@/features/ontology/server/actions/ontology-documents"
 import { importOntologyFromJson } from "@/features/ontology/server/actions/ontology-transfer"
@@ -66,6 +67,7 @@ export function OntologyHeader({
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [exportOpen, setExportOpen] = useState(false)
   const [importFormatOpen, setImportFormatOpen] = useState(false)
+  const [vocabulariesOpen, setVocabulariesOpen] = useState(false)
   const [exportMode, setExportMode] = useState<ExportOntologyMode>("json")
   const [isDeleting, setIsDeleting] = useState(false)
   const hasCurrentDocument = currentDocument !== null
@@ -212,6 +214,24 @@ export function OntologyHeader({
         </TooltipTrigger>
         <TooltipContent>Ontology details</TooltipContent>
       </Tooltip>
+
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setVocabulariesOpen(true)}
+          >
+            <BookMarked className="size-4" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>Reference vocabularies (OLS4 & LOV)</TooltipContent>
+      </Tooltip>
+
+      <ReferenceVocabulariesDialog
+        open={vocabulariesOpen}
+        onOpenChange={setVocabulariesOpen}
+      />
 
       <VisualToggle
         isVisual={hasCurrentDocument && isVisual}

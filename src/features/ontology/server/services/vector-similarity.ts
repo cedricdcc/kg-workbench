@@ -21,12 +21,12 @@ export function cosineSimilarity(a: number[], b: number[]): number {
   return Math.max(0, Math.min(1, sim))
 }
 
-export type CandidateTerm<T = {}> = T & {
+export type CandidateTerm<T = Record<string, unknown>> = T & {
   curie: string
   embedding: number[] | null
 }
 
-export type RankedTerm<T = {}> = T & {
+export type RankedTerm<T = Record<string, unknown>> = T & {
   curie: string
   similarity: number
 }

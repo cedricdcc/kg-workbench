@@ -3,7 +3,33 @@ import type { RegistrySearchResult, RegistryTerm } from "./types"
 const LOV_BASE = "https://lov.linkeddata.es/dataset/lov/api/v2"
 const TIMEOUT_MS = 10000
 
-export function parseLovTerm(raw: any): RegistryTerm {
+interface LovTermRecord {
+  prefixedName?: string
+  qname?: string
+  uri?: string
+  label?: string
+  labels?: Array<{ value?: string }>
+  comment?: string
+  comments?: Array<{ value?: string }>
+  description?: string
+  type?: string
+  _source?: LovTermRecord
+}
+
+interface LovVocabRecord {
+  prefix?: string
+  uri?: string
+  title?: string
+  titles?: Array<{ value?: string }>
+  description?: string
+  descriptions?: Array<{ value?: string }>
+  _source?: {
+    prefix?: string
+    uri?: string
+  }
+}
+
+export function parseLovTerm(raw: LovTermRecord): RegistryTerm {
   const curie = raw.prefixedName || raw.qname || ""
   const iri = raw.uri || ""
   const label =
@@ -49,9 +75,9 @@ export async function searchLov(query: string): Promise<RegistrySearchResult[]> 
 
     if (!res.ok) return []
     const data = await res.json()
-    const results = data.results || []
+    const results = (data.results || []) as LovVocabRecord[]
 
-    return results.slice(0, 10).map((item: any): RegistrySearchResult => {
+    return results.slice(0, 10).map((item): RegistrySearchResult => {
       const prefix = (item.prefix || item._source?.prefix || "").toLowerCase()
       const title =
         (Array.isArray(item.titles) && item.titles[0]?.value) ||
@@ -93,9 +119,9 @@ export async function fetchLovTerms(prefix: string): Promise<RegistryTerm[]> {
 
     if (!res.ok) return []
     const data = await res.json()
-    const rawResults = data.results || []
+    const rawResults = (data.results || []) as LovTermRecord[]
 
-    return rawResults.map((r: any) => parseLovTerm(r._source || r))
+    return rawResults.map((r) => parseLovTerm(r._source || r))
   } catch (err) {
     console.error(`Failed to fetch terms for LOV vocabulary ${prefix}:`, err)
     return []

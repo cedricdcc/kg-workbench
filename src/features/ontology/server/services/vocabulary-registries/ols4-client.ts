@@ -3,7 +3,36 @@ import type { RegistrySearchResult, RegistryTerm } from "./types"
 const OLS_BASE = "https://www.ebi.ac.uk/ols4/api"
 const TIMEOUT_MS = 10000
 
-export function parseOlsTerm(raw: any): RegistryTerm {
+interface OlsRawTerm {
+  obo_id?: string
+  short_form?: string
+  iri?: string
+  ontology_name?: string
+  label?: string | string[]
+  description?: string | string[]
+  synonyms?: string[]
+  subClassOf?: Array<string | { iri?: string }>
+  type?: string
+  is_defining_ontology?: boolean
+  _links?: {
+    parents?: { href?: string }
+  }
+}
+
+interface OlsRawDoc {
+  ontology_name?: string
+  id?: string
+  title?: string
+  description?: string
+  config?: {
+    title?: string
+    description?: string
+    baseUris?: string[]
+    id?: string
+  }
+}
+
+export function parseOlsTerm(raw: OlsRawTerm): RegistryTerm {
   const oboId: string = raw.obo_id || raw.short_form || ""
   let curie = oboId.replace(/_/g, ":")
   if (!curie.includes(":") && raw.iri) {
@@ -35,9 +64,6 @@ export function parseOlsTerm(raw: any): RegistryTerm {
     : []
 
   const parentIris: string[] = []
-  if (raw._links?.parents?.href) {
-    // Links exist, or direct hierarchical properties
-  }
   if (Array.isArray(raw.subClassOf)) {
     for (const parent of raw.subClassOf) {
       if (typeof parent === "string") parentIris.push(parent)
@@ -78,9 +104,9 @@ export async function searchOls(query: string): Promise<RegistrySearchResult[]> 
 
     if (!res.ok) return []
     const data = await res.json()
-    const docs = data.response?.docs || []
+    const docs = (data.response?.docs || []) as OlsRawDoc[]
 
-    return docs.map((doc: any): RegistrySearchResult => {
+    return docs.map((doc): RegistrySearchResult => {
       const prefix = (doc.ontology_name || doc.id || "").toLowerCase()
       const title = doc.config?.title || doc.title || prefix.toUpperCase()
       const description = doc.config?.description || doc.description || ""
@@ -117,7 +143,7 @@ export async function fetchOlsTerms(ontologyId: string): Promise<RegistryTerm[]>
 
     if (!res.ok) return []
     const data = await res.json()
-    const rawTerms = data._embedded?.terms || []
+    const rawTerms = (data._embedded?.terms || []) as OlsRawTerm[]
 
     return rawTerms.map(parseOlsTerm)
   } catch (err) {
