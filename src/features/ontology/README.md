@@ -11,6 +11,8 @@ scope:
   - browser/detail views and React Flow canvas state
   - persisted layout and class-position state for visual mode and JSON round-trips
   - AI-assisted ontology draft generation and staged review from competency questions
+  - reference vocabularies and standard ontology indexing (OLS4 & LOV)
+  - zero-cost local vector similarity matching and semantic entity alignment
 entry_points:
   - path: src/app/ontology/page.tsx
     purpose: Server route that resolves the active ontology document and initial data.
@@ -18,11 +20,11 @@ entry_points:
     purpose: Client shell that coordinates browser, detail, visual, and ontology metadata dialog regions.
 server_entry_points:
   - path: src/features/ontology/server/queries/
-    purpose: Focused read layer and client-callable query functions for ontology documents, structure, metadata, and saved layout state.
+    purpose: Focused read layer and client-callable query functions for ontology documents, structure, metadata, reference ontologies, and saved layout state.
   - path: src/features/ontology/server/actions/
-    purpose: Focused write actions for ontology CRUD, JSON import/export, module transfer, and visual layout persistence.
+    purpose: Focused write actions for ontology CRUD, JSON import/export, module transfer, visual layout persistence, and reference vocabularies sync.
   - path: src/features/ontology/server/actions/generate-ontology.ts
-    purpose: AI-assisted ontology draft generation from competency questions and transactional persistence.
+    purpose: AI-assisted ontology draft generation from competency questions with local vector grounding, contextual expansion, and transactional persistence.
 update_this_readme_when:
   - route composition changes
   - shell or canvas flow changes
@@ -47,6 +49,9 @@ update_this_readme_when:
 - `class position`: saved node position for visual mode
 - `module layout`: saved module bounds for the canvas
 - `export dependency`: class or relation reference that crosses the current export selection and needs an explicit decision
+- `reference ontology`: external vocabulary or standard ontology (e.g. SOSA/SSN, ENVO, Schema.org) cached locally from OLS4/LOV
+- `vector alignment`: zero-cost local 384-d semantic embedding matching suggesting reuse, subClassOf, or equivalence for entities
+- `contextual graph closure`: Option B automatic discovery of direct parents and linked relations for adopted standard terms
 
 ## Flow
 
