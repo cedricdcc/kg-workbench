@@ -23,7 +23,9 @@ import {
 } from "@/features/ontology/server/queries"
 import {
   executeAiGeneration,
+  listGeminiModels,
   type AiGenerationOptions,
+  type GeminiModelInfo,
 } from "@/features/ontology/server/services/ai-ontology-generator"
 import {
   GeneratedOntologyDraftSchema,
@@ -274,4 +276,10 @@ export async function applyOntologyDraft(
     createdRelations,
     updatedCQs,
   }
+}
+
+export async function getAvailableGeminiModels(
+  apiKey?: string
+): Promise<GeminiModelInfo[]> {
+  return listGeminiModels(apiKey)
 }

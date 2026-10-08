@@ -1,13 +1,25 @@
 "use client"
 
 import { useState } from "react"
-import { Cpu, Loader2, Sparkles } from "lucide-react"
+import { Check, Cpu, Loader2, RefreshCw, Sparkles } from "lucide-react"
+import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import type { AiGenerationOptions } from "@/features/ontology/server/services/ai-ontology-generator"
+import { getAvailableGeminiModels } from "@/features/ontology/server/actions/generate-ontology"
+import type {
+  AiGenerationOptions,
+  GeminiModelInfo,
+} from "@/features/ontology/server/services/ai-ontology-generator"
 import type { ProviderType } from "./types"
 
 interface ConfigStepProps {
@@ -26,8 +38,40 @@ export function AiGenerateConfigStep({
   const [provider, setProvider] = useState<ProviderType>("gemini")
   const [geminiApiKey, setGeminiApiKey] = useState("")
   const [geminiModel, setGeminiModel] = useState("gemini-3.8-flash")
+  const [availableModels, setAvailableModels] = useState<GeminiModelInfo[]>([])
+  const [isCheckingKey, setIsCheckingKey] = useState(false)
+  const [keyVerified, setKeyVerified] = useState(false)
+
   const [ollamaBaseUrl, setOllamaBaseUrl] = useState("http://localhost:11434")
   const [ollamaModel, setOllamaModel] = useState("qwen2.5")
+
+  async function handleCheckAndFetchModels() {
+    setIsCheckingKey(true)
+    try {
+      const models = await getAvailableGeminiModels(
+        geminiApiKey.trim() || undefined
+      )
+      if (models.length === 0) {
+        toast.warning("No generateContent models found for this Gemini key.")
+        return
+      }
+      setAvailableModels(models)
+      setKeyVerified(true)
+      // Pick current model if present, otherwise default to first available
+      const exists = models.some((m) => m.id === geminiModel)
+      if (!exists && models[0]) {
+        setGeminiModel(models[0].id)
+      }
+      toast.success(`Key verified! Loaded ${models.length} Gemini models.`)
+    } catch (err: unknown) {
+      setKeyVerified(false)
+      const message =
+        err instanceof Error ? err.message : "Failed to verify API key."
+      toast.error(message)
+    } finally {
+      setIsCheckingKey(false)
+    }
+  }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -82,33 +126,77 @@ export function AiGenerateConfigStep({
         <div className="space-y-3.5 rounded-md border p-3.5">
           <div className="space-y-1.5">
             <Label htmlFor="gemini-key" className="text-xs font-medium">
-              Gemini API Key (Optional override)
+              Gemini API Key
             </Label>
-            <Input
-              id="gemini-key"
-              type="password"
-              placeholder="Defaults to server GEMINI_API_KEY if configured"
-              value={geminiApiKey}
-              onChange={(e) => setGeminiApiKey(e.target.value)}
-              className="text-xs"
-            />
+            <div className="flex gap-2">
+              <Input
+                id="gemini-key"
+                type="password"
+                placeholder="Leave blank to use server GEMINI_API_KEY, or paste key"
+                value={geminiApiKey}
+                onChange={(e) => {
+                  setGeminiApiKey(e.target.value)
+                  setKeyVerified(false)
+                }}
+                className="text-xs"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleCheckAndFetchModels}
+                disabled={isCheckingKey}
+                className="shrink-0 gap-1.5 text-xs"
+              >
+                {isCheckingKey ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : keyVerified ? (
+                  <Check className="h-3.5 w-3.5 text-emerald-500" />
+                ) : (
+                  <RefreshCw className="h-3.5 w-3.5" />
+                )}
+                {keyVerified ? "Verified" : "Check & Fetch Models"}
+              </Button>
+            </div>
             <p className="text-[11px] text-muted-foreground">
-              Uses the Google AI Studio free tier (up to 15 RPM, 1,500
-              requests/day).
+              Click &quot;Check &amp; Fetch Models&quot; to test your key and load
+              available Gemini models.
             </p>
           </div>
 
           <div className="space-y-1.5">
             <Label htmlFor="gemini-model" className="text-xs font-medium">
               Model
+              {availableModels.length > 0 && (
+                <span className="ml-2 font-normal text-muted-foreground">
+                  ({availableModels.length} available)
+                </span>
+              )}
             </Label>
-            <Input
-              id="gemini-model"
-              value={geminiModel}
-              onChange={(e) => setGeminiModel(e.target.value)}
-              className="text-xs"
-              placeholder="gemini-3.8-flash"
-            />
+
+            {availableModels.length > 0 ? (
+              <Select value={geminiModel} onValueChange={setGeminiModel}>
+                <SelectTrigger id="gemini-model" className="w-full text-xs">
+                  <SelectValue placeholder="Select a Gemini model" />
+                </SelectTrigger>
+                <SelectContent className="max-h-60">
+                  {availableModels.map((m) => (
+                    <SelectItem key={m.id} value={m.id} className="text-xs">
+                      <span className="font-medium">{m.displayName}</span>{" "}
+                      <span className="text-muted-foreground">({m.id})</span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <Input
+                id="gemini-model"
+                value={geminiModel}
+                onChange={(e) => setGeminiModel(e.target.value)}
+                className="text-xs"
+                placeholder="gemini-3.8-flash"
+              />
+            )}
           </div>
         </div>
       )}
