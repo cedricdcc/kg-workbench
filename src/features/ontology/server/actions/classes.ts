@@ -1,7 +1,7 @@
-﻿"use server"
+"use server"
 
 import { revalidatePath } from "next/cache"
-import { eq } from "drizzle-orm"
+import { and, eq, notInArray } from "drizzle-orm"
 
 import type {
   OntologyClass,
@@ -13,7 +13,16 @@ import {
   assertOntologyRecordAccess,
 } from "@/server/group-access"
 import { getDb } from "@/server/database"
-import { ontologyClasses, ontologyLocalizedTexts } from "@/server/db/schema"
+import {
+  ontologyAttributes,
+  ontologyClasses,
+  ontologyLocalizedTexts,
+  ontologyRelations,
+} from "@/server/db/schema"
+import {
+  ReconcileAndAdoptClassInputSchema,
+  type ReconcileAndAdoptClassInput,
+} from "../../schemas/reconciliation"
 
 export async function createClass(
   ontologyId: string,
@@ -110,3 +119,71 @@ export async function deleteClass(id: string): Promise<void> {
   await db.delete(ontologyClasses).where(eq(ontologyClasses.id, id))
   revalidatePath(routes.ontology.root)
 }
+
+export async function reconcileAndAdoptClass(
+  rawInput: ReconcileAndAdoptClassInput
+): Promise<{ classId: string; updatedRelations: number; deletedRelations: number }> {
+  const input = ReconcileAndAdoptClassInputSchema.parse(rawInput)
+  const db = getDb()
+  await assertOntologyDocumentAccess(input.ontologyId, db)
+  await assertOntologyRecordAccess("ontology_classes", input.classId, db)
+
+  return await db.transaction(async (tx) => {
+    // 1. Update the class identity in-place
+    await tx
+      .update(ontologyClasses)
+      .set({
+        name: input.standardTerm.label || input.standardTerm.curie,
+        description: input.standardTerm.description ?? "",
+      })
+      .where(eq(ontologyClasses.id, input.classId))
+
+    // 2. Prune unselected attributes
+    if (input.retainedAttributeIds.length > 0) {
+      await tx
+        .delete(ontologyAttributes)
+        .where(
+          and(
+            eq(ontologyAttributes.class_id, input.classId),
+            notInArray(ontologyAttributes.id, input.retainedAttributeIds)
+          )
+        )
+    } else {
+      await tx
+        .delete(ontologyAttributes)
+        .where(eq(ontologyAttributes.class_id, input.classId))
+    }
+
+    // 3. Process relation decisions
+    let updatedRelations = 0
+    let deletedRelations = 0
+
+    for (const decision of input.relationDecisions) {
+      if (decision.action === "delete") {
+        await tx
+          .delete(ontologyRelations)
+          .where(eq(ontologyRelations.id, decision.relationId))
+        deletedRelations++
+      } else if (decision.action === "remap" && decision.remappedName) {
+        await tx
+          .update(ontologyRelations)
+          .set({
+            name: decision.remappedName,
+            ...(decision.remappedDescription !== undefined && {
+              description: decision.remappedDescription,
+            }),
+          })
+          .where(eq(ontologyRelations.id, decision.relationId))
+        updatedRelations++
+      }
+    }
+
+    revalidatePath(routes.ontology.root)
+    return {
+      classId: input.classId,
+      updatedRelations,
+      deletedRelations,
+    }
+  })
+}
+
