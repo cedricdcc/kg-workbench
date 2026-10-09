@@ -118,12 +118,20 @@ function AdoptClassReconciliationDialogBody({
   const [incomingSearch, setIncomingSearch] = useState("")
   const [outgoingSearch, setOutgoingSearch] = useState("")
   const [attributeSearch, setAttributeSearch] = useState("")
+  const [incomingFilter, setIncomingFilter] = useState<
+    "all" | "keep" | "remap" | "delete"
+  >("all")
+  const [outgoingFilter, setOutgoingFilter] = useState<
+    "all" | "keep" | "remap" | "delete"
+  >("all")
 
   const outgoingRelations = useMemo(
     () =>
       connectedRelations
         .filter((r) => r.direction === "outgoing")
         .filter((r) => {
+          const dec = decisions[r.relation.id]?.action || "keep"
+          if (outgoingFilter !== "all" && dec !== outgoingFilter) return false
           if (!outgoingSearch.trim()) return true
           const q = outgoingSearch.toLowerCase()
           return (
@@ -131,7 +139,7 @@ function AdoptClassReconciliationDialogBody({
             r.otherClassName.toLowerCase().includes(q)
           )
         }),
-    [connectedRelations, outgoingSearch]
+    [connectedRelations, outgoingSearch, outgoingFilter, decisions]
   )
 
   const incomingRelations = useMemo(
@@ -139,6 +147,8 @@ function AdoptClassReconciliationDialogBody({
       connectedRelations
         .filter((r) => r.direction === "incoming")
         .filter((r) => {
+          const dec = decisions[r.relation.id]?.action || "keep"
+          if (incomingFilter !== "all" && dec !== incomingFilter) return false
           if (!incomingSearch.trim()) return true
           const q = incomingSearch.toLowerCase()
           return (
@@ -146,7 +156,7 @@ function AdoptClassReconciliationDialogBody({
             r.otherClassName.toLowerCase().includes(q)
           )
         }),
-    [connectedRelations, incomingSearch]
+    [connectedRelations, incomingSearch, incomingFilter, decisions]
   )
 
   const filteredAttributes = useMemo(() => {
@@ -310,7 +320,10 @@ function AdoptClassReconciliationDialogBody({
   const failoverAttempts = provenance?.attempts.filter((a) => a.status === "failed") ?? []
 
   return (
-    <DialogContent className="max-w-[98vw] w-[98vw] h-[95vh] max-h-[95vh] p-0 flex flex-col overflow-hidden rounded-xl border bg-background shadow-2xl">
+    <DialogContent
+      showCloseButton={false}
+      className="fixed inset-0 top-0 left-0 z-50 flex h-dvh w-screen max-w-none max-h-none translate-x-0 translate-y-0 flex-col overflow-hidden rounded-none border-0 bg-background p-0 sm:max-w-none sm:w-screen sm:h-dvh shadow-none ring-0 duration-100"
+    >
       {/* Top Header Bar */}
       <header className="px-5 py-3 border-b flex flex-wrap items-center justify-between gap-3 bg-muted/20 shrink-0">
         <div className="flex items-center gap-2.5">
@@ -451,14 +464,30 @@ function AdoptClassReconciliationDialogBody({
             </span>
           </div>
 
-          <div className="relative shrink-0">
-            <Search className="h-3.5 w-3.5 absolute left-2.5 top-2.5 text-muted-foreground" />
-            <Input
-              value={incomingSearch}
-              onChange={(e) => setIncomingSearch(e.target.value)}
-              placeholder="Filter incoming relations..."
-              className="h-8 text-xs pl-8 font-mono"
-            />
+          <div className="flex flex-col gap-1.5 shrink-0">
+            <div className="relative">
+              <Search className="h-3.5 w-3.5 absolute left-2.5 top-2.5 text-muted-foreground" />
+              <Input
+                value={incomingSearch}
+                onChange={(e) => setIncomingSearch(e.target.value)}
+                placeholder="Filter incoming relations..."
+                className="h-8 text-xs pl-8 font-mono"
+              />
+            </div>
+            <div className="flex items-center gap-1 bg-background border rounded-md p-1">
+              {(["all", "keep", "remap", "delete"] as const).map((filter) => (
+                <Button
+                  key={filter}
+                  type="button"
+                  size="sm"
+                  variant={incomingFilter === filter ? "secondary" : "ghost"}
+                  className="h-6 text-[10px] px-2 flex-1 capitalize font-mono"
+                  onClick={() => setIncomingFilter(filter)}
+                >
+                  {filter}
+                </Button>
+              ))}
+            </div>
           </div>
 
           <ScrollArea className="flex-1 pr-2">
@@ -610,7 +639,7 @@ function AdoptClassReconciliationDialogBody({
                     No attributes attached to this class.
                   </p>
                 ) : (
-                  <div className="grid grid-cols-1 gap-2">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                     {filteredAttributes.map((attr) => {
                       const isChecked = selectedAttributeIds.has(attr.id)
                       return (
@@ -663,14 +692,30 @@ function AdoptClassReconciliationDialogBody({
             </span>
           </div>
 
-          <div className="relative shrink-0">
-            <Search className="h-3.5 w-3.5 absolute left-2.5 top-2.5 text-muted-foreground" />
-            <Input
-              value={outgoingSearch}
-              onChange={(e) => setOutgoingSearch(e.target.value)}
-              placeholder="Filter outgoing relations..."
-              className="h-8 text-xs pl-8 font-mono"
-            />
+          <div className="flex flex-col gap-1.5 shrink-0">
+            <div className="relative">
+              <Search className="h-3.5 w-3.5 absolute left-2.5 top-2.5 text-muted-foreground" />
+              <Input
+                value={outgoingSearch}
+                onChange={(e) => setOutgoingSearch(e.target.value)}
+                placeholder="Filter outgoing relations..."
+                className="h-8 text-xs pl-8 font-mono"
+              />
+            </div>
+            <div className="flex items-center gap-1 bg-background border rounded-md p-1">
+              {(["all", "keep", "remap", "delete"] as const).map((filter) => (
+                <Button
+                  key={filter}
+                  type="button"
+                  size="sm"
+                  variant={outgoingFilter === filter ? "secondary" : "ghost"}
+                  className="h-6 text-[10px] px-2 flex-1 capitalize font-mono"
+                  onClick={() => setOutgoingFilter(filter)}
+                >
+                  {filter}
+                </Button>
+              ))}
+            </div>
           </div>
 
           <ScrollArea className="flex-1 pr-2">

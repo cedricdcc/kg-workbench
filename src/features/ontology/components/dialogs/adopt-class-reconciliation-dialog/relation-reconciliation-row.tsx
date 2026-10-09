@@ -143,7 +143,7 @@ export function RelationReconciliationRow({
             </span>
           </div>
 
-          <div className="grid grid-cols-1 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {propertyCandidates.length > 0 && (
               <Select
                 value={decision.remappedName || ""}
