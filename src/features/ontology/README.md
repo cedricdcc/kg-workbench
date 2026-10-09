@@ -22,9 +22,11 @@ server_entry_points:
   - path: src/features/ontology/server/queries/
     purpose: Focused read layer and client-callable query functions for ontology documents, structure, metadata, reference ontologies, and saved layout state.
   - path: src/features/ontology/server/actions/
-    purpose: Focused write actions for ontology CRUD, JSON import/export, module transfer, visual layout persistence, and reference vocabularies sync.
+    purpose: Focused write actions for ontology CRUD, JSON import/export, module transfer, visual layout persistence, atomic class reconciliation, and reference vocabularies sync.
   - path: src/features/ontology/server/actions/generate-ontology.ts
     purpose: AI-assisted ontology draft generation from competency questions with local vector grounding, contextual expansion, and transactional persistence.
+  - path: src/features/ontology/server/services/ai-relation-reconciliation.ts
+    purpose: On-demand AI relation reconciliation and property remapping suggestion service using Gemini.
 update_this_readme_when:
   - route composition changes
   - shell or canvas flow changes
@@ -52,6 +54,7 @@ update_this_readme_when:
 - `reference ontology`: external vocabulary or standard ontology (e.g. SOSA/SSN, ENVO, Schema.org) cached locally from OLS4/LOV
 - `vector alignment`: zero-cost local 384-d semantic embedding matching suggesting reuse, subClassOf, or equivalence for entities
 - `contextual graph closure`: Option B automatic discovery of direct parents and linked relations for adopted standard terms
+- `adopt class reconciliation`: in-place transformation of existing classes to standard terms without UUID churn or canvas layout disruption, with interactive remapping/deletion of connected relations and attribute retention controls
 
 ## Flow
 
