@@ -1,3 +1,5 @@
+import { listGeminiModels } from "./ai-ontology-generator/gemini-provider"
+
 export type ConnectedRelationContext = {
   id: string
   name: string
@@ -11,6 +13,24 @@ export type AiRelationSuggestion = {
   suggestedAction: "keep" | "remap" | "delete"
   suggestedName?: string
   rationale: string
+}
+
+export type ModelAttemptLog = {
+  model: string
+  status: "succeeded" | "failed"
+  statusCode?: number
+  error?: string
+  timestamp: string
+}
+
+export type AiRelationProvenance = {
+  successfulModel: string
+  attempts: ModelAttemptLog[]
+}
+
+export type SuggestionResult = {
+  suggestions: AiRelationSuggestion[]
+  provenance: AiRelationProvenance
 }
 
 export function parseAiRelationSuggestions(rawText: string): AiRelationSuggestion[] {
@@ -39,6 +59,14 @@ export function parseAiRelationSuggestions(rawText: string): AiRelationSuggestio
   })
 }
 
+const DEFAULT_FALLBACK_MODELS = [
+  "gemini-2.5-flash",
+  "gemini-2.5-pro",
+  "gemini-1.5-flash",
+  "gemini-1.5-pro",
+  "gemini-3.8-flash",
+]
+
 export async function suggestRelationRemappings(input: {
   ontologyId: string
   oldClassName: string
@@ -47,9 +75,18 @@ export async function suggestRelationRemappings(input: {
   relations: ConnectedRelationContext[]
   apiKey?: string
   model?: string
-}): Promise<AiRelationSuggestion[]> {
+  candidateModels?: string[]
+}): Promise<SuggestionResult> {
+  const chosenModel = input.model?.trim() || "gemini-2.5-flash"
+
   if (input.relations.length === 0) {
-    return []
+    return {
+      suggestions: [],
+      provenance: {
+        successfulModel: chosenModel,
+        attempts: [],
+      },
+    }
   }
 
   const apiKey = input.apiKey?.trim() || process.env.GEMINI_API_KEY?.trim()
@@ -59,12 +96,31 @@ export async function suggestRelationRemappings(input: {
     )
   }
 
-  let model = input.model?.trim() || "gemini-3.8-flash"
-  if (model === "gemini-2.0-flash") {
-    model = "gemini-3.8-flash"
+  // Determine candidate models
+  let candidatePool = input.candidateModels
+  if (!candidatePool || candidatePool.length === 0) {
+    try {
+      const liveModels = await listGeminiModels(apiKey)
+      if (liveModels.length > 0) {
+        candidatePool = liveModels.map((m) => m.id)
+      }
+    } catch {
+      // Offline or network error listing models; use built-in fallbacks
+    }
   }
-  const cleanModel = model.replace(/^models\//, "")
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${cleanModel}:generateContent?key=${apiKey}`
+
+  if (!candidatePool || candidatePool.length === 0) {
+    candidatePool = DEFAULT_FALLBACK_MODELS
+  }
+
+  // Ensure requested model is tried first
+  const primaryModel = chosenModel.replace(/^models\//, "")
+  const modelsQueue = [
+    primaryModel,
+    ...candidatePool
+      .map((m) => m.replace(/^models\//, ""))
+      .filter((m) => m !== primaryModel),
+  ]
 
   const systemInstruction = `You are a knowledge graph and ontology engineering expert.
 An existing concept "${input.oldClassName}" is being reconciled and adopted to standard reference term "${input.standardTermCurie}"${input.standardTermDescription ? ` (${input.standardTermDescription})` : ""}.
@@ -102,39 +158,88 @@ ${JSON.stringify(input.relations, null, 2)}`
     },
   }
 
-  const response = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(requestBody),
-  }).catch((err) => {
-    throw new Error(`Failed to reach Google Gemini API: ${err.message}`)
-  })
+  const attempts: ModelAttemptLog[] = []
+  let lastError: Error | null = null
 
-  if (!response.ok) {
-    const errorText = await response.text().catch(() => "")
-    if (response.status === 429) {
-      throw new Error("Gemini API rate limit exceeded. Please try again shortly.")
+  for (const currentModel of modelsQueue) {
+    let cleanModel = currentModel
+    if (cleanModel === "gemini-2.0-flash") {
+      cleanModel = "gemini-3.8-flash"
     }
-    if (response.status === 400 || response.status === 403) {
-      throw new Error(
-        `Gemini API request failed (${response.status}): Please check that your API key is valid.`
-      )
-    }
-    throw new Error(`Gemini API error (${response.status}): ${errorText || response.statusText}`)
-  }
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${cleanModel}:generateContent?key=${apiKey}`
 
-  const result = (await response.json()) as {
-    candidates?: Array<{
-      content?: {
-        parts?: Array<{ text?: string }>
+    try {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(requestBody),
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => "")
+        attempts.push({
+          model: currentModel,
+          status: "failed",
+          statusCode: response.status,
+          error: errorText || response.statusText,
+          timestamp: new Date().toISOString(),
+        })
+        lastError = new Error(
+          `Gemini API error (${response.status}): ${errorText || response.statusText}`
+        )
+        // Fall back to next model
+        continue
       }
-    }>
+
+      const result = (await response.json()) as {
+        candidates?: Array<{
+          content?: {
+            parts?: Array<{ text?: string }>
+          }
+        }>
+      }
+
+      const rawText = result.candidates?.[0]?.content?.parts?.[0]?.text
+      if (!rawText) {
+        attempts.push({
+          model: currentModel,
+          status: "failed",
+          error: "Empty content returned",
+          timestamp: new Date().toISOString(),
+        })
+        lastError = new Error("Empty content returned from Gemini")
+        continue
+      }
+
+      const suggestions = parseAiRelationSuggestions(rawText)
+      attempts.push({
+        model: currentModel,
+        status: "succeeded",
+        timestamp: new Date().toISOString(),
+      })
+
+      return {
+        suggestions,
+        provenance: {
+          successfulModel: currentModel,
+          attempts,
+        },
+      }
+    } catch (err: unknown) {
+      const errorMsg = err instanceof Error ? err.message : String(err)
+      attempts.push({
+        model: currentModel,
+        status: "failed",
+        error: errorMsg,
+        timestamp: new Date().toISOString(),
+      })
+      lastError = err instanceof Error ? err : new Error(errorMsg)
+    }
   }
 
-  const rawText = result.candidates?.[0]?.content?.parts?.[0]?.text
-  if (!rawText) {
-    throw new Error("Gemini returned an empty response.")
-  }
-
-  return parseAiRelationSuggestions(rawText)
+  throw new Error(
+    `All Gemini models failed (${attempts
+      .map((a) => `${a.model}: ${a.statusCode || a.error}`)
+      .join(", ")}): ${lastError?.message || "Unknown error"}`
+  )
 }

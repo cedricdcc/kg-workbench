@@ -195,7 +195,8 @@ export async function suggestRelationRemappingsAction(input: {
   relations: import("../services/ai-relation-reconciliation").ConnectedRelationContext[]
   apiKey?: string
   model?: string
-}): Promise<import("../services/ai-relation-reconciliation").AiRelationSuggestion[]> {
+  candidateModels?: string[]
+}): Promise<import("../services/ai-relation-reconciliation").SuggestionResult> {
   const db = getDb()
   await assertOntologyDocumentAccess(input.ontologyId, db)
   const { suggestRelationRemappings } = await import(
