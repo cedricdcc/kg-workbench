@@ -187,3 +187,21 @@ export async function reconcileAndAdoptClass(
   })
 }
 
+export async function suggestRelationRemappingsAction(input: {
+  ontologyId: string
+  oldClassName: string
+  standardTermCurie: string
+  standardTermDescription?: string
+  relations: import("../services/ai-relation-reconciliation").ConnectedRelationContext[]
+  apiKey?: string
+  model?: string
+}): Promise<import("../services/ai-relation-reconciliation").AiRelationSuggestion[]> {
+  const db = getDb()
+  await assertOntologyDocumentAccess(input.ontologyId, db)
+  const { suggestRelationRemappings } = await import(
+    "../services/ai-relation-reconciliation"
+  )
+  return suggestRelationRemappings(input)
+}
+
+
