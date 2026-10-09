@@ -138,6 +138,9 @@ export function ClassDetail({
             entityId={cls.id}
             entityName={cls.name}
             entityType="class"
+            cls={cls}
+            allClasses={allClasses}
+            relations={relations}
           />
         </section>
 

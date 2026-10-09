@@ -7,6 +7,9 @@ import { toast } from "sonner"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import type { OntologyRelation } from "@/domain/ontology"
+import type { OntologyClassWithAttributes } from "@/features/ontology/server/queries"
+import { AdoptClassReconciliationDialog } from "@/features/ontology/components/dialogs/adopt-class-reconciliation-dialog/adopt-class-reconciliation-dialog"
 import {
   findNearestStandardTerms,
   mapClassToStandardParent,
@@ -20,6 +23,9 @@ interface SemanticAlignmentsCardProps {
   entityId: string
   entityName: string
   entityType: "class" | "relation"
+  cls?: OntologyClassWithAttributes
+  allClasses?: OntologyClassWithAttributes[]
+  relations?: OntologyRelation[]
 }
 
 export function SemanticAlignmentsCard({
@@ -27,9 +33,15 @@ export function SemanticAlignmentsCard({
   entityId,
   entityName,
   entityType,
+  cls,
+  allClasses,
+  relations,
 }: SemanticAlignmentsCardProps) {
   const queryClient = useQueryClient()
   const [activeActionId, setActiveActionId] = useState<string | null>(null)
+  const [reconcileCandidate, setReconcileCandidate] =
+    useState<TermAlignmentCandidate | null>(null)
+  const [isReconcileDialogOpen, setIsReconcileDialogOpen] = useState(false)
 
   const { data: candidates = [], isLoading } = useQuery<TermAlignmentCandidate[]>({
     queryKey: ["semantic-alignments", entityType, entityId, entityName],
@@ -64,6 +76,12 @@ export function SemanticAlignmentsCard({
   }
 
   async function handleAdoptTerm(candidate: TermAlignmentCandidate) {
+    if (entityType === "class" && cls) {
+      setReconcileCandidate(candidate)
+      setIsReconcileDialogOpen(true)
+      return
+    }
+
     setActiveActionId(`adopt-${candidate.curie}`)
     try {
       const newName = candidate.label || candidate.curie
@@ -217,6 +235,19 @@ export function SemanticAlignmentsCard({
           )
         })}
       </div>
+
+      {cls && (
+        <AdoptClassReconciliationDialog
+          open={isReconcileDialogOpen}
+          onOpenChange={setIsReconcileDialogOpen}
+          ontologyId={ontologyId}
+          cls={cls}
+          allClasses={allClasses ?? []}
+          relations={relations ?? []}
+          standardTerm={reconcileCandidate}
+        />
+      )}
     </div>
   )
 }
+
