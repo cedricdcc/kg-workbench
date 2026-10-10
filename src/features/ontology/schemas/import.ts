@@ -122,6 +122,17 @@ function createImportSchemas<TDataTypeSchema extends z.ZodTypeAny>(
     includeJsonSchemaIds
   )
 
+  const ImportRestrictionSchema = withJsonSchemaId(
+    z.object({
+      propertyIri: z.string(),
+      type: z.enum(["exact", "min", "max", "some", "all"]),
+      cardinality: z.number().int().nonnegative().optional(),
+      targetIri: z.string().optional(),
+    }),
+    "restriction",
+    includeJsonSchemaIds
+  )
+
   const ImportClassSchema = withJsonSchemaId(
     z.object({
       id: z.string(),
@@ -131,6 +142,8 @@ function createImportSchemas<TDataTypeSchema extends z.ZodTypeAny>(
       description: z.string().default(""),
       parentClassId: z.string().nullable().optional(),
       attributes: z.array(ImportAttributeSchema).default([]),
+      disjointWithClassIds: z.array(z.string()).optional(),
+      restrictions: z.array(ImportRestrictionSchema).optional(),
     }),
     "class",
     includeJsonSchemaIds

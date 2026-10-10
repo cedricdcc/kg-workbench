@@ -18,6 +18,7 @@ import {
   deleteClass,
   updateClass,
 } from "@/features/ontology/server/actions/classes"
+import { computeInheritedAttributesAndRelations } from "@/features/ontology/utils/hierarchy-validation"
 import { AttributeTable } from "./attribute-table/attribute-table"
 import { ClassDetailHeader } from "./class-detail-header"
 import { ClassDetailRelations } from "./class-detail-relations"
@@ -67,14 +68,20 @@ export function ClassDetail({
     () => new Map(allClasses.map((c) => [c.id, c])),
     [allClasses]
   )
+
+  const inheritedInfo = useMemo(
+    () => computeInheritedAttributesAndRelations(cls.id, allClasses, relations),
+    [cls.id, allClasses, relations]
+  )
+
   const relationCount = useMemo(
     () =>
       relations.filter(
         (relation) =>
           relation.domain_class_id === cls.id ||
           relation.range_class_id === cls.id
-      ).length,
-    [cls.id, relations]
+      ).length + inheritedInfo.inheritedRelations.length,
+    [cls.id, relations, inheritedInfo.inheritedRelations.length]
   )
 
   function handleDelete() {
@@ -92,7 +99,11 @@ export function ClassDetail({
           Instances ({examples.length})
         </TabsTrigger>
         <TabsTrigger value="attributes">
-          Attributes ({cls.attributes.length})
+          Attributes ({cls.attributes.length}
+          {inheritedInfo.inheritedAttributes.length > 0
+            ? ` + ${inheritedInfo.inheritedAttributes.length}`
+            : ""}
+          )
         </TabsTrigger>
         <TabsTrigger value="relations">Relations ({relationCount})</TabsTrigger>
         <TabsTrigger value="notes">Notes ({notes.length})</TabsTrigger>
@@ -177,6 +188,7 @@ export function ClassDetail({
           ontologyId={ontologyId}
           classId={cls.id}
           attributes={cls.attributes}
+          inheritedAttributes={inheritedInfo.inheritedAttributes}
           languages={attributeMetadata.languages}
           defaultLanguage={attributeMetadata.defaultLanguage}
           localizedTexts={attributeMetadata.localizedTexts}
@@ -189,6 +201,7 @@ export function ClassDetail({
         <ClassDetailRelations
           classId={cls.id}
           relations={relations}
+          inheritedRelations={inheritedInfo.inheritedRelations}
           classMap={classMap}
           onNavigateToRelation={onNavigateToRelation}
         />

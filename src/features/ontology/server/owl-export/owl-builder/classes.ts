@@ -12,6 +12,7 @@ import {
   appendResourceElement,
   escapeXmlAttribute,
   KG_NS,
+  XSD_NS,
 } from "../rdf"
 import { appendAnnotationValues } from "./localized-texts"
 import {
@@ -113,6 +114,62 @@ export function appendClass(
     : null
   if (parent) {
     appendResourceElement(lines, "    ", "rdfs:subClassOf", parent.iri)
+  }
+
+  if (entry.cls.disjointWithClassIds?.length) {
+    for (const disjointId of entry.cls.disjointWithClassIds) {
+      const disjointTarget = classById.get(disjointId)
+      if (disjointTarget) {
+        appendResourceElement(
+          lines,
+          "    ",
+          "owl:disjointWith",
+          disjointTarget.iri
+        )
+      }
+    }
+  }
+
+  if (entry.cls.restrictions?.length) {
+    for (const rest of entry.cls.restrictions) {
+      lines.push("    <rdfs:subClassOf>")
+      lines.push("      <owl:Restriction>")
+      appendResourceElement(
+        lines,
+        "        ",
+        "owl:onProperty",
+        rest.propertyIri
+      )
+      if (rest.type === "exact" && rest.cardinality !== undefined) {
+        lines.push(
+          `        <owl:qualifiedCardinality rdf:datatype="${XSD_NS}nonNegativeInteger">${rest.cardinality}</owl:qualifiedCardinality>`
+        )
+      } else if (rest.type === "min" && rest.cardinality !== undefined) {
+        lines.push(
+          `        <owl:minQualifiedCardinality rdf:datatype="${XSD_NS}nonNegativeInteger">${rest.cardinality}</owl:minQualifiedCardinality>`
+        )
+      } else if (rest.type === "max" && rest.cardinality !== undefined) {
+        lines.push(
+          `        <owl:maxQualifiedCardinality rdf:datatype="${XSD_NS}nonNegativeInteger">${rest.cardinality}</owl:maxQualifiedCardinality>`
+        )
+      } else if (rest.type === "some" && rest.targetIri) {
+        appendResourceElement(
+          lines,
+          "        ",
+          "owl:someValuesFrom",
+          rest.targetIri
+        )
+      } else if (rest.type === "all" && rest.targetIri) {
+        appendResourceElement(
+          lines,
+          "        ",
+          "owl:allValuesFrom",
+          rest.targetIri
+        )
+      }
+      lines.push("      </owl:Restriction>")
+      lines.push("    </rdfs:subClassOf>")
+    }
   }
 
   lines.push("  </owl:Class>")

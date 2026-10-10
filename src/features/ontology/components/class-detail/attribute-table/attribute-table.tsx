@@ -36,6 +36,12 @@ interface AttributeTableProps {
   ontologyId: string
   classId: string
   attributes: OntologyAttribute[]
+  inheritedAttributes?: Array<
+    OntologyAttribute & {
+      inheritedFromClassName: string
+      inheritedFromClassId: string
+    }
+  >
   languages: OntologyLanguage[]
   defaultLanguage?: string | null
   localizedTexts: OntologyLocalizedText[]
@@ -47,6 +53,7 @@ export function AttributeTable({
   ontologyId,
   classId,
   attributes,
+  inheritedAttributes = [],
   languages,
   defaultLanguage,
   localizedTexts,
@@ -194,16 +201,49 @@ export function AttributeTable({
               </TableCell>
             </TableRow>
           )}
-          {attributes.length === 0 && !adding && (
-            <TableRow>
-              <TableCell
-                colSpan={5}
-                className="text-center text-xs text-muted-foreground"
-              >
-                No attributes yet.
+          {attributes.length === 0 &&
+            inheritedAttributes.length === 0 &&
+            !adding && (
+              <TableRow>
+                <TableCell
+                  colSpan={5}
+                  className="text-center text-xs text-muted-foreground"
+                >
+                  No attributes yet.
+                </TableCell>
+              </TableRow>
+            )}
+          {inheritedAttributes.map((attr) => (
+            <TableRow
+              key={`inherited-${attr.id}`}
+              className="bg-muted/20 opacity-85"
+            >
+              <TableCell>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs font-medium text-foreground/80">
+                    {attr.name}
+                  </span>
+                  <span className="rounded border border-border/40 bg-background/80 px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                    from {attr.inheritedFromClassName}
+                  </span>
+                </div>
+              </TableCell>
+              <TableCell className="text-xs text-muted-foreground">
+                {attr.data_type}
+              </TableCell>
+              <TableCell className="text-xs text-muted-foreground">
+                {attr.required ? "Required" : "Optional"}
+              </TableCell>
+              <TableCell className="text-xs text-muted-foreground italic">
+                {attr.description || "—"}
+              </TableCell>
+              <TableCell className="text-xs text-muted-foreground">
+                <span className="text-[10px] text-muted-foreground">
+                  Inherited
+                </span>
               </TableCell>
             </TableRow>
-          )}
+          ))}
         </TableBody>
       </Table>
       <AttributeMetadataSheet
