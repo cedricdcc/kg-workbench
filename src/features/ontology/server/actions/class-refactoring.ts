@@ -2,7 +2,6 @@
 
 import { and, eq, inArray } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
-import { z } from "zod"
 
 import { routes } from "@/lib/routes"
 import { getDb } from "@/server/database"
@@ -16,24 +15,14 @@ import {
   assertOntologyRecordAccess,
 } from "@/server/group-access"
 import { validateHierarchyAcyclicity } from "@/features/ontology/utils/hierarchy-validation"
+import {
+  MergeClassesInputSchema,
+  ReparentClassInputSchema,
+  type MergeClassesInput,
+  type ReparentClassInput,
+} from "@/features/ontology/schemas/class-refactoring"
 
-export const ReparentClassInputSchema = z.object({
-  ontologyId: z.string().uuid(),
-  classId: z.string().uuid(),
-  targetParentClassId: z.string().uuid().nullable().optional(),
-  dropAttributeIds: z.array(z.string().uuid()).optional(),
-})
-
-export type ReparentClassInput = z.infer<typeof ReparentClassInputSchema>
-
-export const MergeClassesInputSchema = z.object({
-  ontologyId: z.string().uuid(),
-  sourceClassId: z.string().uuid(),
-  targetClassId: z.string().uuid(),
-  retainedAttributeIds: z.array(z.string().uuid()).optional(),
-})
-
-export type MergeClassesInput = z.infer<typeof MergeClassesInputSchema>
+export type { MergeClassesInput, ReparentClassInput }
 
 export async function refactorClassHierarchy(
   input: ReparentClassInput

@@ -3,7 +3,7 @@ import { test } from "node:test"
 import {
   ReparentClassInputSchema,
   MergeClassesInputSchema,
-} from "../src/features/ontology/server/actions/class-refactoring"
+} from "../src/features/ontology/schemas/class-refactoring"
 
 test("ReparentClassInputSchema and MergeClassesInputSchema validate correctly", () => {
   const reparent = ReparentClassInputSchema.parse({
