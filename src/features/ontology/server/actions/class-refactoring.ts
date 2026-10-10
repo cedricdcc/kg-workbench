@@ -15,14 +15,14 @@ import {
   assertOntologyRecordAccess,
 } from "@/server/group-access"
 import { validateHierarchyAcyclicity } from "@/features/ontology/utils/hierarchy-validation"
+import type {
+  MergeClassesInput,
+  ReparentClassInput,
+} from "@/features/ontology/schemas/class-refactoring"
 import {
   MergeClassesInputSchema,
   ReparentClassInputSchema,
-  type MergeClassesInput,
-  type ReparentClassInput,
 } from "@/features/ontology/schemas/class-refactoring"
-
-export type { MergeClassesInput, ReparentClassInput }
 
 export async function refactorClassHierarchy(
   input: ReparentClassInput
