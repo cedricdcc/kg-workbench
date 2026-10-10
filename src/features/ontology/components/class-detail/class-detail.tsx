@@ -114,6 +114,8 @@ export function ClassDetail({
           cls={cls}
           modules={modules}
           allClasses={allClasses}
+          relations={relations}
+          ontologyId={ontologyId}
         />
 
         <section>

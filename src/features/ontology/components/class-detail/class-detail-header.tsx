@@ -1,8 +1,10 @@
 "use client"
 
-import { useTransition } from "react"
+import { useState, useTransition } from "react"
+import { GitBranch } from "lucide-react"
 import { toast } from "sonner"
 
+import { Button } from "@/components/ui/button"
 import {
   Select,
   SelectContent,
@@ -10,7 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import type { OntologyModule } from "@/domain/ontology"
+import type { OntologyModule, OntologyRelation } from "@/domain/ontology"
 import type { OntologyClassWithAttributes } from "@/features/ontology/server/queries"
 import { updateClass } from "@/features/ontology/server/actions/classes"
 import { ClassPicker } from "@/components/shared/class-picker"
@@ -20,18 +22,24 @@ import {
   useOntologyAssist,
 } from "@/features/ontology/hooks/use-ontology-assist"
 import { SmartAssistChip } from "@/features/ontology/components/shared/smart-assist-chip"
+import { RefactorClassDialog } from "@/features/ontology/components/dialogs/refactor-class-dialog/refactor-class-dialog"
 
 interface ClassDetailHeaderProps {
   cls: OntologyClassWithAttributes
   modules: OntologyModule[]
   allClasses: OntologyClassWithAttributes[]
+  relations?: OntologyRelation[]
+  ontologyId?: string
 }
 
 export function ClassDetailHeader({
   cls,
   modules,
   allClasses,
+  relations,
+  ontologyId,
 }: ClassDetailHeaderProps) {
+  const [refactorOpen, setRefactorOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
   const parentOptions = allClasses.filter((c) => c.id !== cls.id)
 
@@ -100,17 +108,42 @@ export function ClassDetailHeader({
         <p className="mb-1 text-xs font-medium text-muted-foreground">
           Parent class
         </p>
-        <ClassPicker
-          value={cls.parent_class_id ?? "__none__"}
-          onValueChange={handleParentChange}
-          allClasses={parentOptions}
-          modules={modules}
-          currentModuleId={cls.module_id}
-          disabled={isPending}
-          noneOption={{ label: "None", value: "__none__" }}
-          className="w-fit max-w-full"
-        />
+        <div className="flex items-center gap-2">
+          <ClassPicker
+            value={cls.parent_class_id ?? "__none__"}
+            onValueChange={handleParentChange}
+            allClasses={parentOptions}
+            modules={modules}
+            currentModuleId={cls.module_id}
+            disabled={isPending}
+            noneOption={{ label: "None", value: "__none__" }}
+            className="w-fit max-w-full"
+          />
+          {ontologyId && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setRefactorOpen(true)}
+              className="h-8 gap-1 text-xs"
+            >
+              <GitBranch className="h-3.5 w-3.5" />
+              Refactor
+            </Button>
+          )}
+        </div>
         <SmartAssistChip assist={assist} className="mt-1" />
+
+        {ontologyId && (
+          <RefactorClassDialog
+            ontologyId={ontologyId}
+            cls={cls}
+            allClasses={allClasses}
+            allRelations={relations ?? []}
+            open={refactorOpen}
+            onOpenChange={setRefactorOpen}
+          />
+        )}
       </div>
     </div>
   )
