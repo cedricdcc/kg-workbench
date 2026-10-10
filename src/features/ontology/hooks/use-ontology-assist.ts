@@ -110,18 +110,31 @@ export function evaluateOntologyAssistance(
   return result
 }
 
-export function useOntologyAssist(
-  params: EvaluateOntologyAssistParams
-): OntologyAssistResult {
+export function useOntologyAssist({
+  query,
+  entityType,
+  targetClassId,
+  parentClassId,
+  allClasses,
+  referenceTerms,
+}: EvaluateOntologyAssistParams): OntologyAssistResult {
   return useMemo(
-    () => evaluateOntologyAssistance(params),
+    () =>
+      evaluateOntologyAssistance({
+        query,
+        entityType,
+        targetClassId,
+        parentClassId,
+        allClasses,
+        referenceTerms,
+      }),
     [
-      params.query,
-      params.entityType,
-      params.targetClassId,
-      params.parentClassId,
-      params.allClasses,
-      params.referenceTerms,
+      query,
+      entityType,
+      targetClassId,
+      parentClassId,
+      allClasses,
+      referenceTerms,
     ]
   )
 }

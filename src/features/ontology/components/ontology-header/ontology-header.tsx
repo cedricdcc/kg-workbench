@@ -2,13 +2,14 @@
 
 import { useRef, useState, type ChangeEvent } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { BookMarked, Settings2 } from "lucide-react"
+import { Activity, BookMarked, Settings2 } from "lucide-react"
 import { toast } from "sonner"
 
 import { CreateOntologyDialog } from "@/features/ontology/components/dialogs/create-ontology-dialog"
 import { ExportOntologyDialog } from "@/features/ontology/components/export-ontology-dialog/export-ontology-dialog"
 import { ImportFormatDialog } from "@/features/ontology/components/import-format-dialog/import-format-dialog"
 import { ReferenceVocabulariesDialog } from "@/features/ontology/components/reference-vocabularies-dialog/reference-vocabularies-dialog"
+import { OntologyAnalysisReportDialog } from "@/features/ontology/components/dialogs/ontology-analysis-report-dialog/ontology-analysis-report-dialog"
 import type { ExportOntologyMode } from "@/features/ontology/components/export-ontology-dialog/types"
 import { deleteOntologyDocument } from "@/features/ontology/server/actions/ontology-documents"
 import { importOntologyFromJson } from "@/features/ontology/server/actions/ontology-transfer"
@@ -68,6 +69,7 @@ export function OntologyHeader({
   const [exportOpen, setExportOpen] = useState(false)
   const [importFormatOpen, setImportFormatOpen] = useState(false)
   const [vocabulariesOpen, setVocabulariesOpen] = useState(false)
+  const [analysisOpen, setAnalysisOpen] = useState(false)
   const [exportMode, setExportMode] = useState<ExportOntologyMode>("json")
   const [isDeleting, setIsDeleting] = useState(false)
   const hasCurrentDocument = currentDocument !== null
@@ -228,10 +230,34 @@ export function OntologyHeader({
         <TooltipContent>Reference vocabularies (OLS4 & LOV)</TooltipContent>
       </Tooltip>
 
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon"
+            disabled={!hasCurrentDocument}
+            onClick={() => setAnalysisOpen(true)}
+          >
+            <Activity className="size-4" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>Ontology analysis & health report</TooltipContent>
+      </Tooltip>
+
       <ReferenceVocabulariesDialog
         open={vocabulariesOpen}
         onOpenChange={setVocabulariesOpen}
       />
+
+      {currentDocument && (
+        <OntologyAnalysisReportDialog
+          ontologyId={currentDocument.id}
+          ontologyName={currentDocument.name}
+          open={analysisOpen}
+          onOpenChange={setAnalysisOpen}
+          onOpenVocabularies={() => setVocabulariesOpen(true)}
+        />
+      )}
 
       <VisualToggle
         isVisual={hasCurrentDocument && isVisual}
