@@ -1,6 +1,7 @@
 "use client"
 
 import { useTransition } from "react"
+import { toast } from "sonner"
 
 import {
   Select,
@@ -13,6 +14,12 @@ import type { OntologyModule } from "@/domain/ontology"
 import type { OntologyClassWithAttributes } from "@/features/ontology/server/queries"
 import { updateClass } from "@/features/ontology/server/actions/classes"
 import { ClassPicker } from "@/components/shared/class-picker"
+
+import {
+  evaluateOntologyAssistance,
+  useOntologyAssist,
+} from "@/features/ontology/hooks/use-ontology-assist"
+import { SmartAssistChip } from "@/features/ontology/components/shared/smart-assist-chip"
 
 interface ClassDetailHeaderProps {
   cls: OntologyClassWithAttributes
@@ -28,6 +35,14 @@ export function ClassDetailHeader({
   const [isPending, startTransition] = useTransition()
   const parentOptions = allClasses.filter((c) => c.id !== cls.id)
 
+  const assist = useOntologyAssist({
+    query: cls.name,
+    entityType: "class",
+    targetClassId: cls.id,
+    parentClassId: cls.parent_class_id,
+    allClasses,
+  })
+
   function handleModuleChange(moduleId: string) {
     startTransition(async () => {
       await updateClass(cls.id, {
@@ -37,9 +52,23 @@ export function ClassDetailHeader({
   }
 
   function handleParentChange(parentId: string) {
+    const targetParentId = parentId === "__none__" ? null : parentId
+    const check = evaluateOntologyAssistance({
+      query: cls.name,
+      entityType: "class",
+      targetClassId: cls.id,
+      parentClassId: targetParentId,
+      allClasses,
+    })
+
+    if (check.isCycle) {
+      toast.error(check.cycleMessage ?? "Cannot set parent: cycle detected.")
+      return
+    }
+
     startTransition(async () => {
       await updateClass(cls.id, {
-        parentClassId: parentId === "__none__" ? null : parentId,
+        parentClassId: targetParentId,
       })
     })
   }
@@ -81,6 +110,7 @@ export function ClassDetailHeader({
           noneOption={{ label: "None", value: "__none__" }}
           className="w-fit max-w-full"
         />
+        <SmartAssistChip assist={assist} className="mt-1" />
       </div>
     </div>
   )

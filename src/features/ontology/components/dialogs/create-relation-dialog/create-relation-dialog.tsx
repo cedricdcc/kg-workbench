@@ -25,6 +25,8 @@ import {
 } from "@/lib/localized-text-utils"
 import { createRelation } from "@/features/ontology/server/actions/relations"
 import { LocalizedTextEditor } from "../../shared/localized-text-editor/localized-text-editor"
+import { useOntologyAssist } from "@/features/ontology/hooks/use-ontology-assist"
+import { SmartAssistChip } from "@/features/ontology/components/shared/smart-assist-chip"
 
 import { RelationClassField } from "./relation-class-field"
 import type { CreateRelationDialogProps } from "./types"
@@ -70,6 +72,13 @@ export function CreateRelationDialog({
   const [domainError, setDomainError] = useState<string | null>(null)
   const [rangeError, setRangeError] = useState<string | null>(null)
   const [isPending, setIsPending] = useState(false)
+
+  const assist = useOntologyAssist({
+    query: name,
+    entityType: "relation",
+    allClasses,
+  })
+
   const canCreateRelation = Boolean(
     name.trim() && domainClassId && rangeClassId
   )
@@ -292,6 +301,13 @@ export function CreateRelationDialog({
                 },
               },
             ]}
+          />
+          <SmartAssistChip
+            assist={assist}
+            onAdoptSuggestion={(suggestion) => {
+              setName(suggestion.label)
+              setNameError(null)
+            }}
           />
           {nameError ? (
             <p className="text-xs text-destructive">{nameError}</p>
