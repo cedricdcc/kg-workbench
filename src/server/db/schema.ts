@@ -329,11 +329,18 @@ export const referenceOntologyTerms = pgTable("reference_ontology_terms", {
   iri: text("iri").notNull(),
   label: text("label").notNull(),
   type: text("type").notNull(), // 'class' | 'property' | 'individual'
+  property_kind: text("property_kind"), // 'datatype' | 'object' | null
   description: text("description").notNull().default(""),
   synonyms: text("synonyms")
     .array()
     .default(sql`'{}'::text[]`),
   parent_iris: text("parent_iris")
+    .array()
+    .default(sql`'{}'::text[]`),
+  domain_iris: text("domain_iris")
+    .array()
+    .default(sql`'{}'::text[]`),
+  range_iris: text("range_iris")
     .array()
     .default(sql`'{}'::text[]`),
   related_property_iris: text("related_property_iris")
@@ -342,3 +349,39 @@ export const referenceOntologyTerms = pgTable("reference_ontology_terms", {
   embedding: real("embedding").array(),
   group_key: text("group_key").notNull().default("shared"),
 })
+
+export const ontologyClassDisjointness = pgTable(
+  "ontology_class_disjointness",
+  {
+    ontology_id: uuid("ontology_id").notNull(),
+    class_id: uuid("class_id")
+      .notNull()
+      .references(() => ontologyClasses.id, { onDelete: "cascade" }),
+    disjoint_class_id: uuid("disjoint_class_id")
+      .notNull()
+      .references(() => ontologyClasses.id, { onDelete: "cascade" }),
+  },
+  (table) => [
+    primaryKey({ columns: [table.class_id, table.disjoint_class_id] }),
+  ]
+)
+
+export const ontologyClassRestrictions = pgTable(
+  "ontology_class_restrictions",
+  {
+    id: generatedId(),
+    ontology_id: uuid("ontology_id").notNull(),
+    class_id: uuid("class_id")
+      .notNull()
+      .references(() => ontologyClasses.id, { onDelete: "cascade" }),
+    relation_id: uuid("relation_id").references(() => ontologyRelations.id, {
+      onDelete: "cascade",
+    }),
+    attribute_id: uuid("attribute_id").references(() => ontologyAttributes.id, {
+      onDelete: "cascade",
+    }),
+    restriction_type: text("restriction_type").notNull(), // 'min_cardinality' | 'max_cardinality' | 'exact_cardinality'
+    cardinality_value: integer("cardinality_value").notNull().default(1),
+    created_at: created_at(),
+  }
+)
