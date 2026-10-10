@@ -26,6 +26,10 @@ import type { RecommendedVocabulary } from "@/features/ontology/server/services/
 import { RedundancyClustersTab } from "./redundancy-clusters-tab"
 import { ClassAlignmentMatrixTab } from "./class-alignment-matrix-tab"
 import { RecommendedVocabulariesTab } from "./recommended-vocabularies-tab"
+import {
+  RefactorExamplePreviewDialog,
+  type ExamplePreviewTarget,
+} from "./refactor-example-preview-dialog"
 
 interface OntologyAnalysisReportDialogProps {
   ontologyId: string
@@ -46,6 +50,9 @@ export function OntologyAnalysisReportDialog({
 }: OntologyAnalysisReportDialogProps) {
   const queryClient = useQueryClient()
   const [importingPrefix, setImportingPrefix] = useState<string | null>(null)
+  const [examplePreviewTarget, setExamplePreviewTarget] =
+    useState<ExamplePreviewTarget | null>(null)
+  const [examplePreviewOpen, setExamplePreviewOpen] = useState(false)
 
   const { data, isLoading, isRefetching, refetch } = useQuery({
     queryKey: ["ontology-analysis", ontologyId],
@@ -488,6 +495,10 @@ export function OntologyAnalysisReportDialog({
                         onOpenChange(false)
                         onSelectClassForRefactor?.(id)
                       }}
+                      onOpenExamplePreview={(cluster) => {
+                        setExamplePreviewTarget({ type: "redundancy", cluster })
+                        setExamplePreviewOpen(true)
+                      }}
                     />
                   </TabsContent>
 
@@ -498,6 +509,13 @@ export function OntologyAnalysisReportDialog({
                     <ClassAlignmentMatrixTab
                       alignments={data.classAlignments}
                       totalClasses={data.totalClasses}
+                      onOpenExamplePreview={(alignment) => {
+                        setExamplePreviewTarget({
+                          type: "alignment",
+                          alignment,
+                        })
+                        setExamplePreviewOpen(true)
+                      }}
                     />
                   </TabsContent>
 
@@ -517,6 +535,31 @@ export function OntologyAnalysisReportDialog({
             </div>
           </div>
         ) : null}
+
+        <RefactorExamplePreviewDialog
+          ontologyId={ontologyId}
+          target={examplePreviewTarget}
+          open={examplePreviewOpen}
+          onOpenChange={setExamplePreviewOpen}
+          onSuccess={async () => {
+            await Promise.all([
+              queryClient.invalidateQueries({
+                queryKey: ["reference-ontologies"],
+              }),
+              queryClient.invalidateQueries({
+                queryKey: ["reference-terms"],
+              }),
+              queryClient.invalidateQueries({
+                queryKey: ["ontology-analysis", ontologyId],
+              }),
+            ])
+            refetch()
+          }}
+          onOpenStudio={(classId) => {
+            onOpenChange(false)
+            onSelectClassForRefactor?.(classId)
+          }}
+        />
       </DialogContent>
     </Dialog>
   )

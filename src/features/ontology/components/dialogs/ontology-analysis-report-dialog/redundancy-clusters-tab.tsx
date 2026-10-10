@@ -11,11 +11,13 @@ import type { RedundancyCluster } from "@/features/ontology/server/services/onto
 interface RedundancyClustersTabProps {
   clusters: RedundancyCluster[]
   onSelectClassForRefactor?: (classId: string) => void
+  onOpenExamplePreview?: (cluster: RedundancyCluster) => void
 }
 
 export function RedundancyClustersTab({
   clusters,
   onSelectClassForRefactor,
+  onOpenExamplePreview,
 }: RedundancyClustersTabProps) {
   const [search, setSearch] = useState("")
 
@@ -131,7 +133,7 @@ export function RedundancyClustersTab({
                 </div>
               </div>
 
-              {onSelectClassForRefactor && (
+              {(onOpenExamplePreview || onSelectClassForRefactor) && (
                 <div className="mt-4 flex items-center justify-between border-t pt-3">
                   <span className="text-[11px] text-muted-foreground">
                     Action: Resolve duplication
@@ -139,13 +141,17 @@ export function RedundancyClustersTab({
                   <Button
                     size="sm"
                     variant="default"
-                    onClick={() =>
-                      onSelectClassForRefactor(cluster.classIds[0])
-                    }
+                    onClick={() => {
+                      if (onOpenExamplePreview) {
+                        onOpenExamplePreview(cluster)
+                      } else if (onSelectClassForRefactor) {
+                        onSelectClassForRefactor(cluster.classIds[0])
+                      }
+                    }}
                     className="h-8 gap-1.5 text-xs font-medium"
                   >
                     <GitMerge className="h-3.5 w-3.5" />
-                    Refactor / Merge in Studio
+                    Refactor / View Example
                   </Button>
                 </div>
               )}

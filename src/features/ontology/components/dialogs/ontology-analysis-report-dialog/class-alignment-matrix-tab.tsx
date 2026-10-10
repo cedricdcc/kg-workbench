@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { CheckCircle2, Link2, Search } from "lucide-react"
+import { CheckCircle2, Link2, Search, Sparkles } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -19,11 +19,13 @@ import type { ClassAlignment } from "@/features/ontology/server/services/ontolog
 interface ClassAlignmentMatrixTabProps {
   alignments: ClassAlignment[]
   totalClasses: number
+  onOpenExamplePreview?: (alignment: ClassAlignment) => void
 }
 
 export function ClassAlignmentMatrixTab({
   alignments,
   totalClasses,
+  onOpenExamplePreview,
 }: ClassAlignmentMatrixTabProps) {
   const [search, setSearch] = useState("")
   const [confidenceFilter, setConfidenceFilter] = useState<
@@ -152,17 +154,17 @@ export function ClassAlignmentMatrixTab({
           <Table>
             <TableHeader className="sticky top-0 z-10 bg-muted/40">
               <TableRow>
-                <TableHead className="w-[30%] font-semibold">
+                <TableHead className="w-[28%] font-semibold">
                   Local Ontology Class
                 </TableHead>
-                <TableHead className="w-[35%] font-semibold">
+                <TableHead className="w-[32%] font-semibold">
                   Standard Vocabulary Match
                 </TableHead>
-                <TableHead className="w-[20%] font-semibold">
+                <TableHead className="w-[18%] font-semibold">
                   Semantic Match Score
                 </TableHead>
-                <TableHead className="w-[15%] text-right font-semibold">
-                  Confidence
+                <TableHead className="w-[22%] text-right font-semibold">
+                  Confidence &amp; Actions
                 </TableHead>
               </TableRow>
             </TableHeader>
@@ -209,17 +211,30 @@ export function ClassAlignmentMatrixTab({
                     </TableCell>
 
                     <TableCell className="text-right">
-                      <Badge
-                        variant={isHigh ? "default" : "secondary"}
-                        className={`gap-1 text-[11px] font-medium ${
-                          isHigh
-                            ? "border-emerald-500/20 bg-emerald-600/15 text-emerald-700 dark:text-emerald-300"
-                            : ""
-                        }`}
-                      >
-                        <CheckCircle2 className="h-3 w-3" />
-                        {isHigh ? "High Alignment" : "Moderate"}
-                      </Badge>
+                      <div className="flex items-center justify-end gap-2">
+                        <Badge
+                          variant={isHigh ? "default" : "secondary"}
+                          className={`gap-1 text-[11px] font-medium ${
+                            isHigh
+                              ? "border-emerald-500/20 bg-emerald-600/15 text-emerald-700 dark:text-emerald-300"
+                              : ""
+                          }`}
+                        >
+                          <CheckCircle2 className="h-3 w-3" />
+                          {isHigh ? "High" : "Moderate"}
+                        </Badge>
+                        {onOpenExamplePreview && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => onOpenExamplePreview(a)}
+                            className="h-7 gap-1 text-xs font-medium hover:border-primary hover:text-primary"
+                          >
+                            <Sparkles className="h-3 w-3 text-primary" />
+                            Refactor / Adopt
+                          </Button>
+                        )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 )
