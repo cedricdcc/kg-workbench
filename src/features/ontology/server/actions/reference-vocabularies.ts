@@ -4,7 +4,11 @@ import { and, eq, or } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 import { routes } from "@/lib/routes"
 import { getDb } from "@/server/database"
-import { ontologyClasses, referenceOntologies, referenceOntologyTerms } from "@/server/db/schema"
+import {
+  ontologyClasses,
+  referenceOntologies,
+  referenceOntologyTerms,
+} from "@/server/db/schema"
 import {
   assertOntologyDocumentAccess,
   assertOntologyRecordAccess,
@@ -15,7 +19,10 @@ import {
   searchRegistries,
   type RegistrySearchResult,
 } from "@/features/ontology/server/services/vocabulary-registries"
-import { getLocalBatchEmbeddings, getLocalEmbedding } from "@/server/embedding/local-embedder"
+import {
+  getLocalBatchEmbeddings,
+  getLocalEmbedding,
+} from "@/server/embedding/local-embedder"
 import { rankTermsBySimilarity } from "@/features/ontology/server/services/vector-similarity"
 import { getActiveReferenceTerms } from "@/features/ontology/server/queries/reference-vocabularies"
 
@@ -185,7 +192,9 @@ export async function findNearestStandardTerms(
   const activeTerms = await getActiveReferenceTerms()
   if (activeTerms.length === 0) return []
 
-  const filtered = type ? activeTerms.filter((t) => t.type === type) : activeTerms
+  const filtered = type
+    ? activeTerms.filter((t) => t.type === type)
+    : activeTerms
   if (filtered.length === 0) return []
 
   const queryVector = await getLocalEmbedding(trimmed)
@@ -249,7 +258,9 @@ export async function mapClassToStandardParent(
         ontology_id: ontologyId,
         module_id: targetClass?.module_id ?? null,
         name: parentName,
-        description: candidate.description || `Standard vocabulary class (${candidate.curie})`,
+        description:
+          candidate.description ||
+          `Standard vocabulary class (${candidate.curie})`,
       })
       .returning()
 
@@ -269,4 +280,84 @@ export async function mapClassToStandardParent(
   revalidatePath(routes.ontology.root)
 
   return { parentClassId: parentId }
+}
+
+export async function importReferenceOntologyFile(input: {
+  fileName: string
+  content: string
+  format?: "turtle" | "rdfxml"
+}): Promise<{ id: string; prefix: string; name: string; termsSynced: number }> {
+  const format =
+    input.format ||
+    (input.fileName.endsWith(".ttl") || input.fileName.endsWith(".n3")
+      ? "turtle"
+      : "rdfxml")
+
+  const { parseRdfTurtle, parseRdfXml } =
+    await import("../services/vocabulary-ingestion/rdf-parser")
+  const parsed =
+    format === "turtle"
+      ? parseRdfTurtle(input.content)
+      : parseRdfXml(input.content)
+
+  if (parsed.terms.length === 0) {
+    throw new Error(
+      "No classes or properties found in the uploaded ontology file."
+    )
+  }
+
+  const db = getDb()
+  const groupKey = await getCurrentGroupKeyOrThrow().catch(() => "shared")
+
+  const [inserted] = await db
+    .insert(referenceOntologies)
+    .values({
+      prefix: parsed.prefix,
+      name: parsed.name,
+      base_iri: parsed.baseIri,
+      source_registry: "custom",
+      source_id: parsed.prefix,
+      version: "",
+      group_key: groupKey,
+    })
+    .returning()
+
+  if (!inserted) {
+    throw new Error("Failed to register custom ontology.")
+  }
+
+  const limitedTerms = parsed.terms.slice(0, 500)
+  const signatures = limitedTerms.map(
+    (t) => `${t.label} (${t.curie}): ${t.description} ${t.synonyms.join(" ")}`
+  )
+  const embeddings = await getLocalBatchEmbeddings(signatures)
+
+  const toInsert = limitedTerms.map((t, idx) => ({
+    reference_ontology_id: inserted.id,
+    curie: t.curie,
+    iri: t.iri,
+    label: t.label,
+    type: t.type,
+    property_kind: t.propertyKind ?? null,
+    description: t.description || "",
+    synonyms: t.synonyms || [],
+    parent_iris: t.parentIris || [],
+    domain_iris: t.domainIris || [],
+    range_iris: t.rangeIris || [],
+    related_property_iris: [],
+    embedding: embeddings[idx] || null,
+    group_key: groupKey,
+  }))
+
+  if (toInsert.length > 0) {
+    await db.insert(referenceOntologyTerms).values(toInsert)
+  }
+
+  revalidatePath(routes.ontology.root)
+  return {
+    id: inserted.id,
+    prefix: inserted.prefix,
+    name: inserted.name,
+    termsSynced: toInsert.length,
+  }
 }
