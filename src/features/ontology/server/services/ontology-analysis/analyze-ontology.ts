@@ -31,6 +31,7 @@ export interface RecommendedVocabulary {
   coveredClassCount: number
   coveredClassNames: string[]
   suggestedSource: "ols" | "lov"
+  baseIri: string
 }
 
 export interface ClassAlignment {
@@ -54,12 +55,14 @@ const KNOWN_STANDARD_VOCABULARIES: Array<{
   prefix: string
   name: string
   source: "ols" | "lov"
+  baseIri: string
   targetTerms: string[]
 }> = [
   {
     prefix: "sosa",
     name: "Sensor, Observation, Sample, and Actuator (SOSA)",
     source: "ols",
+    baseIri: "http://www.w3.org/ns/sosa/",
     targetTerms: [
       "sensor",
       "platform",
@@ -74,6 +77,7 @@ const KNOWN_STANDARD_VOCABULARIES: Array<{
     prefix: "schema",
     name: "Schema.org Core",
     source: "lov",
+    baseIri: "https://schema.org/",
     targetTerms: [
       "person",
       "organization",
@@ -89,6 +93,7 @@ const KNOWN_STANDARD_VOCABULARIES: Array<{
     prefix: "qudt",
     name: "Quantity, Unit, Dimension and Type (QUDT)",
     source: "ols",
+    baseIri: "http://qudt.org/schema/qudt/",
     targetTerms: [
       "quantity",
       "unit",
@@ -102,12 +107,14 @@ const KNOWN_STANDARD_VOCABULARIES: Array<{
     prefix: "geo",
     name: "OGC GeoSPARQL",
     source: "lov",
+    baseIri: "http://www.opengis.net/ont/geosparql#",
     targetTerms: ["geometry", "feature", "spatialobject", "point", "polygon"],
   },
   {
     prefix: "prov",
     name: "W3C PROV Ontology",
     source: "ols",
+    baseIri: "http://www.w3.org/ns/prov#",
     targetTerms: ["agent", "activity", "entity", "plan", "softwareagent"],
   },
 ]
@@ -261,6 +268,7 @@ export async function calculateOntologyAnalysis(
         coveredClassCount: coveredNames.length,
         coveredClassNames: coveredNames,
         suggestedSource: std.source,
+        baseIri: std.baseIri,
       })
     }
   }

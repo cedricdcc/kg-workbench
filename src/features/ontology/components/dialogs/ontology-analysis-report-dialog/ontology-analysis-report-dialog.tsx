@@ -1,22 +1,27 @@
 "use client"
 
+import { useState } from "react"
 import {
   Activity,
   BookOpen,
   GitMerge,
   Layers,
   Link2,
+  Loader2,
   RefreshCw,
   Sparkles,
   X,
 } from "lucide-react"
-import { useQuery } from "@tanstack/react-query"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { toast } from "sonner"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { runFullOntologyAnalysis } from "@/features/ontology/server/actions/ontology-analysis"
+import { addReferenceOntology } from "@/features/ontology/server/actions/reference-vocabularies"
+import type { RecommendedVocabulary } from "@/features/ontology/server/services/ontology-analysis/analyze-ontology"
 
 import { RedundancyClustersTab } from "./redundancy-clusters-tab"
 import { ClassAlignmentMatrixTab } from "./class-alignment-matrix-tab"
@@ -39,6 +44,9 @@ export function OntologyAnalysisReportDialog({
   onSelectClassForRefactor,
   onOpenVocabularies,
 }: OntologyAnalysisReportDialogProps) {
+  const queryClient = useQueryClient()
+  const [importingPrefix, setImportingPrefix] = useState<string | null>(null)
+
   const { data, isLoading, isRefetching, refetch } = useQuery({
     queryKey: ["ontology-analysis", ontologyId],
     queryFn: () => runFullOntologyAnalysis(ontologyId),
@@ -47,6 +55,36 @@ export function OntologyAnalysisReportDialog({
 
   function handleRefresh() {
     refetch()
+  }
+
+  async function handleDirectImportVocabulary(vocab: RecommendedVocabulary) {
+    setImportingPrefix(vocab.prefix)
+    try {
+      await addReferenceOntology({
+        prefix: vocab.prefix,
+        name: vocab.name,
+        baseIri: vocab.baseIri,
+        sourceRegistry: vocab.suggestedSource,
+        sourceId: vocab.prefix,
+      })
+      toast.success(
+        `Imported "${vocab.name}" (${vocab.prefix.toUpperCase()}). Indexing terms.`
+      )
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["reference-ontologies"] }),
+        queryClient.invalidateQueries({ queryKey: ["reference-terms"] }),
+        queryClient.invalidateQueries({
+          queryKey: ["ontology-analysis", ontologyId],
+        }),
+      ])
+      refetch()
+    } catch (err: unknown) {
+      const msg =
+        err instanceof Error ? err.message : "Failed to import vocabulary."
+      toast.error(msg)
+    } finally {
+      setImportingPrefix(null)
+    }
   }
 
   function getScoreColor(score: number) {
@@ -367,19 +405,46 @@ export function OntologyAnalysisReportDialog({
                       </strong>{" "}
                       in this ontology.
                     </div>
-                    {onOpenVocabularies && (
+                    <div className="flex items-center gap-2">
                       <Button
                         size="sm"
-                        variant="outline"
-                        onClick={() => {
-                          onOpenChange(false)
-                          onOpenVocabularies()
-                        }}
-                        className="h-7.5 w-full text-xs font-medium"
+                        variant="default"
+                        disabled={
+                          importingPrefix ===
+                          data.recommendedVocabularies[0].prefix
+                        }
+                        onClick={() =>
+                          handleDirectImportVocabulary(
+                            data.recommendedVocabularies[0]
+                          )
+                        }
+                        className="h-8 flex-1 gap-1.5 text-xs font-medium"
                       >
-                        Explore in Reference Vocabularies
+                        {importingPrefix ===
+                        data.recommendedVocabularies[0].prefix ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Sparkles className="h-3.5 w-3.5" />
+                        )}
+                        {importingPrefix ===
+                        data.recommendedVocabularies[0].prefix
+                          ? "Importing..."
+                          : `Import ${data.recommendedVocabularies[0].prefix.toUpperCase()} Directly`}
                       </Button>
-                    )}
+                      {onOpenVocabularies && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            onOpenChange(false)
+                            onOpenVocabularies()
+                          }}
+                          className="h-8 text-xs font-medium"
+                        >
+                          Library
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 )}
               </aside>
@@ -442,10 +507,9 @@ export function OntologyAnalysisReportDialog({
                   >
                     <RecommendedVocabulariesTab
                       vocabularies={data.recommendedVocabularies}
-                      onOpenVocabularies={() => {
-                        onOpenChange(false)
-                        onOpenVocabularies?.()
-                      }}
+                      onImportVocabulary={handleDirectImportVocabulary}
+                      importingPrefix={importingPrefix}
+                      onOpenVocabularies={onOpenVocabularies}
                     />
                   </TabsContent>
                 </Tabs>
