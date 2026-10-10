@@ -1,7 +1,13 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { CheckCircle2, Link2, Search, Sparkles } from "lucide-react"
+import {
+  CheckCircle2,
+  ExternalLink,
+  Link2,
+  Search,
+  Sparkles,
+} from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -14,7 +20,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 import type { ClassAlignment } from "@/features/ontology/server/services/ontology-analysis/analyze-ontology"
+import { resolveExternalUri } from "@/features/ontology/utils/external-uri"
 
 interface ClassAlignmentMatrixTabProps {
   alignments: ClassAlignment[]
@@ -183,15 +195,61 @@ export function ClassAlignmentMatrixTab({
                     </TableCell>
 
                     <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Link2 className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                        <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs font-semibold text-foreground">
-                          {a.candidateCurie}
-                        </code>
-                        <span className="text-xs text-muted-foreground">
-                          ({a.candidateLabel})
-                        </span>
-                      </div>
+                      {(() => {
+                        const uri = resolveExternalUri(
+                          a.candidateCurie,
+                          a.candidateIri
+                        )
+                        return (
+                          <div className="flex items-center gap-2">
+                            <Link2 className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                            {uri ? (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <a
+                                    href={uri}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex cursor-pointer items-center gap-1 rounded bg-muted px-1.5 py-0.5 font-mono text-xs font-semibold text-foreground transition-colors hover:bg-muted/80 hover:text-primary"
+                                  >
+                                    <span>{a.candidateCurie}</span>
+                                    <ExternalLink className="h-2.5 w-2.5 opacity-60" />
+                                  </a>
+                                </TooltipTrigger>
+                                <TooltipContent
+                                  side="top"
+                                  className="max-w-xs font-mono text-[11px] break-all"
+                                >
+                                  {uri}
+                                </TooltipContent>
+                              </Tooltip>
+                            ) : (
+                              <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs font-semibold text-foreground">
+                                {a.candidateCurie}
+                              </code>
+                            )}
+                            {uri ? (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span className="cursor-help text-xs text-muted-foreground underline decoration-muted-foreground/40 decoration-dotted underline-offset-2">
+                                    ({a.candidateLabel})
+                                  </span>
+                                </TooltipTrigger>
+                                <TooltipContent
+                                  side="top"
+                                  className="max-w-xs font-mono text-[11px] break-all"
+                                >
+                                  {uri}
+                                </TooltipContent>
+                              </Tooltip>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">
+                                ({a.candidateLabel})
+                              </span>
+                            )}
+                          </div>
+                        )
+                      })()}
                     </TableCell>
 
                     <TableCell>

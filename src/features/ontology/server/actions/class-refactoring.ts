@@ -90,7 +90,7 @@ export async function refactorClassHierarchy(
     }
   })
 
-  revalidatePath(routes.ontology.root)
+  revalidatePath(routes.ontology.root, "layout")
   return { classId: validated.classId }
 }
 
@@ -197,7 +197,7 @@ export async function mergeClasses(input: MergeClassesInput): Promise<{
       )
   })
 
-  revalidatePath(routes.ontology.root)
+  revalidatePath(routes.ontology.root, "layout")
   return {
     targetClassId: validated.targetClassId,
     migratedRelations,

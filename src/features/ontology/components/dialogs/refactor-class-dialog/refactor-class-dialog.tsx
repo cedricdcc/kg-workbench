@@ -1,6 +1,7 @@
 "use client"
 
 import { useMemo, useState, useTransition } from "react"
+import { useRouter } from "next/navigation"
 import { GitBranch, Layers } from "lucide-react"
 import { toast } from "sonner"
 
@@ -44,6 +45,7 @@ export function RefactorClassDialog({
   onOpenChange,
   onSuccess,
 }: RefactorClassDialogProps) {
+  const router = useRouter()
   const [activeTab, setActiveTab] = useState<"reparent" | "merge">("reparent")
   const [selectedParentClassId, setSelectedParentClassId] = useState<
     string | null
@@ -128,6 +130,7 @@ export function RefactorClassDialog({
           )
         }
         onOpenChange(false)
+        router.refresh()
         onSuccess?.()
       } catch (err: unknown) {
         toast.error(

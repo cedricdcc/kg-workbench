@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import {
   ArrowRight,
   CheckCircle2,
@@ -17,12 +18,18 @@ import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 import { mergeClasses } from "@/features/ontology/server/actions/class-refactoring"
 import { mapClassToStandardParent } from "@/features/ontology/server/actions/reference-vocabularies"
 import type {
   ClassAlignment,
   RedundancyCluster,
 } from "@/features/ontology/server/services/ontology-analysis/analyze-ontology"
+import { resolveExternalUri } from "@/features/ontology/utils/external-uri"
 
 export type ExamplePreviewTarget =
   | { type: "redundancy"; cluster: RedundancyCluster }
@@ -45,6 +52,7 @@ export function RefactorExamplePreviewDialog({
   onSuccess,
   onOpenStudio,
 }: RefactorExamplePreviewDialogProps) {
+  const router = useRouter()
   const [isApplying, setIsApplying] = useState(false)
   const [selectedTargetClassId, setSelectedTargetClassId] = useState<string>("")
 
@@ -84,6 +92,7 @@ export function RefactorExamplePreviewDialog({
         `Merged ${sourceIds.length} redundant class(es). Re-routed ${totalMigrated} relation(s).`
       )
       onSuccess()
+      router.refresh()
       onOpenChange(false)
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to apply merge."
@@ -106,6 +115,7 @@ export function RefactorExamplePreviewDialog({
         `Linked "${alignment.className}" as subclass of "${alignment.candidateCurie}".`
       )
       onSuccess()
+      router.refresh()
       onOpenChange(false)
     } catch (err: unknown) {
       const msg =
@@ -285,105 +295,152 @@ export function RefactorExamplePreviewDialog({
           )}
 
           {/* Standard Alignment Before & After */}
-          {isAlignment && alignment && (
-            <div className="space-y-5">
-              <div className="rounded-lg border bg-sky-500/10 p-3.5 text-xs text-sky-800 dark:text-sky-300">
-                <span className="font-semibold">Detected Match:</span> Local
-                class <strong>{alignment.className}</strong> strongly matches
-                industry standard <strong>{alignment.candidateCurie}</strong> (
-                {alignment.candidateLabel}) with{" "}
-                <strong>
-                  {Math.round(alignment.similarity * 100)}% confidence
-                </strong>
-                .
-              </div>
+          {isAlignment &&
+            alignment &&
+            (() => {
+              const externalUri = resolveExternalUri(
+                alignment.candidateCurie,
+                alignment.candidateIri
+              )
+              return (
+                <div className="space-y-5">
+                  <div className="rounded-lg border bg-sky-500/10 p-3.5 text-xs text-sky-800 dark:text-sky-300">
+                    <span className="font-semibold">Detected Match:</span> Local
+                    class <strong>{alignment.className}</strong> strongly
+                    matches industry standard{" "}
+                    {externalUri ? (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <strong className="cursor-help underline decoration-sky-600/50 decoration-dotted underline-offset-2">
+                            {alignment.candidateCurie} (
+                            {alignment.candidateLabel})
+                          </strong>
+                        </TooltipTrigger>
+                        <TooltipContent
+                          side="top"
+                          className="max-w-xs font-mono text-[11px] break-all"
+                        >
+                          {externalUri}
+                        </TooltipContent>
+                      </Tooltip>
+                    ) : (
+                      <strong>
+                        {alignment.candidateCurie} ({alignment.candidateLabel})
+                      </strong>
+                    )}{" "}
+                    with{" "}
+                    <strong>
+                      {Math.round(alignment.similarity * 100)}% confidence
+                    </strong>
+                    .
+                  </div>
 
-              {/* Before & After Cards */}
-              <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-[1fr,auto,1fr]">
-                {/* BEFORE Card */}
-                <div className="flex flex-col justify-between rounded-xl border border-muted-foreground/30 bg-muted/10 p-4 shadow-xs">
-                  <div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
-                        Current State (Before)
-                      </span>
-                      <Badge variant="outline" className="text-[10px]">
-                        Custom / Isolated
-                      </Badge>
+                  {/* Before & After Cards */}
+                  <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-[1fr,auto,1fr]">
+                    {/* BEFORE Card */}
+                    <div className="flex flex-col justify-between rounded-xl border border-muted-foreground/30 bg-muted/10 p-4 shadow-xs">
+                      <div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
+                            Current State (Before)
+                          </span>
+                          <Badge variant="outline" className="text-[10px]">
+                            Custom / Isolated
+                          </Badge>
+                        </div>
+
+                        <div className="mt-3 space-y-1.5 rounded-md border bg-background p-3 text-xs shadow-xs">
+                          <div className="font-semibold text-foreground">
+                            {alignment.className}
+                          </div>
+                          <p className="text-[11px] text-muted-foreground">
+                            Custom application term with no external
+                            interoperability or standard semantics.
+                          </p>
+                        </div>
+                      </div>
+
+                      <p className="mt-4 text-[11px] text-muted-foreground">
+                        Cannot be linked across external semantic graphs or
+                        federated SPARQL queries.
+                      </p>
                     </div>
 
-                    <div className="mt-3 space-y-1.5 rounded-md border bg-background p-3 text-xs shadow-xs">
-                      <div className="font-semibold text-foreground">
-                        {alignment.className}
+                    {/* Arrow Transition */}
+                    <div className="flex items-center justify-center py-2 md:py-0">
+                      <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-primary shadow-xs">
+                        <ArrowRight className="h-4 w-4" />
                       </div>
-                      <p className="text-[11px] text-muted-foreground">
-                        Custom application term with no external
-                        interoperability or standard semantics.
+                    </div>
+
+                    {/* AFTER Card */}
+                    <div className="flex flex-col justify-between rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-4 shadow-xs">
+                      <div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-semibold tracking-wider text-emerald-700 uppercase dark:text-emerald-400">
+                            Proposed Outcome (After)
+                          </span>
+                          <Badge
+                            variant="outline"
+                            className="border-emerald-500/30 text-[10px] text-emerald-600"
+                          >
+                            Standards Compliant
+                          </Badge>
+                        </div>
+
+                        <div className="mt-3 space-y-2 rounded-md border border-emerald-500/20 bg-background p-3 text-xs shadow-xs">
+                          <div className="flex items-center gap-1.5 font-semibold text-foreground">
+                            <Layers className="h-4 w-4 text-emerald-500" />
+                            <span>
+                              {alignment.className}{" "}
+                              <span className="font-mono text-xs text-muted-foreground">
+                                rdfs:subClassOf
+                              </span>{" "}
+                              {externalUri ? (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <code className="cursor-help rounded bg-muted px-1 font-mono text-emerald-700 underline decoration-emerald-500/50 decoration-dotted underline-offset-2 dark:text-emerald-300">
+                                      {alignment.candidateCurie}
+                                    </code>
+                                  </TooltipTrigger>
+                                  <TooltipContent
+                                    side="top"
+                                    className="max-w-xs font-mono text-[11px] break-all"
+                                  >
+                                    {externalUri}
+                                  </TooltipContent>
+                                </Tooltip>
+                              ) : (
+                                <code className="rounded bg-muted px-1 font-mono text-emerald-700 dark:text-emerald-300">
+                                  {alignment.candidateCurie}
+                                </code>
+                              )}
+                            </span>
+                          </div>
+                          <div className="space-y-1 text-[11px] text-muted-foreground">
+                            <p>✔ Preserves local class identity and data</p>
+                            <p>
+                              ✔ Automatically inherits standard ontology
+                              properties
+                            </p>
+                            <p>
+                              ✔ Compliant with FAIR data and external RDF
+                              reasoners
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <p className="mt-4 text-[11px] text-emerald-700/80 dark:text-emerald-400/80">
+                        Highest recommended OWL strategy: retains domain
+                        precision while gaining international standards
+                        interoperability.
                       </p>
                     </div>
                   </div>
-
-                  <p className="mt-4 text-[11px] text-muted-foreground">
-                    Cannot be linked across external semantic graphs or
-                    federated SPARQL queries.
-                  </p>
                 </div>
-
-                {/* Arrow Transition */}
-                <div className="flex items-center justify-center py-2 md:py-0">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-primary shadow-xs">
-                    <ArrowRight className="h-4 w-4" />
-                  </div>
-                </div>
-
-                {/* AFTER Card */}
-                <div className="flex flex-col justify-between rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-4 shadow-xs">
-                  <div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-semibold tracking-wider text-emerald-700 uppercase dark:text-emerald-400">
-                        Proposed Outcome (After)
-                      </span>
-                      <Badge
-                        variant="outline"
-                        className="border-emerald-500/30 text-[10px] text-emerald-600"
-                      >
-                        Standards Compliant
-                      </Badge>
-                    </div>
-
-                    <div className="mt-3 space-y-2 rounded-md border border-emerald-500/20 bg-background p-3 text-xs shadow-xs">
-                      <div className="flex items-center gap-1.5 font-semibold text-foreground">
-                        <Layers className="h-4 w-4 text-emerald-500" />
-                        <span>
-                          {alignment.className}{" "}
-                          <span className="font-mono text-xs text-muted-foreground">
-                            rdfs:subClassOf
-                          </span>{" "}
-                          <code className="rounded bg-muted px-1 font-mono text-emerald-700 dark:text-emerald-300">
-                            {alignment.candidateCurie}
-                          </code>
-                        </span>
-                      </div>
-                      <div className="space-y-1 text-[11px] text-muted-foreground">
-                        <p>✔ Preserves local class identity and data</p>
-                        <p>
-                          ✔ Automatically inherits standard ontology properties
-                        </p>
-                        <p>
-                          ✔ Compliant with FAIR data and external RDF reasoners
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <p className="mt-4 text-[11px] text-emerald-700/80 dark:text-emerald-400/80">
-                    Highest recommended OWL strategy: retains domain precision
-                    while gaining international standards interoperability.
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
+              )
+            })()}
 
           {/* Action Footer */}
           <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-4">

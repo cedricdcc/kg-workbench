@@ -11,6 +11,7 @@ export interface ReferenceTermForAnalysis {
   type: string
   description?: string | null
   prefix?: string
+  iri?: string
 }
 
 export interface AnalysisInput {
@@ -40,6 +41,7 @@ export interface ClassAlignment {
   candidateCurie: string
   candidateLabel: string
   similarity: number
+  candidateIri?: string
 }
 
 export interface OntologyAnalysisResult {
@@ -231,6 +233,7 @@ export async function calculateOntologyAnalysis(
         candidateCurie: bestMatch.term.curie,
         candidateLabel: bestMatch.term.label,
         similarity: Math.round(bestMatch.score * 100) / 100,
+        candidateIri: bestMatch.term.iri,
       })
     }
   }

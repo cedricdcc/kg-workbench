@@ -3,6 +3,7 @@
 import { Check } from "lucide-react"
 
 import { cn } from "@/lib/utils"
+import { resolveExternalUri } from "@/features/ontology/utils/external-uri"
 
 type ClassPickerItemProps = {
   label: string
@@ -19,6 +20,8 @@ export function ClassPickerItem({
   disabled = false,
   onSelect,
 }: ClassPickerItemProps) {
+  const externalUri = resolveExternalUri(label)
+
   return (
     <button
       type="button"
@@ -37,7 +40,12 @@ export function ClassPickerItem({
           isSelected ? "opacity-100" : "opacity-0"
         )}
       />
-      <span className="flex-1 truncate text-left">{label}</span>
+      <span
+        className="flex-1 truncate text-left"
+        title={externalUri ? `External URI: ${externalUri}` : undefined}
+      >
+        {label}
+      </span>
       {hint && (
         <span className="shrink-0 text-[10px] text-muted-foreground">
           {hint}

@@ -1,6 +1,6 @@
 "use server"
 
-import { and, eq, or } from "drizzle-orm"
+import { and, eq, ne, or } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 import { routes } from "@/lib/routes"
 import { getDb } from "@/server/database"
@@ -223,15 +223,16 @@ export async function mapClassToStandardParent(
   await assertOntologyDocumentAccess(ontologyId, db)
   await assertOntologyRecordAccess("ontology_classes", classId, db)
 
-  const parentName = candidate.label || candidate.curie
+  const parentName = candidate.curie || candidate.label
 
-  // Find if parent already exists in this ontology
+  // Find if parent already exists in this ontology (excluding the target class itself)
   const [existingParent] = await db
     .select()
     .from(ontologyClasses)
     .where(
       and(
         eq(ontologyClasses.ontology_id, ontologyId),
+        ne(ontologyClasses.id, classId),
         or(
           eq(ontologyClasses.name, parentName),
           eq(ontologyClasses.name, candidate.curie)
@@ -276,8 +277,8 @@ export async function mapClassToStandardParent(
     .set({ parent_class_id: parentId })
     .where(eq(ontologyClasses.id, classId))
 
-  revalidatePath(routes.ontology.document(ontologyId))
-  revalidatePath(routes.ontology.root)
+  revalidatePath(routes.ontology.document(ontologyId), "layout")
+  revalidatePath(routes.ontology.root, "layout")
 
   return { parentClassId: parentId }
 }

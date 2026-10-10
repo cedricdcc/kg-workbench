@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils"
 import { ClassPickerItem } from "./class-picker-item"
 import { ModuleAccordion } from "./module-accordion"
 import { UnavailableClassOptions } from "./unavailable-class-options"
+import { resolveExternalUri } from "@/features/ontology/utils/external-uri"
 import type {
   ModuleGroup,
   NoneOption,
@@ -133,6 +134,7 @@ export function ClassPicker({
   }
 
   const currentModule = currentModuleId ? moduleMap.get(currentModuleId) : null
+  const externalUri = resolveExternalUri(displayLabel)
 
   return (
     <Popover open={open} onOpenChange={handleOpenChange}>
@@ -140,6 +142,7 @@ export function ClassPicker({
         <button
           type="button"
           disabled={disabled}
+          title={externalUri ? `External URI: ${externalUri}` : undefined}
           className={cn(
             "flex h-8 w-full items-center justify-between gap-1.5 rounded-none border border-input bg-transparent px-2.5 py-2 text-xs whitespace-nowrap transition-colors outline-none select-none",
             "focus-visible:border-ring focus-visible:ring-1 focus-visible:ring-ring/50",

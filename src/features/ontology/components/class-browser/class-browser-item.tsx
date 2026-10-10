@@ -1,8 +1,14 @@
 "use client"
 
 import { Badge } from "@/components/ui/badge"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 import type { OntologyModule } from "@/domain/ontology"
 import type { OntologyClassWithAttributes } from "@/features/ontology/server/queries"
+import { resolveExternalUri } from "@/features/ontology/utils/external-uri"
 import { truncateWithEllipsis } from "@/lib/truncate-with-ellipsis"
 import { cn } from "@/lib/utils"
 
@@ -35,6 +41,8 @@ export function ClassBrowserItem({
     ? truncateWithEllipsis(cls.description, DESCRIPTION_MAX_LENGTH)
     : null
 
+  const externalUri = resolveExternalUri(cls.name)
+
   return (
     <button
       type="button"
@@ -45,7 +53,23 @@ export function ClassBrowserItem({
       )}
     >
       <div className="flex min-w-0 items-center gap-2">
-        <span className="min-w-0 font-medium">{cls.name}</span>
+        {externalUri ? (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="min-w-0 cursor-help font-medium underline decoration-muted-foreground/40 decoration-dotted underline-offset-2">
+                {cls.name}
+              </span>
+            </TooltipTrigger>
+            <TooltipContent
+              side="right"
+              className="max-w-xs font-mono text-[11px] break-all"
+            >
+              {externalUri}
+            </TooltipContent>
+          </Tooltip>
+        ) : (
+          <span className="min-w-0 font-medium">{cls.name}</span>
+        )}
         {module && moduleName && (
           <Badge
             variant="secondary"

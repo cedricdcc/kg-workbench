@@ -35,6 +35,7 @@ export async function runFullOntologyAnalysis(
       label: t.label,
       type: t.type,
       description: t.description,
+      iri: t.iri,
     })),
   })
 }

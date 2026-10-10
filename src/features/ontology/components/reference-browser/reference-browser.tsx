@@ -16,6 +16,11 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
+import {
   getReferenceOntologies,
   getActiveReferenceTerms,
   type ReferenceOntologySummary,
@@ -212,9 +217,19 @@ export function ReferenceBrowser({
                   }`}
                 >
                   <div className="flex items-center justify-between gap-1.5">
-                    <span className="truncate font-medium text-foreground">
-                      {term.label}
-                    </span>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="cursor-help truncate font-medium text-foreground underline decoration-muted-foreground/30 decoration-dotted underline-offset-2">
+                          {term.label}
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent
+                        side="top"
+                        className="max-w-xs font-mono text-[11px] break-all"
+                      >
+                        {term.iri}
+                      </TooltipContent>
+                    </Tooltip>
                     <div className="flex shrink-0 items-center gap-1">
                       <Badge
                         variant={isClass ? "default" : "secondary"}
@@ -248,9 +263,19 @@ export function ReferenceBrowser({
                     </div>
                   </div>
 
-                  <div className="truncate font-mono text-[10px] text-muted-foreground">
-                    {term.curie}
-                  </div>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className="cursor-help truncate font-mono text-[10px] text-muted-foreground">
+                        {term.curie}
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent
+                      side="top"
+                      className="max-w-xs font-mono text-[11px] break-all"
+                    >
+                      {term.iri}
+                    </TooltipContent>
+                  </Tooltip>
 
                   {term.description && (
                     <p className="line-clamp-2 text-[11px] leading-relaxed text-muted-foreground">

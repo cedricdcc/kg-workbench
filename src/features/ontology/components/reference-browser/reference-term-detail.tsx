@@ -1,10 +1,16 @@
 "use client"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { Check, Copy, ExternalLink, Loader2, Plus } from "lucide-react"
 import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 import type { OntologyModule } from "@/domain/ontology"
 import { createClass } from "@/features/ontology/server/actions/classes"
 
@@ -31,6 +37,7 @@ export function ReferenceTermDetail({
   activeModuleId,
   onClassCreated,
 }: ReferenceTermDetailProps) {
+  const router = useRouter()
   const [isImporting, setIsImporting] = useState(false)
   const [copiedField, setCopiedField] = useState<string | null>(null)
 
@@ -47,7 +54,7 @@ export function ReferenceTermDetail({
     setIsImporting(true)
     try {
       const created = await createClass(ontologyId, targetModule.id, {
-        name: term.label || term.curie,
+        name: term.curie || term.label,
         description:
           term.description ||
           `Imported standard vocabulary term (${term.curie})`,
@@ -55,6 +62,7 @@ export function ReferenceTermDetail({
       toast.success(
         `Imported "${created.name}" into module "${targetModule.name}".`
       )
+      router.refresh()
       onClassCreated?.(created.id)
     } catch (err: unknown) {
       const msg =
@@ -79,12 +87,35 @@ export function ReferenceTermDetail({
       {/* Header */}
       <div className="space-y-1.5 border-b pb-3">
         <div className="flex flex-wrap items-center gap-2">
-          <h2 className="text-base font-semibold text-foreground">
-            {term.label}
-          </h2>
-          <Badge variant="outline" className="font-mono text-[10px]">
-            {term.curie}
-          </Badge>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <h2 className="cursor-help text-base font-semibold text-foreground underline decoration-muted-foreground/30 decoration-dotted underline-offset-2">
+                {term.label}
+              </h2>
+            </TooltipTrigger>
+            <TooltipContent
+              side="top"
+              className="max-w-xs font-mono text-[11px] break-all"
+            >
+              {term.iri}
+            </TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Badge
+                variant="outline"
+                className="cursor-help font-mono text-[10px]"
+              >
+                {term.curie}
+              </Badge>
+            </TooltipTrigger>
+            <TooltipContent
+              side="top"
+              className="max-w-xs font-mono text-[11px] break-all"
+            >
+              {term.iri}
+            </TooltipContent>
+          </Tooltip>
           <Badge
             variant={isClass ? "default" : "secondary"}
             className="text-[9px] tracking-wider uppercase"

@@ -16,6 +16,7 @@ import { cn } from "@/lib/utils"
 import { getClassExamplePreview } from "./example-preview"
 import type { ClassNodeData } from "./use-ontology-flow"
 import { NODE_HEIGHT, NODE_WIDTH } from "./use-ontology-flow"
+import { resolveExternalUri } from "../utils/external-uri"
 
 type ClassNodeType = Node<ClassNodeData, "classNode">
 
@@ -28,6 +29,8 @@ export function ClassNode({ data, selected }: NodeProps<ClassNodeType>) {
   const examplePreview = getClassExamplePreview(data.examples)
   const hasExamples = data.examples.length > 0
   const showExampleButton = hasExamples
+
+  const externalUri = resolveExternalUri(data.label)
 
   return (
     <>
@@ -71,7 +74,23 @@ export function ClassNode({ data, selected }: NodeProps<ClassNodeType>) {
               className="mt-0.5 h-2 w-2 shrink-0 rounded-full"
               style={{ backgroundColor: data.classColor }}
             />
-            <span className="truncate text-sm font-medium">{data.label}</span>
+            {externalUri ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="cursor-help truncate text-sm font-medium underline decoration-muted-foreground/40 decoration-dotted underline-offset-2">
+                    {data.label}
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent
+                  side="top"
+                  className="max-w-xs font-mono text-[11px] break-all"
+                >
+                  {externalUri}
+                </TooltipContent>
+              </Tooltip>
+            ) : (
+              <span className="truncate text-sm font-medium">{data.label}</span>
+            )}
           </div>
           {data.noteCount > 0 && (
             <span className={cn(COUNTER_BADGE_CLASSNAME, "ml-auto shrink-0")}>

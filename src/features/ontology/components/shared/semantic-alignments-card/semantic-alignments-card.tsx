@@ -1,12 +1,25 @@
 "use client"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
-import { Check, Compass, ExternalLink, GitFork, Loader2, Sparkles } from "lucide-react"
+import {
+  Check,
+  Compass,
+  ExternalLink,
+  GitFork,
+  Loader2,
+  Sparkles,
+} from "lucide-react"
 import { toast } from "sonner"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 import type { OntologyRelation } from "@/domain/ontology"
 import type { OntologyClassWithAttributes } from "@/features/ontology/server/queries"
 import { AdoptClassReconciliationDialog } from "@/features/ontology/components/dialogs/adopt-class-reconciliation-dialog/adopt-class-reconciliation-dialog"
@@ -17,6 +30,7 @@ import {
 } from "@/features/ontology/server/actions/reference-vocabularies"
 import { updateClass } from "@/features/ontology/server/actions/classes"
 import { updateRelation } from "@/features/ontology/server/actions/relations"
+import { resolveExternalUri } from "@/features/ontology/utils/external-uri"
 
 interface SemanticAlignmentsCardProps {
   ontologyId: string
@@ -37,13 +51,16 @@ export function SemanticAlignmentsCard({
   allClasses,
   relations,
 }: SemanticAlignmentsCardProps) {
+  const router = useRouter()
   const queryClient = useQueryClient()
   const [activeActionId, setActiveActionId] = useState<string | null>(null)
   const [reconcileCandidate, setReconcileCandidate] =
     useState<TermAlignmentCandidate | null>(null)
   const [isReconcileDialogOpen, setIsReconcileDialogOpen] = useState(false)
 
-  const { data: candidates = [], isLoading } = useQuery<TermAlignmentCandidate[]>({
+  const { data: candidates = [], isLoading } = useQuery<
+    TermAlignmentCandidate[]
+  >({
     queryKey: ["semantic-alignments", entityType, entityId, entityName],
     queryFn: () =>
       findNearestStandardTerms(
@@ -63,12 +80,12 @@ export function SemanticAlignmentsCard({
         label: candidate.label,
         description: candidate.description,
       })
-      toast.success(
-        `Mapped "${entityName}" as subClassOf ${candidate.curie}`
-      )
+      toast.success(`Mapped "${entityName}" as subClassOf ${candidate.curie}`)
       await queryClient.invalidateQueries()
+      router.refresh()
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Failed to map parent class."
+      const msg =
+        err instanceof Error ? err.message : "Failed to map parent class."
       toast.error(msg)
     } finally {
       setActiveActionId(null)
@@ -84,20 +101,25 @@ export function SemanticAlignmentsCard({
 
     setActiveActionId(`adopt-${candidate.curie}`)
     try {
-      const newName = candidate.label || candidate.curie
+      const newName = candidate.curie || candidate.label
       if (entityType === "class") {
         await updateClass(entityId, {
           name: newName,
-          ...(candidate.description ? { description: candidate.description } : {}),
+          ...(candidate.description
+            ? { description: candidate.description }
+            : {}),
         })
       } else {
         await updateRelation(entityId, {
           name: newName,
-          ...(candidate.description ? { description: candidate.description } : {}),
+          ...(candidate.description
+            ? { description: candidate.description }
+            : {}),
         })
       }
       toast.success(`Adopted standard term "${candidate.curie}"`)
       await queryClient.invalidateQueries()
+      router.refresh()
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to adopt term."
       toast.error(msg)
@@ -108,7 +130,7 @@ export function SemanticAlignmentsCard({
 
   if (isLoading) {
     return (
-      <div className="rounded-lg border bg-muted/20 p-3.5 space-y-2">
+      <div className="space-y-2 rounded-lg border bg-muted/20 p-3.5">
         <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
           <Loader2 className="h-3.5 w-3.5 animate-spin" />
           <span>Searching reference vocabularies...</span>
@@ -125,14 +147,16 @@ export function SemanticAlignmentsCard({
           <span>Standard Vocabulary Alignments</span>
         </div>
         <p className="mt-1 text-[11px] opacity-75">
-          No matching standard terms found in workspace library. Use the Reference Vocabularies button in the header to index ontologies like SOSA, ENVO, or Schema.org.
+          No matching standard terms found in workspace library. Use the
+          Reference Vocabularies button in the header to index ontologies like
+          SOSA, ENVO, or Schema.org.
         </p>
       </div>
     )
   }
 
   return (
-    <div className="rounded-lg border border-primary/20 bg-primary/5 p-3.5 space-y-3">
+    <div className="space-y-3 rounded-lg border border-primary/20 bg-primary/5 p-3.5">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Sparkles className="h-4 w-4 text-primary" />
@@ -140,13 +164,17 @@ export function SemanticAlignmentsCard({
             Standard Vocabulary Alignments
           </span>
         </div>
-        <Badge variant="outline" className="text-[10px] bg-background border-primary/30 text-primary">
+        <Badge
+          variant="outline"
+          className="border-primary/30 bg-background text-[10px] text-primary"
+        >
           Local Vector Match
         </Badge>
       </div>
 
       <p className="text-[11px] text-muted-foreground">
-        Nearest standard candidates discovered via local embeddings. Align this {entityType} to reuse established domain standards:
+        Nearest standard candidates discovered via local embeddings. Align this{" "}
+        {entityType} to reuse established domain standards:
       </p>
 
       <div className="space-y-2">
@@ -155,35 +183,69 @@ export function SemanticAlignmentsCard({
           const isAdoptPending = activeActionId === `adopt-${cand.curie}`
           const scorePercent = Math.round(cand.similarity * 100)
 
+          const externalUri = resolveExternalUri(cand.curie, cand.iri)
+
           return (
             <div
               key={cand.curie}
-              className="rounded-md border bg-background/80 p-2.5 space-y-2 text-xs transition-colors hover:border-primary/40 shadow-xs"
+              className="space-y-2 rounded-md border bg-background/80 p-2.5 text-xs shadow-xs transition-colors hover:border-primary/40"
             >
               <div className="flex items-start justify-between gap-2">
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="font-semibold text-foreground font-mono">
-                      {cand.curie}
-                    </span>
-                    <Badge variant="secondary" className="text-[9px] px-1 py-0">
+                    {externalUri ? (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="cursor-help font-mono font-semibold text-foreground underline decoration-muted-foreground/40 decoration-dotted underline-offset-2">
+                            {cand.curie}
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent
+                          side="top"
+                          className="max-w-xs font-mono text-[11px] break-all"
+                        >
+                          {externalUri}
+                        </TooltipContent>
+                      </Tooltip>
+                    ) : (
+                      <span className="font-mono font-semibold text-foreground">
+                        {cand.curie}
+                      </span>
+                    )}
+                    <Badge variant="secondary" className="px-1 py-0 text-[9px]">
                       {scorePercent}% match
                     </Badge>
                   </div>
-                  {cand.label && cand.label !== cand.curie && (
-                    <div className="text-[11px] text-muted-foreground">
-                      {cand.label}
-                    </div>
-                  )}
+                  {cand.label &&
+                    cand.label !== cand.curie &&
+                    (externalUri ? (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className="cursor-help text-[11px] text-muted-foreground underline decoration-muted-foreground/40 decoration-dotted underline-offset-2">
+                            {cand.label}
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent
+                          side="top"
+                          className="max-w-xs font-mono text-[11px] break-all"
+                        >
+                          {externalUri}
+                        </TooltipContent>
+                      </Tooltip>
+                    ) : (
+                      <div className="text-[11px] text-muted-foreground">
+                        {cand.label}
+                      </div>
+                    ))}
                 </div>
 
-                {cand.iri && (
+                {externalUri && (
                   <a
-                    href={cand.iri}
+                    href={externalUri}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-muted-foreground hover:text-foreground"
-                    title={cand.iri}
+                    title={externalUri}
                   >
                     <ExternalLink className="h-3 w-3" />
                   </a>
@@ -191,7 +253,7 @@ export function SemanticAlignmentsCard({
               </div>
 
               {cand.description && (
-                <p className="text-[11px] text-muted-foreground/90 line-clamp-2">
+                <p className="line-clamp-2 text-[11px] text-muted-foreground/90">
                   {cand.description}
                 </p>
               )}
@@ -250,4 +312,3 @@ export function SemanticAlignmentsCard({
     </div>
   )
 }
-
