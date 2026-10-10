@@ -16,4 +16,4 @@ Task 3: complete (commits 6adbc27..0c7ad21, tests: pnpm test tests/hierarchy-val
 Task 4: complete (commits 0c7ad21..688b659, tests: pnpm test tests/ontology-assist.test.ts → 53/53 pass)
 Task 5: complete (commits 688b659..8edd860, tests: pnpm test tests/ontology-analysis.test.ts → 54/54 pass)
 Task 6: complete (commits 8edd860..79762ca, tests: pnpm test tests/class-refactoring.test.ts → 55/55 pass)
-Enhancement: full-screen 2-column analysis & health report workbench complete (commits 97ace49..348dc95, tests: 55/55 pass)
+Enhancement: full-screen 2-column analysis & health report workbench with 1-click in-place vocabulary imports complete (commits 97ace49..8b73b04, tests: 55/55 pass)
