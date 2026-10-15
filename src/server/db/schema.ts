@@ -385,3 +385,16 @@ export const ontologyClassRestrictions = pgTable(
     created_at: created_at(),
   }
 )
+
+export const ontologyDefectSuppressions = pgTable(
+  "ontology_defect_suppressions",
+  {
+    id: generatedId(),
+    ontology_id: uuid("ontology_id")
+      .notNull()
+      .references(() => ontologyDocuments.id, { onDelete: "cascade" }),
+    defect_id: text("defect_id").notNull(),
+    created_at: created_at(),
+  }
+)
+
