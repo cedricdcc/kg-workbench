@@ -59,10 +59,10 @@ import {
 import { getDefectSuppressions } from "@/features/ontology/server/queries/defect-suppressions"
 import { toggleDefectSuppression } from "@/features/ontology/server/actions/defect-suppressions"
 import { updateClass } from "@/features/ontology/server/actions/classes"
-import { deleteRelation } from "@/features/ontology/server/actions/relations"
-import { OntologyDefectsSheet } from "../ontology-defects"
-
-
+import { runFullOntologyAnalysis } from "@/features/ontology/server/actions/ontology-analysis"
+import { addReferenceOntology } from "@/features/ontology/server/actions/reference-vocabularies"
+import type { RecommendedVocabulary } from "@/features/ontology/server/services/ontology-analysis/analyze-ontology"
+import { OntologyIssuesSheet } from "../ontology-issues"
 
 export interface OntologyShellProps {
   documents: OntologyDocument[]
@@ -128,7 +128,18 @@ export function OntologyShell({
     enabled: Boolean(currentDocument.id),
   })
 
-  const [defectsSheetOpen, setDefectsSheetOpen] = useState(false)
+  const [issuesSheetOpen, setIssuesSheetOpen] = useState(false)
+  const [importingPrefix, setImportingPrefix] = useState<string | null>(null)
+
+  const {
+    data: analysisData,
+    isLoading: isLoadingAnalysis,
+    error: analysisError,
+  } = useQuery({
+    queryKey: ["ontology-analysis", currentDocument.id],
+    queryFn: () => runFullOntologyAnalysis(currentDocument.id),
+    enabled: issuesSheetOpen && Boolean(currentDocument.id),
+  })
 
   const suppressedSet = useMemo(() => new Set(suppressions), [suppressions])
   const defectsReport = useMemo(() => {
@@ -138,6 +149,16 @@ export function OntologyShell({
       suppressedIds: suppressedSet,
     })
   }, [classes, relations, suppressedSet])
+
+  const issuesCounts = useMemo(
+    () => ({
+      error: defectsReport.counts.error,
+      warning: defectsReport.counts.warning,
+      suggestion: analysisData?.redundancyClusters.length ?? 0,
+      info: defectsReport.counts.info,
+    }),
+    [defectsReport.counts, analysisData?.redundancyClusters.length]
+  )
 
   const queryClient = useQueryClient()
 
@@ -179,6 +200,34 @@ export function OntologyShell({
     }
   }
 
+  async function handleImportVocabulary(vocab: RecommendedVocabulary) {
+    setImportingPrefix(vocab.prefix)
+    try {
+      await addReferenceOntology({
+        prefix: vocab.prefix,
+        name: vocab.name,
+        baseIri: vocab.baseIri,
+        sourceRegistry: vocab.suggestedSource,
+        sourceId: vocab.prefix,
+      })
+      toast.success(
+        `Imported "${vocab.name}" (${vocab.prefix.toUpperCase()}). Indexing terms.`
+      )
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["reference-ontologies"] }),
+        queryClient.invalidateQueries({ queryKey: ["reference-terms"] }),
+        queryClient.invalidateQueries({
+          queryKey: ["ontology-analysis", currentDocument.id],
+        }),
+      ])
+    } catch (err: unknown) {
+      toast.error(
+        err instanceof Error ? err.message : "Failed to import vocabulary."
+      )
+    } finally {
+      setImportingPrefix(null)
+    }
+  }
 
   const currentModuleIds = useMemo(
     () =>
@@ -391,7 +440,9 @@ export function OntologyShell({
         defaultLanguage: currentDocument.default_language,
       }}
       activeDefects={
-        selectedClass ? defectsReport.defectsByTargetId[selectedClass.id] ?? [] : []
+        selectedClass
+          ? (defectsReport.defectsByTargetId[selectedClass.id] ?? [])
+          : []
       }
       onQuickFix={handleQuickFix}
     />
@@ -419,7 +470,7 @@ export function OntologyShell({
       }}
       activeDefects={
         selectedRelation
-          ? defectsReport.defectsByTargetId[selectedRelation.id] ?? []
+          ? (defectsReport.defectsByTargetId[selectedRelation.id] ?? [])
           : []
       }
       onQuickFix={handleQuickFix}
@@ -458,8 +509,9 @@ export function OntologyShell({
         isVisual={isVisual}
         onVisualToggle={setIsVisual}
         onOpenOntologyDetails={() => openOntologyDetails("overview")}
-        defectsReport={defectsReport}
-        onOpenDefectsSheet={() => setDefectsSheetOpen(true)}
+        onOpenVocabularies={() => setReferenceDialogOpen(true)}
+        issuesCounts={issuesCounts}
+        onOpenIssuesSheet={() => setIssuesSheetOpen(true)}
       />
       <ModuleTabBar
         modules={currentDocument.modules}
@@ -593,10 +645,14 @@ export function OntologyShell({
         onOpenChange={setReferenceDialogOpen}
       />
 
-      <OntologyDefectsSheet
-        open={defectsSheetOpen}
-        onOpenChange={setDefectsSheetOpen}
+      <OntologyIssuesSheet
+        open={issuesSheetOpen}
+        onOpenChange={setIssuesSheetOpen}
         report={defectsReport}
+        redundancyClusters={analysisData?.redundancyClusters}
+        recommendedVocabularies={analysisData?.recommendedVocabularies}
+        isLoadingAnalysis={isLoadingAnalysis}
+        analysisError={analysisError}
         onSelectEntity={(id, kind) => {
           if (kind === "class") {
             handleSelectClass(id)
@@ -607,6 +663,10 @@ export function OntologyShell({
         onSuppress={handleSuppressDefect}
         onRestore={handleRestoreDefect}
         onQuickFix={handleQuickFix}
+        onImportVocabulary={handleImportVocabulary}
+        importingPrefix={importingPrefix}
+        onOpenVocabularies={() => setReferenceDialogOpen(true)}
+        onSelectClassForRefactor={handleSelectClass}
       />
     </div>
   )

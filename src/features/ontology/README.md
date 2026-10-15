@@ -73,11 +73,11 @@ update_this_readme_when:
 4. `left-browser-panel.tsx` wraps class, relation, and reference standard vocabulary browsing through `EntityTypeTabs` when the shell is in browser mode.
 5. `visual-region.tsx` renders `OntologyCanvas` for React Flow editing and selection when the shell is in visual mode, including class example previews on nodes, selected relation example previews on edges, and defect warning markers on class nodes.
    Manual node and module moves stay local in the canvas state immediately and persist in the background without re-fitting the viewport on each drag save.
-6. `ontology-header.tsx` handles ontology creation, JSON import, import-format guidance, export dialog entry points, and renders `ontology-defects-pill.tsx`.
+6. `ontology-header.tsx` consolidates 4 landmarks (`DocumentSelector`, expanded `ontology-actions-menu.tsx`, `ontology-issues-pill.tsx`, and `visual-toggle.tsx`), removing header bloat and standalone buttons.
 7. `selection.ts` resolves class/relation selections, while `OntologyShell` also tracks explicit module overview selection.
 8. `detail-panel-shell.tsx` hosts tabbed class, relation, or module detail views with metadata editors for translations, notes, examples, instance rules, relation attributes, contextual defect callout banners, and inline competency-question authoring in the ontology details dialog.
 9. Server actions persist ontology structure changes, metadata rows, saved visual layout state, JSON round-trips, and OWL export generation.
-10. `ontology-defects-pill.tsx` displays real-time defect counts in the header, opening `ontology-defects-sheet.tsx` for inspecting, quick-fixing, and suppressing defects. Canvas nodes highlight active defect markers and detail panels show contextual banners.
+10. `ontology-issues-pill.tsx` displays concrete typed issue counts (`Error`, `Warning`, `Suggestion`, `Clean`) with zero arbitrary health percentages. Clicking opens `ontology-issues-sheet.tsx` (slide-over drawer with tabs for Structural Defects & Quick-Fixes, Semantic Redundancy Clusters, and Standard Vocabulary Recommendations with 1-click import).
 11. OWL export runs pre-flight validation and injects linter diagnostic notes into the exported ontology comments.
 
 ## Constraints
