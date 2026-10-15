@@ -51,6 +51,12 @@ import {
   type SelectedReferenceTerm,
 } from "../reference-browser/reference-term-detail"
 import { ReferenceVocabulariesDialog } from "../reference-vocabularies-dialog/reference-vocabularies-dialog"
+import {
+  runOntologyLinter,
+  type OntologyDefectReport,
+} from "@/features/ontology/utils/linter"
+import { getDefectSuppressions } from "@/features/ontology/server/queries/defect-suppressions"
+
 
 export interface OntologyShellProps {
   documents: OntologyDocument[]
@@ -109,6 +115,24 @@ export function OntologyShell({
     queryKey: ["reference-ontologies"],
     queryFn: () => getReferenceOntologies(),
   })
+
+  const { data: suppressions = [] } = useQuery({
+    queryKey: ["ontology-defect-suppressions", currentDocument.id],
+    queryFn: () => getDefectSuppressions(currentDocument.id),
+    enabled: Boolean(currentDocument.id),
+  })
+
+  const [defectsSheetOpen, setDefectsSheetOpen] = useState(false)
+
+  const suppressedSet = useMemo(() => new Set(suppressions), [suppressions])
+  const defectsReport = useMemo(() => {
+    return runOntologyLinter({
+      classes,
+      relations,
+      suppressedIds: suppressedSet,
+    })
+  }, [classes, relations, suppressedSet])
+
   const currentModuleIds = useMemo(
     () =>
       new Set(
@@ -377,6 +401,8 @@ export function OntologyShell({
         isVisual={isVisual}
         onVisualToggle={setIsVisual}
         onOpenOntologyDetails={() => openOntologyDetails("overview")}
+        defectsReport={defectsReport}
+        onOpenDefectsSheet={() => setDefectsSheetOpen(true)}
       />
       <ModuleTabBar
         modules={currentDocument.modules}

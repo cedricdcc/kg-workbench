@@ -35,6 +35,8 @@ import { DocumentSelector } from "./document-selector"
 import { DeleteConfirmationDialog } from "./delete-confirmation-dialog"
 import { CreateImportActions } from "./create-import-actions"
 import { VisualToggle } from "./visual-toggle"
+import { OntologyDefectsPill } from "./ontology-defects-pill"
+import type { OntologyDefectReport } from "@/features/ontology/utils/linter"
 
 export interface OntologyHeaderProps {
   documents: OntologyDocument[]
@@ -46,6 +48,8 @@ export interface OntologyHeaderProps {
   isVisual: boolean
   onVisualToggle?: (checked: boolean) => void
   onOpenOntologyDetails?: () => void
+  defectsReport?: OntologyDefectReport
+  onOpenDefectsSheet?: () => void
 }
 
 export function OntologyHeader({
@@ -58,6 +62,8 @@ export function OntologyHeader({
   isVisual,
   onVisualToggle,
   onOpenOntologyDetails,
+  defectsReport,
+  onOpenDefectsSheet,
 }: OntologyHeaderProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -256,6 +262,14 @@ export function OntologyHeader({
           open={analysisOpen}
           onOpenChange={setAnalysisOpen}
           onOpenVocabularies={() => setVocabulariesOpen(true)}
+        />
+      )}
+
+      {defectsReport && (
+        <OntologyDefectsPill
+          report={defectsReport}
+          onClick={onOpenDefectsSheet}
+          disabled={!hasCurrentDocument}
         />
       )}
 
