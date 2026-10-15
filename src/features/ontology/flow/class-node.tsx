@@ -92,11 +92,31 @@ export function ClassNode({ data, selected }: NodeProps<ClassNodeType>) {
               <span className="truncate text-sm font-medium">{data.label}</span>
             )}
           </div>
-          {data.noteCount > 0 && (
+            {data.noteCount > 0 && (
             <span className={cn(COUNTER_BADGE_CLASSNAME, "ml-auto shrink-0")}>
               {data.noteCount}
               <StickyNote className="ml-1 inline h-3 w-3 align-[-1px]" />
             </span>
+          )}
+          {data.hasDefect && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span
+                  className={cn(
+                    "inline-flex size-4 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white shadow-2xs",
+                    !data.noteCount && "ml-auto",
+                    data.defectSeverity === "error"
+                      ? "bg-destructive animate-pulse"
+                      : "bg-amber-500"
+                  )}
+                >
+                  !
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="top">
+                {data.defectCount} defect(s) detected on this class
+              </TooltipContent>
+            </Tooltip>
           )}
         </div>
 

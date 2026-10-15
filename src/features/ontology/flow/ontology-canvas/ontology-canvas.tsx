@@ -46,6 +46,8 @@ import { useOntologyFlow } from "../use-ontology-flow"
 import { CanvasActionsPanel } from "./canvas-actions-panel"
 import { ModuleGroupNode } from "./module-group-node"
 
+import type { OntologyDefect } from "@/features/ontology/utils/linter"
+
 export interface OntologyCanvasProps {
   ontologyId: string
   classes: OntologyClassWithAttributes[]
@@ -64,6 +66,7 @@ export interface OntologyCanvasProps {
   onSelectModule: (id: string) => void
   onClassCreated: (classId: string) => void
   onRelationCreated: (relationId: string) => void
+  defectsByTargetId?: Record<string, OntologyDefect[]>
 }
 
 const nodeTypes: NodeTypes = {
@@ -138,6 +141,7 @@ function OntologyCanvasInner({
   onSelectModule,
   onClassCreated,
   onRelationCreated,
+  defectsByTargetId,
 }: OntologyCanvasProps) {
   const [createClassOpen, setCreateClassOpen] = useState(false)
   const [createRelationOpen, setCreateRelationOpen] = useState(false)
@@ -165,6 +169,7 @@ function OntologyCanvasInner({
     activeModuleId,
     savedPositions: localSavedPositions,
     savedModuleLayouts: localSavedModuleLayouts,
+    defectsByTargetId,
   })
 
   const [nodes, setNodes, onNodesChange] = useNodesState(flowNodes)

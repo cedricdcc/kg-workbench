@@ -7,6 +7,9 @@ export interface ClassNodeData extends Record<string, unknown> {
   noteCount: number
   examples: string[]
   external: boolean
+  hasDefect?: boolean
+  defectSeverity?: "error" | "warning" | "info"
+  defectCount?: number
 }
 
 export interface ModuleGroupNodeData extends Record<string, unknown> {

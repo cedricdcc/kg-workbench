@@ -391,6 +391,10 @@ export function OntologyShell({
         languages,
         defaultLanguage: currentDocument.default_language,
       }}
+      activeDefects={
+        selectedClass ? defectsReport.defectsByTargetId[selectedClass.id] ?? [] : []
+      }
+      onQuickFix={handleQuickFix}
     />
   ) : selectedRelation && relationTarget ? (
     <RelationDetail
@@ -414,6 +418,12 @@ export function OntologyShell({
         languages,
         defaultLanguage: currentDocument.default_language,
       }}
+      activeDefects={
+        selectedRelation
+          ? defectsReport.defectsByTargetId[selectedRelation.id] ?? []
+          : []
+      }
+      onQuickFix={handleQuickFix}
     />
   ) : selectedModule ? (
     <ModuleDetail
@@ -537,6 +547,7 @@ export function OntologyShell({
             selectedEntityId={resolvedSelectedEntityId}
             savedPositions={savedPositions}
             savedModuleLayouts={savedModuleLayouts}
+            defectsByTargetId={defectsReport.defectsByTargetId}
             onSelectClass={handleSelectClass}
             onSelectRelation={handleSelectRelation}
             onSelectModule={handleSelectModuleOverview}

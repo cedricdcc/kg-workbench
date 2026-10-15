@@ -16,6 +16,7 @@ import type {
   ModuleLayoutMap,
   OntologyClassWithAttributes,
 } from "../server/queries"
+import type { OntologyDefect } from "../utils/linter"
 import { formatRelationExample, getClassExampleValues } from "./example-preview"
 import { buildAllModulesView } from "./utils/all-modules-view"
 import { buildModuleView } from "./utils/module-view"
@@ -42,6 +43,7 @@ interface UseOntologyFlowOptions {
   activeModuleId: string | null
   savedPositions?: ClassPositionsByModule
   savedModuleLayouts?: ModuleLayoutMap
+  defectsByTargetId?: Record<string, OntologyDefect[]>
 }
 
 export function useOntologyFlow({
@@ -53,6 +55,7 @@ export function useOntologyFlow({
   activeModuleId,
   savedPositions,
   savedModuleLayouts,
+  defectsByTargetId,
 }: UseOntologyFlowOptions) {
   return useMemo(() => {
     const classColors = buildClassColorMap(classes.map((cls) => cls.id))
@@ -101,7 +104,8 @@ export function useOntologyFlow({
         modules,
         activeModuleId,
         savedPositions?.[activeModuleId],
-        classColors
+        classColors,
+        defectsByTargetId
       )
     }
     return buildAllModulesView(
@@ -113,7 +117,8 @@ export function useOntologyFlow({
       modules,
       savedModuleLayouts,
       savedPositions,
-      classColors
+      classColors,
+      defectsByTargetId
     )
   }, [
     classes,
@@ -124,5 +129,6 @@ export function useOntologyFlow({
     activeModuleId,
     savedPositions,
     savedModuleLayouts,
+    defectsByTargetId,
   ])
 }
