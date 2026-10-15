@@ -5,7 +5,6 @@ import type { ImportOntology } from "../src/features/ontology/schemas/import"
 
 function createBaseOntology(overrides: Partial<ImportOntology> = {}): ImportOntology {
   return {
-    id: "ont-test",
     name: "Diagnostic Test Ontology",
     usecase: "Demonstrating OWL export diagnostic notes scaffolding",
     version: "1.0.0",
@@ -13,15 +12,12 @@ function createBaseOntology(overrides: Partial<ImportOntology> = {}): ImportOnto
     classes: [],
     relations: [],
     modules: [],
-    attributes: [],
     relationAttributes: [],
     competencyQuestions: [],
     notes: [],
     examples: [],
     localizedTexts: [],
     languages: [],
-    classRestrictions: [],
-    classDisjointness: [],
     ...overrides,
   }
 }

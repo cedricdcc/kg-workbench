@@ -18,8 +18,6 @@ function createMockClass(
     ontology_id: "ont-1",
     parent_class_id: parentClassId,
     module_id: null,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
     attributes: [],
   }
 }
@@ -40,8 +38,8 @@ function createMockRelation(
     inverse_name: inverseName ?? null,
     description,
     ontology_id: "ont-1",
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
+    cardinality: null,
+    instance_policy: "open",
   }
 }
 

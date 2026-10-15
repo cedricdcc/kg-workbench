@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
-import { autoHealOntologyDraft } from "../src/features/ontology/server/actions/generate-ontology"
+import { autoHealOntologyDraft } from "../src/features/ontology/server/services/ai-ontology-generator"
 import type { GeneratedOntologyDraft } from "../src/features/ontology/schemas/ai-generation"
 
 test("autoHealOntologyDraft breaks direct self-parent cycle (A -> A)", () => {

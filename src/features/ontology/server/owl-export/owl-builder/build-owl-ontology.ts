@@ -57,7 +57,7 @@ export function convertToLinterEntities(ontology: ImportOntology): {
 } {
   const classes: OntologyClassWithAttributes[] = (ontology.classes ?? []).map((c) => ({
     id: c.id ?? c.name,
-    ontology_id: ontology.id ?? "temp-ontology",
+    ontology_id: "temp-ontology",
     module_id: c.moduleId ?? null,
     name: c.name,
     description: c.description ?? "",
@@ -75,7 +75,7 @@ export function convertToLinterEntities(ontology: ImportOntology): {
 
   const relations: OntologyRelation[] = (ontology.relations ?? []).map((r, idx) => ({
     id: r.id ?? `rel-${idx}`,
-    ontology_id: ontology.id ?? "temp-ontology",
+    ontology_id: "temp-ontology",
     name: r.name,
     domain_class_id: r.domainClassId,
     range_class_id: r.rangeClassId,
@@ -198,7 +198,7 @@ export function buildOwlOntology({
     appendLiteralElement(lines, "    ", "rdfs:comment", summary)
 
     for (const defect of defectReport.defects) {
-      const codeStr = defect.code ? `[${defect.code}] ` : ""
+      const codeStr = defect.oopsPitfallId ? `[${defect.oopsPitfallId}] ` : ""
       const diagLine = `[Diagnostic ${defect.severity.toUpperCase()}] ${codeStr}${defect.kind} on ${defect.targetType} "${defect.targetName}": ${defect.description}`
       appendLiteralElement(lines, "    ", "rdfs:comment", diagLine)
     }
