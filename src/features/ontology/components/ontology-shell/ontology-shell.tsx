@@ -55,7 +55,6 @@ import { ReferenceVocabulariesDialog } from "../reference-vocabularies-dialog/re
 import {
   runOntologyLinter,
   type OntologyDefect,
-  type OntologyDefectReport,
 } from "@/features/ontology/utils/linter"
 import { getDefectSuppressions } from "@/features/ontology/server/queries/defect-suppressions"
 import { toggleDefectSuppression } from "@/features/ontology/server/actions/defect-suppressions"
