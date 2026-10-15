@@ -12,6 +12,7 @@ export interface RedundanciesTabProps {
   clusters?: RedundancyCluster[]
   isLoading?: boolean
   error?: Error | null
+  isFullscreen?: boolean
   onSelectClassForRefactor?: (classId: string) => void
 }
 
@@ -19,6 +20,7 @@ export function RedundanciesTab({
   clusters = [],
   isLoading = false,
   error = null,
+  isFullscreen = false,
   onSelectClassForRefactor,
 }: RedundanciesTabProps) {
   const [search, setSearch] = useState("")
@@ -110,7 +112,13 @@ export function RedundanciesTab({
           </Button>
         </div>
       ) : (
-        <div className="space-y-3 overflow-y-auto pr-1">
+        <div
+          className={
+            isFullscreen
+              ? "grid grid-cols-1 gap-3.5 overflow-y-auto pr-1 md:grid-cols-2 lg:grid-cols-3"
+              : "space-y-3 overflow-y-auto pr-1"
+          }
+        >
           {filteredClusters.map((cluster, idx) => (
             <div
               key={idx}

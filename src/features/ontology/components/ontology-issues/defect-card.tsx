@@ -17,6 +17,8 @@ import type { OntologyDefect } from "@/features/ontology/utils/linter"
 export interface DefectCardProps {
   defect: OntologyDefect
   isSuppressed?: boolean
+  isSelected?: boolean
+  onCardClick?: () => void
   onSelectEntity: (id: string, kind: "class" | "relation") => void
   onSuppress: (defectId: string) => void
   onRestore: (defectId: string) => void
@@ -26,6 +28,8 @@ export interface DefectCardProps {
 export function DefectCard({
   defect,
   isSuppressed = false,
+  isSelected = false,
+  onCardClick,
   onSelectEntity,
   onSuppress,
   onRestore,
@@ -36,14 +40,19 @@ export function DefectCard({
 
   return (
     <div
-      className={`rounded-lg border p-3.5 transition-colors ${
-        isSuppressed
-          ? "border-dashed bg-muted/20 opacity-75"
-          : isError
-            ? "border-destructive/30 bg-destructive/5 hover:border-destructive/40"
-            : isWarning
-              ? "border-amber-500/30 bg-amber-500/5 hover:border-amber-500/40"
-              : "border-sky-500/30 bg-sky-500/5 hover:border-sky-500/40"
+      onClick={onCardClick}
+      className={`rounded-lg border p-3.5 transition-all ${
+        onCardClick ? "cursor-pointer" : ""
+      } ${
+        isSelected
+          ? "border-primary bg-primary/10 shadow-sm ring-1 ring-primary"
+          : isSuppressed
+            ? "border-dashed bg-muted/20 opacity-75"
+            : isError
+              ? "border-destructive/30 bg-destructive/5 hover:border-destructive/50"
+              : isWarning
+                ? "border-amber-500/30 bg-amber-500/5 hover:border-amber-500/50"
+                : "border-sky-500/30 bg-sky-500/5 hover:border-sky-500/50"
       }`}
     >
       <div className="flex items-start justify-between gap-2">

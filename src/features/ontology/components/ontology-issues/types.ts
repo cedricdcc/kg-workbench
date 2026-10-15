@@ -25,4 +25,5 @@ export interface OntologyIssuesSheetProps {
   importingPrefix?: string | null
   onOpenVocabularies?: () => void
   onSelectClassForRefactor?: (classId: string) => void
+  defaultFullscreen?: boolean
 }

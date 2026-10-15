@@ -10,6 +10,7 @@ export interface StandardsTabProps {
   vocabularies?: RecommendedVocabulary[]
   isLoading?: boolean
   error?: Error | null
+  isFullscreen?: boolean
   onImportVocabulary?: (vocab: RecommendedVocabulary) => Promise<void>
   importingPrefix?: string | null
   onOpenVocabularies?: () => void
@@ -19,6 +20,7 @@ export function StandardsTab({
   vocabularies = [],
   isLoading = false,
   error = null,
+  isFullscreen = false,
   onImportVocabulary,
   importingPrefix,
   onOpenVocabularies,
@@ -79,7 +81,13 @@ export function StandardsTab({
         </span>
       </div>
 
-      <div className="space-y-3 overflow-y-auto pr-1">
+      <div
+        className={
+          isFullscreen
+            ? "grid grid-cols-1 gap-3.5 overflow-y-auto pr-1 md:grid-cols-2 lg:grid-cols-3"
+            : "space-y-3 overflow-y-auto pr-1"
+        }
+      >
         {vocabularies.map((vocab, idx) => {
           const isImporting = importingPrefix === vocab.prefix
 

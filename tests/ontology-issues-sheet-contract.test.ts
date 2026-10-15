@@ -13,6 +13,7 @@ test("OntologyIssuesSheet files and exports exist with correct contracts", () =>
   const files = [
     "types.ts",
     "defect-card.tsx",
+    "defect-detail-inspector.tsx",
     "structural-defects-tab.tsx",
     "redundancies-tab.tsx",
     "standards-tab.tsx",
@@ -33,10 +34,13 @@ test("OntologyIssuesSheet files and exports exist with correct contracts", () =>
   assert.ok(sheetContent.includes("StructuralDefectsTab"))
   assert.ok(sheetContent.includes("RedundanciesTab"))
   assert.ok(sheetContent.includes("StandardsTab"))
+  assert.ok(sheetContent.includes("defaultFullscreen = true"))
+  assert.ok(sheetContent.includes("isFullscreen"))
 
   const indexContent = fs.readFileSync(
     path.join(issuesDir, "index.ts"),
     "utf-8"
   )
   assert.ok(indexContent.includes("export { OntologyIssuesSheet }"))
+  assert.ok(indexContent.includes("export { DefectDetailInspector }"))
 })
