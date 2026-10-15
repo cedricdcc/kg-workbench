@@ -2,14 +2,12 @@
 
 import { useRef, useState, type ChangeEvent } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { Activity, BookMarked, Settings2 } from "lucide-react"
 import { toast } from "sonner"
 
 import { CreateOntologyDialog } from "@/features/ontology/components/dialogs/create-ontology-dialog"
 import { ExportOntologyDialog } from "@/features/ontology/components/export-ontology-dialog/export-ontology-dialog"
 import { ImportFormatDialog } from "@/features/ontology/components/import-format-dialog/import-format-dialog"
 import { ReferenceVocabulariesDialog } from "@/features/ontology/components/reference-vocabularies-dialog/reference-vocabularies-dialog"
-import { OntologyAnalysisReportDialog } from "@/features/ontology/components/dialogs/ontology-analysis-report-dialog/ontology-analysis-report-dialog"
 import type { ExportOntologyMode } from "@/features/ontology/components/export-ontology-dialog/types"
 import { deleteOntologyDocument } from "@/features/ontology/server/actions/ontology-documents"
 import { importOntologyFromJson } from "@/features/ontology/server/actions/ontology-transfer"
@@ -24,19 +22,14 @@ import type {
   OntologyClassWithAttributes,
   OntologyDocumentWithModules,
 } from "@/features/ontology/server/queries"
-import { Button } from "@/components/ui/button"
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip"
 
 import { DocumentSelector } from "./document-selector"
 import { DeleteConfirmationDialog } from "./delete-confirmation-dialog"
-import { CreateImportActions } from "./create-import-actions"
+import { OntologyActionsMenu } from "./ontology-actions-menu"
 import { VisualToggle } from "./visual-toggle"
-import { OntologyDefectsPill } from "./ontology-defects-pill"
+import { OntologyIssuesPill } from "./ontology-issues-pill"
 import type { OntologyDefectReport } from "@/features/ontology/utils/linter"
+import type { IssuesCounts } from "@/features/ontology/utils/issues-summary"
 
 export interface OntologyHeaderProps {
   documents: OntologyDocument[]
@@ -48,6 +41,9 @@ export interface OntologyHeaderProps {
   isVisual: boolean
   onVisualToggle?: (checked: boolean) => void
   onOpenOntologyDetails?: () => void
+  onOpenVocabularies?: () => void
+  issuesCounts?: IssuesCounts
+  onOpenIssuesSheet?: () => void
   defectsReport?: OntologyDefectReport
   onOpenDefectsSheet?: () => void
 }
@@ -62,6 +58,9 @@ export function OntologyHeader({
   isVisual,
   onVisualToggle,
   onOpenOntologyDetails,
+  onOpenVocabularies,
+  issuesCounts,
+  onOpenIssuesSheet,
   defectsReport,
   onOpenDefectsSheet,
 }: OntologyHeaderProps) {
@@ -75,7 +74,6 @@ export function OntologyHeader({
   const [exportOpen, setExportOpen] = useState(false)
   const [importFormatOpen, setImportFormatOpen] = useState(false)
   const [vocabulariesOpen, setVocabulariesOpen] = useState(false)
-  const [analysisOpen, setAnalysisOpen] = useState(false)
   const [exportMode, setExportMode] = useState<ExportOntologyMode>("json")
   const [isDeleting, setIsDeleting] = useState(false)
   const hasCurrentDocument = currentDocument !== null
@@ -140,10 +138,27 @@ export function OntologyHeader({
     }
   }
 
+  function handleOpenVocabularies() {
+    if (onOpenVocabularies) {
+      onOpenVocabularies()
+    } else {
+      setVocabulariesOpen(true)
+    }
+  }
+
+  const activeCounts =
+    issuesCounts ??
+    (defectsReport
+      ? defectsReport.counts
+      : { error: 0, warning: 0, suggestion: 0, info: 0 })
+
+  const handleOpenIssues = onOpenIssuesSheet ?? onOpenDefectsSheet
+
   return (
     <div className="flex items-center gap-3 border-b px-4 py-2">
       <h1 className="font-heading text-lg font-semibold">Ontology</h1>
 
+      {/* Landmark 1: Document Selector */}
       <DocumentSelector
         documents={documents}
         currentDocumentId={currentDocument?.id ?? null}
@@ -154,7 +169,8 @@ export function OntologyHeader({
         onDocumentChange={handleDocumentChange}
       />
 
-      <CreateImportActions
+      {/* Landmark 2: Consolidated Actions Menu */}
+      <OntologyActionsMenu
         fileInputRef={fileInputRef}
         isBusy={isImporting}
         hasCurrentDocument={hasCurrentDocument}
@@ -163,10 +179,31 @@ export function OntologyHeader({
         onOpenImportFormat={() => setImportFormatOpen(true)}
         onExportJson={() => openExport("json")}
         onExportOwl={() => openExport("owl")}
+        onOpenOntologyDetails={() => onOpenOntologyDetails?.()}
+        onOpenVocabularies={handleOpenVocabularies}
         onDelete={() => setDeleteOpen(true)}
         onFileChange={handleFileChange}
       />
 
+      <div className="flex-1" />
+
+      {/* Landmark 3: Unified Issue Info Pill */}
+      {hasCurrentDocument && (
+        <OntologyIssuesPill
+          counts={activeCounts}
+          onClick={handleOpenIssues}
+          disabled={!hasCurrentDocument}
+        />
+      )}
+
+      {/* Landmark 4: Visual Canvas / Table View Toggle */}
+      <VisualToggle
+        isVisual={hasCurrentDocument && isVisual}
+        disabled={!hasCurrentDocument}
+        onVisualToggle={onVisualToggle ?? (() => undefined)}
+      />
+
+      {/* Dialogs spawned from actions */}
       <CreateOntologyDialog
         open={createOpen}
         onOpenChange={setCreateOpen}
@@ -209,74 +246,9 @@ export function OntologyHeader({
         />
       )}
 
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon"
-            disabled={!hasCurrentDocument}
-            onClick={onOpenOntologyDetails}
-          >
-            <Settings2 className="size-4" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>Ontology details</TooltipContent>
-      </Tooltip>
-
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setVocabulariesOpen(true)}
-          >
-            <BookMarked className="size-4" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>Reference vocabularies (OLS4 & LOV)</TooltipContent>
-      </Tooltip>
-
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon"
-            disabled={!hasCurrentDocument}
-            onClick={() => setAnalysisOpen(true)}
-          >
-            <Activity className="size-4" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>Ontology analysis & health report</TooltipContent>
-      </Tooltip>
-
       <ReferenceVocabulariesDialog
         open={vocabulariesOpen}
         onOpenChange={setVocabulariesOpen}
-      />
-
-      {currentDocument && (
-        <OntologyAnalysisReportDialog
-          ontologyId={currentDocument.id}
-          ontologyName={currentDocument.name}
-          open={analysisOpen}
-          onOpenChange={setAnalysisOpen}
-          onOpenVocabularies={() => setVocabulariesOpen(true)}
-        />
-      )}
-
-      {defectsReport && (
-        <OntologyDefectsPill
-          report={defectsReport}
-          onClick={onOpenDefectsSheet}
-          disabled={!hasCurrentDocument}
-        />
-      )}
-
-      <VisualToggle
-        isVisual={hasCurrentDocument && isVisual}
-        disabled={!hasCurrentDocument}
-        onVisualToggle={onVisualToggle ?? (() => undefined)}
       />
     </div>
   )
