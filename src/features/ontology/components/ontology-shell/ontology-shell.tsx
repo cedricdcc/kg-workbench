@@ -43,7 +43,8 @@ import {
   filterLocalizedTexts,
   filterNotes,
 } from "../shared/metadata-target"
-import { useQuery } from "@tanstack/react-query"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { toast } from "sonner"
 import { getReferenceOntologies } from "@/features/ontology/server/queries/reference-vocabularies"
 import { ReferenceBrowser } from "../reference-browser/reference-browser"
 import {
@@ -53,9 +54,15 @@ import {
 import { ReferenceVocabulariesDialog } from "../reference-vocabularies-dialog/reference-vocabularies-dialog"
 import {
   runOntologyLinter,
+  type OntologyDefect,
   type OntologyDefectReport,
 } from "@/features/ontology/utils/linter"
 import { getDefectSuppressions } from "@/features/ontology/server/queries/defect-suppressions"
+import { toggleDefectSuppression } from "@/features/ontology/server/actions/defect-suppressions"
+import { updateClass } from "@/features/ontology/server/actions/classes"
+import { deleteRelation } from "@/features/ontology/server/actions/relations"
+import { OntologyDefectsSheet } from "../ontology-defects"
+
 
 
 export interface OntologyShellProps {
@@ -132,6 +139,47 @@ export function OntologyShell({
       suppressedIds: suppressedSet,
     })
   }, [classes, relations, suppressedSet])
+
+  const queryClient = useQueryClient()
+
+  async function handleSuppressDefect(defectId: string) {
+    try {
+      await toggleDefectSuppression(currentDocument.id, defectId, true)
+      toast.success("Defect muted")
+      queryClient.invalidateQueries({
+        queryKey: ["ontology-defect-suppressions", currentDocument.id],
+      })
+    } catch {
+      toast.error("Failed to mute defect")
+    }
+  }
+
+  async function handleRestoreDefect(defectId: string) {
+    try {
+      await toggleDefectSuppression(currentDocument.id, defectId, false)
+      toast.success("Defect restored")
+      queryClient.invalidateQueries({
+        queryKey: ["ontology-defect-suppressions", currentDocument.id],
+      })
+    } catch {
+      toast.error("Failed to restore defect")
+    }
+  }
+
+  async function handleQuickFix(defect: OntologyDefect) {
+    try {
+      if (defect.quickFixType === "clear_parent") {
+        await updateClass(defect.targetId, { parentClassId: null })
+        toast.success(`Cleared parent link on "${defect.targetName}"`)
+      } else if (defect.quickFixType === "delete_relation") {
+        await deleteRelation(defect.targetId)
+        toast.success(`Deleted dangling relation "${defect.targetName}"`)
+      }
+    } catch {
+      toast.error("Failed to apply quick fix")
+    }
+  }
+
 
   const currentModuleIds = useMemo(
     () =>
@@ -533,6 +581,22 @@ export function OntologyShell({
       <ReferenceVocabulariesDialog
         open={referenceDialogOpen}
         onOpenChange={setReferenceDialogOpen}
+      />
+
+      <OntologyDefectsSheet
+        open={defectsSheetOpen}
+        onOpenChange={setDefectsSheetOpen}
+        report={defectsReport}
+        onSelectEntity={(id, kind) => {
+          if (kind === "class") {
+            handleSelectClass(id)
+          } else {
+            handleSelectRelation(id)
+          }
+        }}
+        onSuppress={handleSuppressDefect}
+        onRestore={handleRestoreDefect}
+        onQuickFix={handleQuickFix}
       />
     </div>
   )
