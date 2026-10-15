@@ -1,0 +1,6 @@
+export { OntologyIssuesSheet } from "./ontology-issues-sheet"
+export { DefectCard } from "./defect-card"
+export { StructuralDefectsTab } from "./structural-defects-tab"
+export { RedundanciesTab } from "./redundancies-tab"
+export { StandardsTab } from "./standards-tab"
+export type { OntologyIssuesSheetProps, OntologyIssuesTab } from "./types"
