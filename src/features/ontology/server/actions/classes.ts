@@ -109,7 +109,7 @@ export async function updateClass(
     .where(eq(ontologyClasses.id, id))
     .returning()
   if (!row) throw new Error("Ontology class was not found.")
-  revalidatePath(routes.ontology.root)
+  revalidatePath(routes.ontology.root, "layout")
   return row
 }
 
@@ -117,12 +117,16 @@ export async function deleteClass(id: string): Promise<void> {
   const db = getDb()
   await assertOntologyRecordAccess("ontology_classes", id, db)
   await db.delete(ontologyClasses).where(eq(ontologyClasses.id, id))
-  revalidatePath(routes.ontology.root)
+  revalidatePath(routes.ontology.root, "layout")
 }
 
 export async function reconcileAndAdoptClass(
   rawInput: ReconcileAndAdoptClassInput
-): Promise<{ classId: string; updatedRelations: number; deletedRelations: number }> {
+): Promise<{
+  classId: string
+  updatedRelations: number
+  deletedRelations: number
+}> {
   const input = ReconcileAndAdoptClassInputSchema.parse(rawInput)
   const db = getDb()
   await assertOntologyDocumentAccess(input.ontologyId, db)
@@ -133,7 +137,7 @@ export async function reconcileAndAdoptClass(
     await tx
       .update(ontologyClasses)
       .set({
-        name: input.standardTerm.label || input.standardTerm.curie,
+        name: input.standardTerm.curie || input.standardTerm.label,
         description: input.standardTerm.description ?? "",
       })
       .where(eq(ontologyClasses.id, input.classId))
@@ -178,7 +182,7 @@ export async function reconcileAndAdoptClass(
       }
     }
 
-    revalidatePath(routes.ontology.root)
+    revalidatePath(routes.ontology.root, "layout")
     return {
       classId: input.classId,
       updatedRelations,
@@ -199,10 +203,7 @@ export async function suggestRelationRemappingsAction(input: {
 }): Promise<import("../services/ai-relation-reconciliation").SuggestionResult> {
   const db = getDb()
   await assertOntologyDocumentAccess(input.ontologyId, db)
-  const { suggestRelationRemappings } = await import(
-    "../services/ai-relation-reconciliation"
-  )
+  const { suggestRelationRemappings } =
+    await import("../services/ai-relation-reconciliation")
   return suggestRelationRemappings(input)
 }
-
-

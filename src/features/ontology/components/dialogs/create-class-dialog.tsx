@@ -28,6 +28,8 @@ import {
 import { LocalizedTextEditor } from "@/features/ontology/components/shared/localized-text-editor/localized-text-editor"
 import { createClass } from "@/features/ontology/server/actions/classes"
 import type { OntologyClassWithAttributes } from "@/features/ontology/server/queries"
+import { useOntologyAssist } from "@/features/ontology/hooks/use-ontology-assist"
+import { SmartAssistChip } from "@/features/ontology/components/shared/smart-assist-chip"
 
 const NONE = "__none__"
 
@@ -67,7 +69,17 @@ export function CreateClassDialog({
   const [nameError, setNameError] = useState<string | null>(null)
   const [moduleError, setModuleError] = useState<string | null>(null)
   const [isPending, setIsPending] = useState(false)
-  const canCreateClass = Boolean(name.trim() && moduleId)
+
+  const assist = useOntologyAssist({
+    query: name,
+    entityType: "class",
+    parentClassId,
+    allClasses,
+  })
+
+  const canCreateClass = Boolean(
+    name.trim() && moduleId && !assist.hasCollision && !assist.isCycle
+  )
 
   useEffect(() => {
     if (open) {
@@ -103,8 +115,18 @@ export function CreateClassDialog({
     if (!trimmedName) {
       setNameError("Name is required.")
       valid = false
+    } else if (assist.hasCollision) {
+      setNameError(assist.collisionMessage ?? "Class name collision.")
+      valid = false
     } else {
       setNameError(null)
+    }
+
+    if (assist.isCycle) {
+      toast.error(
+        assist.cycleMessage ?? "Cannot create class: hierarchy cycle detected."
+      )
+      valid = false
     }
 
     if (!moduleId) {
@@ -254,6 +276,13 @@ export function CreateClassDialog({
                 },
               },
             ]}
+          />
+          <SmartAssistChip
+            assist={assist}
+            onAdoptSuggestion={(suggestion) => {
+              setName(suggestion.label)
+              setNameError(null)
+            }}
           />
           {nameError ? (
             <p className="text-xs text-destructive">{nameError}</p>

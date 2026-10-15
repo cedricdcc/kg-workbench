@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { BookMarked, Globe, Layers } from "lucide-react"
+import { BookMarked, Globe, Layers, UploadCloud } from "lucide-react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import {
   Dialog,
@@ -18,6 +18,7 @@ import {
 import { VocabularySearchTab } from "./vocabulary-search-tab"
 import { VocabularyLibraryTab } from "./vocabulary-library-tab"
 import { VocabularyTermsView } from "./vocabulary-terms-view"
+import { VocabularyUploadTab } from "./vocabulary-upload-tab"
 
 interface ReferenceVocabulariesDialogProps {
   open: boolean
@@ -87,7 +88,7 @@ export function ReferenceVocabulariesDialog({
           }}
           className="flex min-h-0 flex-1 flex-col overflow-hidden"
         >
-          <TabsList className="grid w-full shrink-0 grid-cols-2">
+          <TabsList className="grid w-full shrink-0 grid-cols-3">
             <TabsTrigger value="library" className="gap-1.5 text-xs">
               <Layers className="h-3.5 w-3.5" />
               Workspace Library ({vocabularies.length})
@@ -95,6 +96,10 @@ export function ReferenceVocabulariesDialog({
             <TabsTrigger value="search" className="gap-1.5 text-xs">
               <Globe className="h-3.5 w-3.5" />
               Search & Add (OLS4 / LOV)
+            </TabsTrigger>
+            <TabsTrigger value="upload" className="gap-1.5 text-xs">
+              <UploadCloud className="h-3.5 w-3.5" />
+              Upload File / URL
             </TabsTrigger>
           </TabsList>
 
@@ -124,6 +129,18 @@ export function ReferenceVocabulariesDialog({
             <VocabularySearchTab
               existingPrefixes={existingPrefixes}
               onAdded={() => {
+                handleRefresh()
+                setActiveTab("library")
+              }}
+            />
+          </TabsContent>
+
+          <TabsContent
+            value="upload"
+            className="mt-2 flex min-h-0 flex-1 flex-col overflow-hidden data-[state=inactive]:hidden"
+          >
+            <VocabularyUploadTab
+              onSuccess={() => {
                 handleRefresh()
                 setActiveTab("library")
               }}
