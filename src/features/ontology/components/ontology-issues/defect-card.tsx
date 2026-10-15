@@ -3,7 +3,6 @@
 import {
   AlertCircle,
   AlertTriangle,
-  ArrowRight,
   Eye,
   Info,
   RotateCcw,
@@ -62,12 +61,12 @@ export function DefectCard({
         </div>
 
         <div className="flex items-center gap-1.5">
-          {defect.oopsPitfall && (
+          {defect.oopsPitfallId && (
             <Badge
               variant="outline"
               className="px-1.5 py-0 font-mono text-[10px] tracking-wide text-muted-foreground uppercase"
             >
-              {defect.oopsPitfall}
+              {defect.oopsPitfallId}
             </Badge>
           )}
           <Badge
@@ -89,7 +88,7 @@ export function DefectCard({
         <p className="font-medium text-foreground">
           Target: <span className="font-semibold">{defect.targetName}</span>{" "}
           <span className="text-[11px] text-muted-foreground">
-            ({defect.targetKind})
+            ({defect.targetType})
           </span>
         </p>
         <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
@@ -103,7 +102,7 @@ export function DefectCard({
             variant="ghost"
             size="sm"
             className="h-7 gap-1 px-2 text-[11px]"
-            onClick={() => onSelectEntity(defect.targetId, defect.targetKind)}
+            onClick={() => onSelectEntity(defect.targetId, defect.targetType)}
           >
             <Eye className="size-3" />
             View
@@ -117,7 +116,7 @@ export function DefectCard({
               onClick={() => onQuickFix(defect)}
             >
               <Wrench className="size-3" />
-              {defect.quickFixLabel ?? "Quick Fix"}
+              {defect.suggestedAction ?? "Quick Fix"}
             </Button>
           )}
         </div>

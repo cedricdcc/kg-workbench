@@ -59,6 +59,7 @@ import {
 import { getDefectSuppressions } from "@/features/ontology/server/queries/defect-suppressions"
 import { toggleDefectSuppression } from "@/features/ontology/server/actions/defect-suppressions"
 import { updateClass } from "@/features/ontology/server/actions/classes"
+import { deleteRelation } from "@/features/ontology/server/actions/relations"
 import { runFullOntologyAnalysis } from "@/features/ontology/server/actions/ontology-analysis"
 import { addReferenceOntology } from "@/features/ontology/server/actions/reference-vocabularies"
 import type { RecommendedVocabulary } from "@/features/ontology/server/services/ontology-analysis/analyze-ontology"

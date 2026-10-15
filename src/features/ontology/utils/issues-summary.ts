@@ -28,7 +28,6 @@ export function getOntologyIssuesSummary(counts: IssuesCounts): IssuesSummary {
   const hasWarnings = warningCount > 0
   const hasSuggestions = suggestionCount > 0
   const hasInfo = infoCount > 0
-  const hasIssues = hasErrors || hasWarnings || hasSuggestions || hasInfo
 
   if (hasErrors) {
     const errorText = `${errorCount} ${errorCount === 1 ? "Error" : "Errors"}`
