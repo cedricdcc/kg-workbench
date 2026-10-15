@@ -161,7 +161,105 @@ export async function generateOntologyDraft(
     }
   }
 
-  return draft
+  const { draft: healedDraft, healedIssues } = autoHealOntologyDraft(draft, classes)
+  if (healedIssues.length > 0) {
+    console.info(`[generateOntologyDraft] Auto-healed ${healedIssues.length} issues:`, healedIssues)
+  }
+
+  return healedDraft
+}
+
+export function autoHealOntologyDraft(
+  draft: GeneratedOntologyDraft,
+  existingClasses: Array<{ id?: string; name: string }> = []
+): { draft: GeneratedOntologyDraft; healedIssues: string[] } {
+  const healedIssues: string[] = []
+  const clonedDraft: GeneratedOntologyDraft = {
+    ...draft,
+    modules: [...draft.modules],
+    classes: draft.classes.map((cls) => ({
+      ...cls,
+      attributes: cls.attributes ? [...cls.attributes] : [],
+    })),
+    relations: draft.relations.map((rel) => ({ ...rel })),
+    cqMappings: draft.cqMappings.map((cq) => ({ ...cq })),
+    suggestedContext: [...(draft.suggestedContext ?? [])],
+  }
+
+  // 1. Break cycles in class hierarchy
+  const classByName = new Map<string, (typeof clonedDraft.classes)[0]>()
+  for (const cls of clonedDraft.classes) {
+    classByName.set(cls.name.toLowerCase(), cls)
+  }
+
+  for (const cls of clonedDraft.classes) {
+    if (!cls.parentClassName) continue
+
+    const visited = new Set<string>()
+    visited.add(cls.name.toLowerCase())
+
+    let parentName: string | null | undefined = cls.parentClassName.toLowerCase()
+    let isCyclic = false
+
+    while (parentName) {
+      if (visited.has(parentName)) {
+        isCyclic = true
+        break
+      }
+      visited.add(parentName)
+      const parentCls = classByName.get(parentName)
+      parentName = parentCls?.parentClassName?.toLowerCase()
+    }
+
+    if (isCyclic) {
+      const origParent = cls.parentClassName
+      cls.parentClassName = null
+      healedIssues.push(
+        `Cleared cyclic parent link on class "${cls.name}" (points to "${origParent}").`
+      )
+    }
+  }
+
+  // 2. Filter dangling relations
+  const validClassNames = new Set<string>()
+  for (const c of existingClasses) {
+    validClassNames.add(c.name.toLowerCase())
+  }
+  for (const c of clonedDraft.classes) {
+    validClassNames.add(c.name.toLowerCase())
+  }
+  if (clonedDraft.suggestedContext) {
+    for (const ctx of clonedDraft.suggestedContext) {
+      if (ctx.type === "parentClass") {
+        validClassNames.add((ctx.label || ctx.curie).toLowerCase())
+        validClassNames.add(ctx.curie.toLowerCase())
+      }
+    }
+  }
+
+  clonedDraft.relations = clonedDraft.relations.filter((rel) => {
+    const domainLower = rel.domainClassName.toLowerCase()
+    const rangeLower = rel.rangeClassName.toLowerCase()
+    const domainValid = validClassNames.has(domainLower)
+    const rangeValid = validClassNames.has(rangeLower)
+
+    if (!domainValid || !rangeValid) {
+      const missing =
+        !domainValid && !rangeValid
+          ? `domain "${rel.domainClassName}" and range "${rel.rangeClassName}" do not exist`
+          : !domainValid
+          ? `domain "${rel.domainClassName}" does not exist`
+          : `range "${rel.rangeClassName}" does not exist`
+
+      healedIssues.push(
+        `Removed dangling relation "${rel.name}": ${missing}.`
+      )
+      return false
+    }
+    return true
+  })
+
+  return { draft: clonedDraft, healedIssues }
 }
 
 export async function applyOntologyDraft(
@@ -173,9 +271,25 @@ export async function applyOntologyDraft(
     throw new Error("Ontology ID is required.")
   }
 
-  const draft = GeneratedOntologyDraftSchema.parse(rawDraft)
+  const parsedDraft = GeneratedOntologyDraftSchema.parse(rawDraft)
   const db = getDb()
   await assertOntologyDocumentAccess(trimmedId, db)
+
+  const existingClassesBefore = await db
+    .select({ id: ontologyClasses.id, name: ontologyClasses.name })
+    .from(ontologyClasses)
+    .where(eq(ontologyClasses.ontology_id, trimmedId))
+
+  const { draft, healedIssues } = autoHealOntologyDraft(
+    parsedDraft,
+    existingClassesBefore
+  )
+  if (healedIssues.length > 0) {
+    console.info(
+      `[applyOntologyDraft] Auto-healed ${healedIssues.length} issues:`,
+      healedIssues
+    )
+  }
 
   let createdModules = 0
   let createdClasses = 0
@@ -282,6 +396,20 @@ export async function applyOntologyDraft(
                 createdClasses++
               }
             }
+          }
+        }
+      }
+
+      // Wire parent class relationships if parentClassName was provided
+      for (const cls of draft.classes) {
+        if (cls.parentClassName) {
+          const parentId = classMap.get(cls.parentClassName.toLowerCase())
+          const classId = classMap.get(cls.name.toLowerCase())
+          if (parentId && classId && parentId !== classId) {
+            await tx
+              .update(ontologyClasses)
+              .set({ parent_class_id: parentId })
+              .where(eq(ontologyClasses.id, classId))
           }
         }
       }

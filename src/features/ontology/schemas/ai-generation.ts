@@ -24,6 +24,7 @@ export const GeneratedClassSchema = z.object({
   name: z.string().trim().min(1),
   description: z.string().default(""),
   moduleName: z.string().trim().min(1),
+  parentClassName: z.string().trim().nullable().optional(),
   attributes: z.array(GeneratedAttributeSchema).default([]),
   alignment: EntityAlignmentSchema.optional(),
 })
