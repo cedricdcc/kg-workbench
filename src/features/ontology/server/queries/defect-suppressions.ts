@@ -1,3 +1,5 @@
+"use server"
+
 import { eq } from "drizzle-orm"
 import { getDb } from "@/server/database"
 import { ontologyDefectSuppressions } from "@/server/db/schema"
