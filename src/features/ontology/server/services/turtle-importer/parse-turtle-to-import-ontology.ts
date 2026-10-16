@@ -13,6 +13,7 @@ import {
   type OntologyDataTypeId,
 } from "@/features/ontology/utils/data-types"
 import { KNOWN_ONTOLOGY_PREFIXES } from "@/features/ontology/utils/external-uri"
+import { computeOntologyDagreLayout } from "./layout"
 import type { ParseTurtleOptions } from "./types"
 
 const RDF_TYPE = "http://www.w3.org/1999/02/22-rdf-syntax-ns#type"
@@ -532,6 +533,14 @@ export function parseTurtleToImportOntology(
     }
   }
 
+  const classes = Array.from(classByIri.values())
+  const visual = computeOntologyDagreLayout(
+    classes,
+    relations,
+    defaultModuleName,
+    defaultModuleId
+  )
+
   return {
     defaultLanguage: options.defaultLanguage ?? "en",
     languages: [{ code: options.defaultLanguage ?? "en", label: "English" }],
@@ -545,12 +554,13 @@ export function parseTurtleToImportOntology(
         description: ontologyUsecase,
       },
     ],
-    classes: Array.from(classByIri.values()),
+    classes,
     relations,
     relationAttributes: [],
     competencyQuestions: [],
     notes: [],
     examples,
     localizedTexts: [],
+    visual,
   }
 }
