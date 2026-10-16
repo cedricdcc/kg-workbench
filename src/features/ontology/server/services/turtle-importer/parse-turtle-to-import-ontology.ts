@@ -1,11 +1,9 @@
 import { Parser as N3Parser, type Quad } from "n3"
 import type {
-  ImportAttribute,
   ImportClass,
   ImportExample,
   ImportOntology,
   ImportRelation,
-  ImportRestriction,
 } from "@/features/ontology/schemas/import"
 import {
   DEFAULT_ONTOLOGY_DATA_TYPE,
@@ -74,12 +72,16 @@ function traverseRdfList(
   let current: string | undefined = firstNode
 
   while (current && current !== RDF_NIL) {
-    const quads = quadsBySubject.get(current) ?? []
-    const firstQuad = quads.find((q) => q.predicate.value === RDF_FIRST)
+    const subjectQuads: Quad[] = quadsBySubject.get(current) ?? []
+    const firstQuad = subjectQuads.find(
+      (q: Quad) => q.predicate.value === RDF_FIRST
+    )
     if (firstQuad) {
       items.push(firstQuad.object.value)
     }
-    const restQuad = quads.find((q) => q.predicate.value === RDF_REST)
+    const restQuad = subjectQuads.find(
+      (q: Quad) => q.predicate.value === RDF_REST
+    )
     current = restQuad?.object.value
   }
 
@@ -261,7 +263,9 @@ export function parseTurtleToImportOntology(
           if (isRestriction) {
             let propIri = ""
             let cardinality: number | undefined
-            let restType: ImportRestriction["type"] = "exact"
+            let restType: NonNullable<
+              ImportClass["restrictions"]
+            >[number]["type"] = "exact"
             let targetRangeIri: string | undefined
 
             for (const rq of restQuads) {

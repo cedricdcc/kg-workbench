@@ -10,8 +10,6 @@ import type {
   BuildOntologyExportInput,
   BuildOntologyExportResult,
   ImportOntologyFromJsonResult,
-  ImportOntologyFromTurtleInput,
-  ImportOntologyFromTurtleResult,
 } from "./types"
 
 export type {

@@ -10,7 +10,10 @@ import { ImportFormatDialog } from "@/features/ontology/components/import-format
 import { ReferenceVocabulariesDialog } from "@/features/ontology/components/reference-vocabularies-dialog/reference-vocabularies-dialog"
 import type { ExportOntologyMode } from "@/features/ontology/components/export-ontology-dialog/types"
 import { deleteOntologyDocument } from "@/features/ontology/server/actions/ontology-documents"
-import { importOntologyFromJson } from "@/features/ontology/server/actions/ontology-transfer"
+import {
+  importOntologyFromJson,
+  importOntologyFromTurtle,
+} from "@/features/ontology/server/actions/ontology-transfer"
 import { routes } from "@/lib/routes"
 import type {
   OntologyDocument,
@@ -67,6 +70,7 @@ export function OntologyHeader({
   const router = useRouter()
   const searchParams = useSearchParams()
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const turtleFileInputRef = useRef<HTMLInputElement>(null)
 
   const [isImporting, setIsImporting] = useState(false)
   const [createOpen, setCreateOpen] = useState(false)
@@ -138,6 +142,31 @@ export function OntologyHeader({
     }
   }
 
+  async function handleTurtleFileChange(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    e.target.value = ""
+
+    setIsImporting(true)
+    try {
+      const { ontologyId, warnings } = await importOntologyFromTurtle(file)
+      if (warnings.length > 0) {
+        toast.warning("Imported with visual warnings.", {
+          description: warnings.slice(0, 3).join(" "),
+        })
+      } else {
+        toast.success("Ontology imported from Turtle successfully.")
+      }
+      const params = new URLSearchParams()
+      params.set("doc", ontologyId)
+      router.push(`${routes.ontology.root}?${params.toString()}`)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Turtle import failed.")
+    } finally {
+      setIsImporting(false)
+    }
+  }
+
   function handleOpenVocabularies() {
     if (onOpenVocabularies) {
       onOpenVocabularies()
@@ -172,10 +201,12 @@ export function OntologyHeader({
       {/* Landmark 2: Consolidated Actions Menu */}
       <OntologyActionsMenu
         fileInputRef={fileInputRef}
+        turtleFileInputRef={turtleFileInputRef}
         isBusy={isImporting}
         hasCurrentDocument={hasCurrentDocument}
         onCreate={() => setCreateOpen(true)}
         onImport={() => fileInputRef.current?.click()}
+        onImportTurtle={() => turtleFileInputRef.current?.click()}
         onOpenImportFormat={() => setImportFormatOpen(true)}
         onExportJson={() => openExport("json")}
         onExportOwl={() => openExport("owl")}
@@ -183,6 +214,7 @@ export function OntologyHeader({
         onOpenVocabularies={handleOpenVocabularies}
         onDelete={() => setDeleteOpen(true)}
         onFileChange={handleFileChange}
+        onTurtleFileChange={handleTurtleFileChange}
       />
 
       <div className="flex-1" />

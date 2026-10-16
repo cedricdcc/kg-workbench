@@ -1,9 +1,3 @@
-import type {
-  ImportClass,
-  ImportOntology,
-  ImportRelation,
-} from "@/features/ontology/schemas/import"
-
 export interface ParseTurtleOptions {
   fileName?: string
   defaultLanguage?: string

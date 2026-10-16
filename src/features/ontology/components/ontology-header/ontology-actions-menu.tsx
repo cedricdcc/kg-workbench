@@ -5,6 +5,7 @@ import {
   BookMarked,
   ChevronDown,
   Download,
+  FileCode,
   FileJson,
   Import,
   Loader2,
@@ -24,10 +25,12 @@ import {
 
 export interface OntologyActionsMenuProps {
   fileInputRef: RefObject<HTMLInputElement | null>
+  turtleFileInputRef?: RefObject<HTMLInputElement | null>
   isBusy: boolean
   hasCurrentDocument: boolean
   onCreate: () => void
   onImport: () => void
+  onImportTurtle?: () => void
   onOpenImportFormat: () => void
   onExportJson: () => void
   onExportOwl: () => void
@@ -35,14 +38,17 @@ export interface OntologyActionsMenuProps {
   onOpenVocabularies: () => void
   onDelete: () => void
   onFileChange: (e: ChangeEvent<HTMLInputElement>) => void
+  onTurtleFileChange?: (e: ChangeEvent<HTMLInputElement>) => void
 }
 
 export function OntologyActionsMenu({
   fileInputRef,
+  turtleFileInputRef,
   isBusy,
   hasCurrentDocument,
   onCreate,
   onImport,
+  onImportTurtle,
   onOpenImportFormat,
   onExportJson,
   onExportOwl,
@@ -50,6 +56,7 @@ export function OntologyActionsMenu({
   onOpenVocabularies,
   onDelete,
   onFileChange,
+  onTurtleFileChange,
 }: OntologyActionsMenuProps) {
   return (
     <>
@@ -60,6 +67,15 @@ export function OntologyActionsMenu({
         className="hidden"
         onChange={onFileChange}
       />
+      {turtleFileInputRef && onTurtleFileChange && (
+        <input
+          ref={turtleFileInputRef}
+          type="file"
+          accept=".ttl,.n3,.owl"
+          className="hidden"
+          onChange={onTurtleFileChange}
+        />
+      )}
 
       <div className="flex shadow-sm">
         <Button
@@ -92,6 +108,12 @@ export function OntologyActionsMenu({
               <Import className="mr-2 h-4 w-4" />
               Import from JSON...
             </DropdownMenuItem>
+            {onImportTurtle && (
+              <DropdownMenuItem onClick={onImportTurtle}>
+                <FileCode className="mr-2 h-4 w-4" />
+                Import from Turtle (.ttl)...
+              </DropdownMenuItem>
+            )}
             <DropdownMenuItem
               disabled={!hasCurrentDocument}
               onClick={onExportJson}
