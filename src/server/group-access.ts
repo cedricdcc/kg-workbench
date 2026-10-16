@@ -68,11 +68,16 @@ function throwAccessDenied(message: string): never {
 }
 
 export async function getCurrentGroupOrThrow(): Promise<AppAccessGroup> {
-  const cookieStore = await cookies()
-  const group = await getCurrentAppAccessGroup(
-    cookieStore.get(getAppAccessCookie().name)?.value,
-    cookieStore.get(getAppAccessGroupCookie().name)?.value
-  )
+  let cookieVal: string | undefined
+  let groupVal: string | undefined
+  try {
+    const cookieStore = await cookies()
+    cookieVal = cookieStore.get(getAppAccessCookie().name)?.value
+    groupVal = cookieStore.get(getAppAccessGroupCookie().name)?.value
+  } catch {
+    // cookies() is unavailable outside Next.js request scope (e.g. unit tests or scripts)
+  }
+  const group = await getCurrentAppAccessGroup(cookieVal, groupVal)
 
   if (!group) throwAccessDenied("No valid app access group is active.")
   return group
