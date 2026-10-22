@@ -1,3 +1,4 @@
+import { getEffectiveApiKey } from "@/server/api-keys"
 import { listGeminiModels } from "./ai-ontology-generator/gemini-provider"
 
 export type ConnectedRelationContext = {
@@ -89,10 +90,10 @@ export async function suggestRelationRemappings(input: {
     }
   }
 
-  const apiKey = input.apiKey?.trim() || process.env.GEMINI_API_KEY?.trim()
+  const apiKey = input.apiKey?.trim() || (await getEffectiveApiKey("gemini"))
   if (!apiKey) {
     throw new Error(
-      "Missing Gemini API key. Please configure GEMINI_API_KEY in your environment or settings."
+      "Missing Gemini API key. Please configure a key in Settings or set GEMINI_API_KEY in your environment."
     )
   }
 

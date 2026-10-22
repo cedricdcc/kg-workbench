@@ -90,14 +90,16 @@ const GEMINI_RESPONSE_SCHEMA = {
   required: ["modules", "classes", "relations", "cqMappings"],
 }
 
+import { getEffectiveApiKey } from "@/server/api-keys"
+
 export async function requestGeminiDraft(
   prompt: { systemPrompt: string; userPrompt: string },
   options?: { apiKey?: string; model?: string }
 ): Promise<GeneratedOntologyDraft> {
-  const apiKey = options?.apiKey?.trim() || process.env.GEMINI_API_KEY?.trim()
+  const apiKey = options?.apiKey?.trim() || (await getEffectiveApiKey("gemini"))
   if (!apiKey) {
     throw new Error(
-      "Missing Gemini API key. Please set GEMINI_API_KEY in your environment or provide an API key in the generation settings."
+      "Missing Gemini API key. Please configure a key in Settings or set GEMINI_API_KEY in your environment."
     )
   }
 
@@ -174,10 +176,10 @@ export type GeminiModelInfo = {
 export async function listGeminiModels(
   apiKey?: string
 ): Promise<GeminiModelInfo[]> {
-  const key = apiKey?.trim() || process.env.GEMINI_API_KEY?.trim()
+  const key = apiKey?.trim() || (await getEffectiveApiKey("gemini"))
   if (!key) {
     throw new Error(
-      "Missing Gemini API key. Please enter an API key or configure GEMINI_API_KEY in your environment."
+      "Missing Gemini API key. Please configure a key in Settings or set GEMINI_API_KEY in your environment."
     )
   }
 
