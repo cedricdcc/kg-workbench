@@ -6,10 +6,10 @@ import { extractionRuns } from "../src/server/db/schema"
 
 test("extractionRuns schema defines onDelete set null for ontology_id foreign key", () => {
   assert.ok(extractionRuns.ontology_id, "ontology_id column must exist")
-  // Verify foreign key configuration exists
-  // @ts-expect-error accessing internal drizzle metadata
   const foreignKeys =
-    extractionRuns[Symbol.for("drizzle:PgInlineForeignKeys")] || []
+    (extractionRuns as unknown as Record<symbol, unknown>)[
+      Symbol.for("drizzle:PgInlineForeignKeys")
+    ] || []
   assert.ok(
     Array.isArray(foreignKeys),
     "Foreign keys must be defined on extraction_runs"

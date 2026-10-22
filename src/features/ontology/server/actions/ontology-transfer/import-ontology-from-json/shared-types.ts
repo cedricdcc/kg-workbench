@@ -20,4 +20,8 @@ export interface PersistOntologyStructureResult {
   ontologyId: string
   idMaps: ImportIdMaps
 }
-export type ServerClient = ReturnType<typeof getDb>
+type DbInstance = ReturnType<typeof getDb>
+type TransactionInstance = Parameters<
+  Parameters<DbInstance["transaction"]>[0]
+>[0]
+export type ServerClient = DbInstance | TransactionInstance
