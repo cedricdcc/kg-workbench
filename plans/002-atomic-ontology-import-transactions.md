@@ -19,6 +19,7 @@
 - **Risk**: LOW
 - **Depends on**: none
 - **Category**: correctness
+- **Status**: DONE (Fixed in commit `a13ec48`)
 - **Planned at**: commit `4ebf3cc`, 2026-10-16
 
 ## Why this matters
@@ -289,11 +290,11 @@ test("importOntologyFromTurtleInternal parses Turtle and persists ontology trans
 
 ## Done criteria
 
-- [ ] `npm exec pnpm -- typecheck` exits 0 with zero errors
-- [ ] `npm exec pnpm -- lint` exits 0 with zero errors
-- [ ] `npm exec pnpm -- test` exits 0
-- [ ] `grep -rn "await db.transaction" src/features/ontology/server/actions/ontology-transfer/` returns occurrences in both turtle and json importers
-- [ ] `plans/README.md` status row updated to DONE
+- [x] `npm exec pnpm -- typecheck` exits 0 with zero errors
+- [x] `npm exec pnpm -- lint` exits 0 with zero errors
+- [x] `npm exec pnpm -- test` exits 0
+- [x] `grep -rn "await db.transaction" src/features/ontology/server/actions/ontology-transfer/` returns occurrences in both turtle and json importers
+- [x] `plans/README.md` status row updated to DONE (commit `a13ec48`)
 
 ## STOP conditions
 
