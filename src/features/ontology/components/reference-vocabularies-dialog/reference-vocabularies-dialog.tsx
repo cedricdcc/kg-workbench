@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { BookMarked, Globe, Layers, UploadCloud } from "lucide-react"
+import { Activity, BookMarked, Globe, Layers, UploadCloud } from "lucide-react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import {
   Dialog,
@@ -19,6 +19,7 @@ import { VocabularySearchTab } from "./vocabulary-search-tab"
 import { VocabularyLibraryTab } from "./vocabulary-library-tab"
 import { VocabularyTermsView } from "./vocabulary-terms-view"
 import { VocabularyUploadTab } from "./vocabulary-upload-tab"
+import { EndpointTesterTab } from "./endpoint-tester-tab/endpoint-tester-tab"
 
 interface ReferenceVocabulariesDialogProps {
   open: boolean
@@ -88,14 +89,18 @@ export function ReferenceVocabulariesDialog({
           }}
           className="flex min-h-0 flex-1 flex-col overflow-hidden"
         >
-          <TabsList className="grid w-full shrink-0 grid-cols-3">
+          <TabsList className="grid w-full shrink-0 grid-cols-4">
             <TabsTrigger value="library" className="gap-1.5 text-xs">
               <Layers className="h-3.5 w-3.5" />
               Workspace Library ({vocabularies.length})
             </TabsTrigger>
             <TabsTrigger value="search" className="gap-1.5 text-xs">
               <Globe className="h-3.5 w-3.5" />
-              Search & Add (OLS4 / LOV)
+              Search & Add
+            </TabsTrigger>
+            <TabsTrigger value="tester" className="gap-1.5 text-xs">
+              <Activity className="h-3.5 w-3.5" />
+              Endpoint Tester & Registries
             </TabsTrigger>
             <TabsTrigger value="upload" className="gap-1.5 text-xs">
               <UploadCloud className="h-3.5 w-3.5" />
@@ -132,6 +137,16 @@ export function ReferenceVocabulariesDialog({
                 handleRefresh()
                 setActiveTab("library")
               }}
+            />
+          </TabsContent>
+
+          <TabsContent
+            value="tester"
+            className="mt-2 flex min-h-0 flex-1 flex-col overflow-hidden data-[state=inactive]:hidden"
+          >
+            <EndpointTesterTab
+              existingPrefixes={existingPrefixes}
+              onImported={handleRefresh}
             />
           </TabsContent>
 
