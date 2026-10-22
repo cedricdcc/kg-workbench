@@ -1,6 +1,7 @@
 "use client"
 
 import { useMemo, useState } from "react"
+import { useRouter } from "next/navigation"
 
 import type {
   OntologyDocument,
@@ -96,6 +97,7 @@ export function OntologyShell({
   examples,
   relationAttributesByRelation,
 }: OntologyShellProps) {
+  const router = useRouter()
   const [activeModuleId, setActiveModuleId] = useState<string | null>(null)
   const [activeEntityType, setActiveEntityType] =
     useState<EntityType>("classes")
@@ -192,9 +194,27 @@ export function OntologyShell({
       if (defect.quickFixType === "clear_parent") {
         await updateClass(defect.targetId, { parentClassId: null })
         toast.success(`Cleared parent link on "${defect.targetName}"`)
+        router.refresh()
+        queryClient.invalidateQueries({
+          queryKey: ["ontology-analysis", currentDocument.id],
+        })
+        queryClient.invalidateQueries({
+          queryKey: ["ontology-defect-suppressions", currentDocument.id],
+        })
       } else if (defect.quickFixType === "delete_relation") {
         await deleteRelation(defect.targetId)
+        if (selectedEntityId === defect.targetId) {
+          setSelectedEntityId(null)
+          setSelectedEntityKind(null)
+        }
         toast.success(`Deleted dangling relation "${defect.targetName}"`)
+        router.refresh()
+        queryClient.invalidateQueries({
+          queryKey: ["ontology-analysis", currentDocument.id],
+        })
+        queryClient.invalidateQueries({
+          queryKey: ["ontology-defect-suppressions", currentDocument.id],
+        })
       }
     } catch {
       toast.error("Failed to apply quick fix")
