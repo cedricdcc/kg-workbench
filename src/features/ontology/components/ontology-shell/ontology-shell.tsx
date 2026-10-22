@@ -104,16 +104,25 @@ export function OntologyShell({
   const searchParams = useSearchParams()
 
   const rawView = searchParams.get("view")
-  const initialViewMode: OntologyViewMode =
+  const urlViewMode: OntologyViewMode =
     rawView === "questions" || rawView === "visual" || rawView === "schema"
       ? rawView
       : "schema"
 
-  const [viewMode, setViewMode] = useState<OntologyViewMode>(initialViewMode)
+  const [activeViewMode, setActiveViewMode] =
+    useState<OntologyViewMode>(urlViewMode)
+  const [prevUrlView, setPrevUrlView] = useState(urlViewMode)
+
+  if (prevUrlView !== urlViewMode) {
+    setPrevUrlView(urlViewMode)
+    setActiveViewMode(urlViewMode)
+  }
+
+  const viewMode = activeViewMode
   const isVisual = viewMode === "visual"
 
   function handleViewModeChange(mode: OntologyViewMode) {
-    setViewMode(mode)
+    setActiveViewMode(mode)
     const params = new URLSearchParams(searchParams.toString())
     if (mode === "schema") {
       params.delete("view")
@@ -556,9 +565,6 @@ export function OntologyShell({
         viewMode={viewMode}
         onViewModeChange={handleViewModeChange}
         cqCount={cqs.length}
-        onVisualToggle={(visual) =>
-          handleViewModeChange(visual ? "visual" : "schema")
-        }
         onOpenOntologyDetails={() => openOntologyDetails("overview")}
         onOpenVocabularies={() => setReferenceDialogOpen(true)}
         issuesCounts={issuesCounts}

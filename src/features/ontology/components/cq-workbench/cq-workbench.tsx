@@ -71,7 +71,7 @@ export function CqWorkbench({
       // Text search
       if (filters.search.trim()) {
         const query = filters.search.toLowerCase()
-        const questionMatches = cq.question.toLowerCase().includes(query)
+        const questionMatches = (cq.question ?? "").toLowerCase().includes(query)
         const evalItem = evaluationsById[cq.id]
         const subjectMatches = evalItem?.subjectClassName?.toLowerCase().includes(query) ?? false
         const predicateMatches = evalItem?.predicateRelationName?.toLowerCase().includes(query) ?? false

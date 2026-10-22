@@ -244,8 +244,11 @@ export function OntologyHeader({
         disabled={!hasCurrentDocument}
         cqCount={cqCount}
         onViewModeChange={(mode) => {
-          onViewModeChange?.(mode)
-          onVisualToggle?.(mode === "visual")
+          if (onViewModeChange) {
+            onViewModeChange(mode)
+          } else {
+            onVisualToggle?.(mode === "visual")
+          }
         }}
       />
 
