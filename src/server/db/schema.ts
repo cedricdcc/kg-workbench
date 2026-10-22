@@ -103,7 +103,9 @@ export const documentParagraphs = pgTable("document_paragraphs", {
 export const extractionRuns = pgTable("extraction_runs", {
   id: generatedId(),
   document_id: uuid("document_id").notNull(),
-  ontology_id: uuid("ontology_id"),
+  ontology_id: uuid("ontology_id").references(() => ontologyDocuments.id, {
+    onDelete: "set null",
+  }),
   status: text("status").notNull().default("pending"),
   started_at: timestamp("started_at", { withTimezone: true, mode: "string" }),
   completed_at: timestamp("completed_at", {
@@ -397,4 +399,3 @@ export const ontologyDefectSuppressions = pgTable(
     created_at: created_at(),
   }
 )
-
