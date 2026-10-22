@@ -1,4 +1,9 @@
-export type SupportedProvider = "gemini"
+export type SupportedProvider =
+  | "gemini"
+  | "bioportal"
+  | "agroportal"
+  | "ecoportal"
+  | string
 
 export interface ProviderConfigStatus {
   provider: SupportedProvider

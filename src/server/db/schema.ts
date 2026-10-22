@@ -425,3 +425,16 @@ export const userApiKeys = pgTable(
   ]
 )
 
+export const registryEndpointSnapshots = pgTable("registry_endpoint_snapshots", {
+  id: generatedId(),
+  group_key: text("group_key").notNull().default("shared"),
+  provider_id: text("provider_id").notNull(),
+  endpoint_url: text("endpoint_url").notNull(),
+  status_code: integer("status_code").notNull(),
+  latency_ms: integer("latency_ms").notNull(),
+  query_params: text("query_params"),
+  response_payload: text("response_payload").notNull(),
+  detected_vocab_count: integer("detected_vocab_count").notNull().default(0),
+  created_at: created_at(),
+})
+
