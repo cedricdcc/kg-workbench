@@ -1,5 +1,4 @@
-import { getRegistryProvider, listRegistryProviders } from "./providers"
-import { searchAllRegistries, searchRegistries } from "./aggregator"
+import { getRegistryProvider } from "./providers"
 import { fetchOlsTerms, parseOlsTerm } from "./ols4-client"
 import { fetchLovTerms, parseLovTerm } from "./lov-client"
 import type { RegistryTerm } from "./types"

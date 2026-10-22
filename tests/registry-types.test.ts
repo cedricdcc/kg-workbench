@@ -3,8 +3,6 @@ import { test } from "node:test"
 import type {
   VocabularyRegistryProvider,
   EndpointTestResult,
-  RegistrySearchOptions,
-  RegistryFetchOptions,
 } from "../src/features/ontology/server/services/vocabulary-registries/types"
 
 test("Vocabulary Registry Types support provider definition", async () => {

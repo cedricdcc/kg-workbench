@@ -1,6 +1,5 @@
 import type {
   EndpointTestResult,
-  RegistryFetchOptions,
   RegistrySearchOptions,
   RegistrySearchResult,
   RegistryTerm,
@@ -156,10 +155,7 @@ export class BartocProvider implements VocabularyRegistryProvider {
     }
   }
 
-  async fetchTerms(
-    ontologyId: string,
-    _options?: RegistryFetchOptions
-  ): Promise<RegistryTerm[]> {
+  async fetchTerms(): Promise<RegistryTerm[]> {
     return []
   }
 }

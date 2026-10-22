@@ -178,7 +178,7 @@ export function EndpointTesterTab({
         />
       ) : (
         <div className="flex flex-1 items-center justify-center rounded-lg border border-dashed p-8 text-center text-xs text-muted-foreground">
-          Select a preset or custom URL above and click "Test Probe" to inspect endpoints, verify response latency, and import ontologies into workspace standards.
+          Select a preset or custom URL above and click &quot;Test Probe&quot; to inspect endpoints, verify response latency, and import ontologies into workspace standards.
         </div>
       )}
 

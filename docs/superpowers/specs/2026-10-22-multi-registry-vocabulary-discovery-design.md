@@ -58,11 +58,22 @@ export interface VocabularyRegistryProvider {
   readonly name: string
   readonly defaultEndpoint: string
   readonly requiresApiKey: boolean
-  readonly category: "general" | "biomedical" | "agri_eco" | "eu_public" | "iot" | "custom"
-  
-  testEndpoint(endpoint: string, apiKey?: string, query?: string): Promise<EndpointTestResult>
-  search(query: string, options?: RegistrySearchOptions): Promise<RegistrySearchResult[]>
-  fetchTerms(ontologyId: string, options?: RegistryFetchOptions): Promise<RegistryTerm[]>
+  readonly category:
+    "general" | "biomedical" | "agri_eco" | "eu_public" | "iot" | "custom"
+
+  testEndpoint(
+    endpoint: string,
+    apiKey?: string,
+    query?: string
+  ): Promise<EndpointTestResult>
+  search(
+    query: string,
+    options?: RegistrySearchOptions
+  ): Promise<RegistrySearchResult[]>
+  fetchTerms(
+    ontologyId: string,
+    options?: RegistryFetchOptions
+  ): Promise<RegistryTerm[]>
 }
 ```
 
@@ -126,9 +137,9 @@ export async function searchAllRegistries(
 }>
 ```
 
-* Executes queries across all requested providers concurrently using `Promise.allSettled`.
-* Combines and deduplicates results by prefix.
-* Returns partial successes immediately with a list of any failed providers for non-blocking UI notifications.
+- Executes queries across all requested providers concurrently using `Promise.allSettled`.
+- Combines and deduplicates results by prefix.
+- Returns partial successes immediately with a list of any failed providers for non-blocking UI notifications.
 
 ---
 
@@ -137,25 +148,30 @@ export async function searchAllRegistries(
 ### 3.1 Endpoint Snapshots Table (`src/server/db/schema.ts`)
 
 ```typescript
-export const registryEndpointSnapshots = pgTable("registry_endpoint_snapshots", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  group_key: text("group_key").notNull().default("shared"),
-  provider_id: text("provider_id").notNull(),
-  endpoint_url: text("endpoint_url").notNull(),
-  status_code: integer("status_code").notNull(),
-  latency_ms: integer("latency_ms").notNull(),
-  query_params: text("query_params"),
-  response_payload: text("response_payload").notNull(),
-  detected_vocab_count: integer("detected_vocab_count").notNull().default(0),
-  created_at: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-})
+export const registryEndpointSnapshots = pgTable(
+  "registry_endpoint_snapshots",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    group_key: text("group_key").notNull().default("shared"),
+    provider_id: text("provider_id").notNull(),
+    endpoint_url: text("endpoint_url").notNull(),
+    status_code: integer("status_code").notNull(),
+    latency_ms: integer("latency_ms").notNull(),
+    query_params: text("query_params"),
+    response_payload: text("response_payload").notNull(),
+    detected_vocab_count: integer("detected_vocab_count").notNull().default(0),
+    created_at: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  }
+)
 ```
 
 ### 3.2 Registry API Key Storage
 
-* Updates `SupportedProvider` in `src/features/settings/server/types.ts` to allow `"bioportal" | "agroportal" | "ecoportal" | string`.
-* API keys are stored encrypted via existing `user_api_keys` using AES-256-GCM.
-* Resolution falls back to environment variables: `BIOPORTAL_API_KEY`, `AGROPORTAL_API_KEY`.
+- Updates `SupportedProvider` in `src/features/settings/server/types.ts` to allow `"bioportal" | "agroportal" | "ecoportal" | string`.
+- API keys are stored encrypted via existing `user_api_keys` using AES-256-GCM.
+- Resolution falls back to environment variables: `BIOPORTAL_API_KEY`, `AGROPORTAL_API_KEY`.
 
 ---
 
@@ -164,6 +180,7 @@ export const registryEndpointSnapshots = pgTable("registry_endpoint_snapshots", 
 ### 4.1 Updated `ReferenceVocabulariesDialog`
 
 The dialog tabs become:
+
 1. **Workspace Library**: Existing installed reference ontologies.
 2. **Search & Add**: Multi-registry search with provider filter badges.
 3. **Endpoint Tester & Registries**: Live diagnostic & discovery workbench.
@@ -171,28 +188,28 @@ The dialog tabs become:
 
 ### 4.2 Endpoint Tester Tab (`src/features/ontology/components/reference-vocabularies-dialog/endpoint-tester-tab/`)
 
-* **`registry-preset-selector.tsx`**: Quick-select buttons for BARTOC, OLS4, AgroPortal, BioPortal, EcoPortal, EU Vocabularies, LOV, and Custom.
-* **`endpoint-probe-form.tsx`**:
-  * Endpoint URL input.
-  * API key input with show/hide toggle and a "Save Key" button.
-  * Test query input (defaults to e.g. `sosa` or `sensor`).
-  * "Test Probe" action with loading spinner.
-* **`probe-metrics-bar.tsx`**:
-  * HTTP Status pill (`200 OK`, `401 Unauthorized`, etc.).
-  * Latency pill (`190 ms`).
-  * Detected Vocabularies count badge.
-* **`probe-results-panel.tsx`** (Two-column layout):
-  * **Left Column (Detected Vocabularies)**: Cards for each detected ontology with Prefix, Title, Base IRI, and a 1-click **"Import to Standards"** button.
-  * **Right Column (Response Inspector)**:
-    * Formatted, scrollable JSON/RDF viewer.
-    * **"Copy Payload"** and **"Save Snapshot"** action buttons.
-    * Collapsible **"Saved Snapshots"** drawer showing past runs with 1-click re-inspection and delete.
+- **`registry-preset-selector.tsx`**: Quick-select buttons for BARTOC, OLS4, AgroPortal, BioPortal, EcoPortal, EU Vocabularies, LOV, and Custom.
+- **`endpoint-probe-form.tsx`**:
+  - Endpoint URL input.
+  - API key input with show/hide toggle and a "Save Key" button.
+  - Test query input (defaults to e.g. `sosa` or `sensor`).
+  - "Test Probe" action with loading spinner.
+- **`probe-metrics-bar.tsx`**:
+  - HTTP Status pill (`200 OK`, `401 Unauthorized`, etc.).
+  - Latency pill (`190 ms`).
+  - Detected Vocabularies count badge.
+- **`probe-results-panel.tsx`** (Two-column layout):
+  - **Left Column (Detected Vocabularies)**: Cards for each detected ontology with Prefix, Title, Base IRI, and a 1-click **"Import to Standards"** button.
+  - **Right Column (Response Inspector)**:
+    - Formatted, scrollable JSON/RDF viewer.
+    - **"Copy Payload"** and **"Save Snapshot"** action buttons.
+    - Collapsible **"Saved Snapshots"** drawer showing past runs with 1-click re-inspection and delete.
 
 ### 4.3 Multi-Registry `VocabularySearchTab`
 
-* Adds filter pills: `[All] [OLS4] [BARTOC] [AgroPortal] [BioPortal] [EU Vocabularies]`.
-* Displays source badges on results (`OLS4`, `BARTOC`, etc.).
-* Displays non-blocking warning toast if a specific registry timed out while displaying the healthy results.
+- Adds filter pills: `[All] [OLS4] [BARTOC] [AgroPortal] [BioPortal] [EU Vocabularies]`.
+- Displays source badges on results (`OLS4`, `BARTOC`, etc.).
+- Displays non-blocking warning toast if a specific registry timed out while displaying the healthy results.
 
 ---
 
@@ -210,22 +227,22 @@ Located in `src/features/ontology/server/actions/reference-vocabularies.ts`:
 
 ## 6. Error Handling & Edge Cases
 
-* **Third-Party Hangs**: 4-second timeout on all provider network calls.
-* **HTML/Proxy Error Payloads**: Safe detection of non-JSON responses before parsing.
-* **Unauthorized Access**: Probing BioPortal/AgroPortal without a key produces a clean 401 status with clear instructions to provide an API key.
-* **Prefix Collisions**: Results from multiple registries with the same prefix are merged cleanly, preferring the entry with the richest description.
-* **Database Isolation**: All snapshots and reference ontologies respect `group_key` multi-tenancy.
+- **Third-Party Hangs**: 4-second timeout on all provider network calls.
+- **HTML/Proxy Error Payloads**: Safe detection of non-JSON responses before parsing.
+- **Unauthorized Access**: Probing BioPortal/AgroPortal without a key produces a clean 401 status with clear instructions to provide an API key.
+- **Prefix Collisions**: Results from multiple registries with the same prefix are merged cleanly, preferring the entry with the richest description.
+- **Database Isolation**: All snapshots and reference ontologies respect `group_key` multi-tenancy.
 
 ---
 
 ## 7. Verification & Testing
 
-* **Unit Tests**:
-  * `bartoc-provider.test.ts`: JSKOS parsing and search result transformation.
-  * `ontoportal-provider.test.ts`: Header handling and query formation.
-  * `lov-provider.test.ts`: Circuit breaker and timeout simulation.
-  * `aggregator.test.ts`: Parallel querying, deduplication, and partial failure handling.
-* **Snapshot Database Tests**:
-  * Test snapshot insert, retrieval, and deletion.
-* **UI Component Tests**:
-  * Test preset selection, live probe simulation, snapshot save, and import triggers.
+- **Unit Tests**:
+  - `bartoc-provider.test.ts`: JSKOS parsing and search result transformation.
+  - `ontoportal-provider.test.ts`: Header handling and query formation.
+  - `lov-provider.test.ts`: Circuit breaker and timeout simulation.
+  - `aggregator.test.ts`: Parallel querying, deduplication, and partial failure handling.
+- **Snapshot Database Tests**:
+  - Test snapshot insert, retrieval, and deletion.
+- **UI Component Tests**:
+  - Test preset selection, live probe simulation, snapshot save, and import triggers.

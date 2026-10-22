@@ -1,7 +1,5 @@
 import type {
   EndpointTestResult,
-  RegistryFetchOptions,
-  RegistrySearchOptions,
   RegistrySearchResult,
   RegistryTerm,
   VocabularyRegistryProvider,
@@ -18,8 +16,7 @@ export class CustomProvider implements VocabularyRegistryProvider {
 
   async testEndpoint(
     endpoint: string,
-    apiKey?: string,
-    _query?: string
+    apiKey?: string
   ): Promise<EndpointTestResult> {
     const startTime = performance.now()
     if (!endpoint || endpoint === "https://") {
@@ -90,17 +87,11 @@ export class CustomProvider implements VocabularyRegistryProvider {
     }
   }
 
-  async search(
-    _query: string,
-    _options?: RegistrySearchOptions
-  ): Promise<RegistrySearchResult[]> {
+  async search(): Promise<RegistrySearchResult[]> {
     return []
   }
 
-  async fetchTerms(
-    _ontologyId: string,
-    _options?: RegistryFetchOptions
-  ): Promise<RegistryTerm[]> {
+  async fetchTerms(): Promise<RegistryTerm[]> {
     return []
   }
 }

@@ -1,6 +1,5 @@
 import type {
   EndpointTestResult,
-  RegistryFetchOptions,
   RegistrySearchOptions,
   RegistrySearchResult,
   RegistryTerm,
@@ -114,10 +113,7 @@ export class EuVocabulariesProvider implements VocabularyRegistryProvider {
     return testResult.ok ? testResult.detectedVocabularies : []
   }
 
-  async fetchTerms(
-    _ontologyId: string,
-    _options?: RegistryFetchOptions
-  ): Promise<RegistryTerm[]> {
+  async fetchTerms(): Promise<RegistryTerm[]> {
     return []
   }
 }

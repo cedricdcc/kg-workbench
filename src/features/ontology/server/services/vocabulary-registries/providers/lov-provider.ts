@@ -1,7 +1,5 @@
 import type {
   EndpointTestResult,
-  RegistryFetchOptions,
-  RegistrySearchOptions,
   RegistrySearchResult,
   RegistryTerm,
   VocabularyRegistryProvider,
@@ -122,10 +120,7 @@ export class LovProvider implements VocabularyRegistryProvider {
     }
   }
 
-  async search(
-    query: string,
-    _options?: RegistrySearchOptions
-  ): Promise<RegistrySearchResult[]> {
+  async search(query: string): Promise<RegistrySearchResult[]> {
     if (!this.checkCircuit()) {
       return []
     }
@@ -137,10 +132,7 @@ export class LovProvider implements VocabularyRegistryProvider {
     }
   }
 
-  async fetchTerms(
-    ontologyId: string,
-    _options?: RegistryFetchOptions
-  ): Promise<RegistryTerm[]> {
+  async fetchTerms(ontologyId: string): Promise<RegistryTerm[]> {
     return fetchLovTerms(ontologyId)
   }
 }

@@ -66,7 +66,7 @@ export function SavedSnapshotsDrawer({
             </div>
           ) : snapshots.length === 0 ? (
             <div className="p-4 text-center text-xs text-muted-foreground">
-              No saved snapshots yet. Run a probe and click "Save Snapshot" to record diagnostic payloads.
+              No saved snapshots yet. Run a probe and click &quot;Save Snapshot&quot; to record diagnostic payloads.
             </div>
           ) : (
             <ScrollArea className="max-h-48">

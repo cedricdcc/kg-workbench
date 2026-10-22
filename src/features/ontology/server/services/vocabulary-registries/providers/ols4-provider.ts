@@ -1,7 +1,5 @@
 import type {
   EndpointTestResult,
-  RegistryFetchOptions,
-  RegistrySearchOptions,
   RegistrySearchResult,
   RegistryTerm,
   VocabularyRegistryProvider,
@@ -97,18 +95,12 @@ export class Ols4Provider implements VocabularyRegistryProvider {
     }
   }
 
-  async search(
-    query: string,
-    _options?: RegistrySearchOptions
-  ): Promise<RegistrySearchResult[]> {
+  async search(query: string): Promise<RegistrySearchResult[]> {
     const results = await searchOls(query)
     return results.map((r) => ({ ...r, source: "ols4" }))
   }
 
-  async fetchTerms(
-    ontologyId: string,
-    _options?: RegistryFetchOptions
-  ): Promise<RegistryTerm[]> {
+  async fetchTerms(ontologyId: string): Promise<RegistryTerm[]> {
     return fetchOlsTerms(ontologyId)
   }
 }
