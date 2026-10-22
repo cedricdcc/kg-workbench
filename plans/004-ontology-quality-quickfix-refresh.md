@@ -19,6 +19,7 @@
 - **Risk**: LOW
 - **Depends on**: none
 - **Category**: correctness
+- **Status**: DONE (Fixed in commit `77b3e3d`)
 - **Planned at**: commit `4ebf3cc`, 2026-10-16
 
 ## Why this matters
@@ -169,10 +170,10 @@ test("OntologyShell wires useRouter and invokes router.refresh in handleQuickFix
 
 ## Done criteria
 
-- [ ] `npm exec pnpm -- typecheck` exits 0 with zero errors
-- [ ] `npm exec pnpm -- lint` exits 0 with zero errors
-- [ ] `npm exec pnpm -- test` exits 0 with contract test passing
-- [ ] `plans/README.md` status row updated to DONE
+- [x] `npm exec pnpm -- typecheck` exits 0 with zero errors
+- [x] `npm exec pnpm -- lint` exits 0 with zero errors
+- [x] `npm exec pnpm -- test` exits 0 with contract test passing
+- [x] `plans/README.md` status row updated to DONE (commit `77b3e3d`)
 
 ## STOP conditions
 
