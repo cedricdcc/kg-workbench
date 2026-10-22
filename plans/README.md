@@ -12,7 +12,7 @@ honor its STOP conditions, and update your row when done.
 | [002](002-atomic-ontology-import-transactions.md) | Atomic Ontology Import Transactions                                 | P1       | S      | —          | DONE (`a13ec48`) |
 | [003](003-fix-fact-table-html-dom-structure.md)   | Fix Fact Table HTML DOM Structure & Scroll Blowout                  | P1       | S      | —          | DONE (`2f1eae4`) |
 | [004](004-ontology-quality-quickfix-refresh.md)   | Ontology Quality Quick Fix Client Revalidation                      | P1       | S      | —          | DONE (`77b3e3d`) |
-| [005](005-decompose-document-filters-toolbar.md)  | Decompose DocumentFiltersToolbar into Custom Hook and Subcomponents | P2       | M      | —          | TODO   |
+| [005](005-decompose-document-filters-toolbar.md)  | Decompose DocumentFiltersToolbar into Custom Hook and Subcomponents | P2       | M      | —          | DONE (`afa7b99`) |
 
 Status values: `TODO` | `IN PROGRESS` | `DONE` | `BLOCKED (with one-line reason)` | `REJECTED (with one-line rationale)`
 

@@ -19,6 +19,7 @@
 - **Risk**: LOW
 - **Depends on**: none
 - **Category**: tech-debt
+- **Status**: DONE (Fixed in commit `afa7b99`)
 - **Planned at**: commit `4ebf3cc`, 2026-10-16
 
 ## Why this matters
@@ -233,11 +234,11 @@ test("DocumentFiltersToolbar is decomposed into subcomponents under 300 LOC", ()
 
 ## Done criteria
 
-- [ ] `npm exec pnpm -- typecheck` exits 0 with zero errors
-- [ ] `npm exec pnpm -- lint` exits 0 with zero errors
-- [ ] `npm exec pnpm -- test` exits 0 with all existing and decomposition tests passing
-- [ ] `document-filters-toolbar.tsx` is under 180 lines
-- [ ] `plans/README.md` status row updated to DONE
+- [x] `npm exec pnpm -- typecheck` exits 0 with zero errors
+- [x] `npm exec pnpm -- lint` exits 0 with zero errors
+- [x] `npm exec pnpm -- test` exits 0 with all existing and decomposition tests passing
+- [x] `document-filters-toolbar.tsx` is under 180 lines (53 lines)
+- [x] `plans/README.md` status row updated to DONE (commit `afa7b99`)
 
 ## STOP conditions
 
