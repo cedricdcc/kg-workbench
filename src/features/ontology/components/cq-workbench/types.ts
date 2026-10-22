@@ -1,9 +1,10 @@
 import type { OntologyModule } from "@/domain/ontology"
-
-export type {
+import type {
   CqCoverageSummary,
   EvaluatedCqCoverage,
 } from "@/features/ontology/utils/cq-coverage"
+
+export type { CqCoverageSummary, EvaluatedCqCoverage }
 
 export type CqCoverageFilter = "all" | "unmapped" | "covered"
 
