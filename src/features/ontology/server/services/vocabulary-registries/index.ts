@@ -1,37 +1,33 @@
-import { fetchOlsTerms, parseOlsTerm, searchOls } from "./ols4-client"
-import { fetchLovTerms, parseLovTerm, searchLov } from "./lov-client"
-import type { RegistrySearchResult, RegistryTerm } from "./types"
+import { getRegistryProvider, listRegistryProviders } from "./providers"
+import { searchAllRegistries, searchRegistries } from "./aggregator"
+import { fetchOlsTerms, parseOlsTerm } from "./ols4-client"
+import { fetchLovTerms, parseLovTerm } from "./lov-client"
+import type { RegistryTerm } from "./types"
 
 export * from "./types"
+export * from "./providers"
+export * from "./aggregator"
 export { parseOlsTerm, parseLovTerm }
 
-export async function searchRegistries(query: string): Promise<RegistrySearchResult[]> {
-  const [olsResults, lovResults] = await Promise.all([
-    searchOls(query),
-    searchLov(query),
-  ])
-
-  // Combine and deduplicate by prefix
-  const seen = new Set<string>()
-  const combined: RegistrySearchResult[] = []
-
-  for (const item of [...olsResults, ...lovResults]) {
-    const key = item.prefix.toLowerCase()
-    if (!seen.has(key)) {
-      seen.add(key)
-      combined.push(item)
+export async function fetchRegistryTerms(
+  source: string,
+  sourceId: string,
+  options?: { apiKey?: string; endpoint?: string }
+): Promise<RegistryTerm[]> {
+  const provider = getRegistryProvider(source)
+  if (provider) {
+    const terms = await provider.fetchTerms(sourceId, options)
+    if (terms && terms.length > 0) {
+      return terms
     }
   }
 
-  return combined
-}
-
-export async function fetchRegistryTerms(
-  source: "ols" | "lov",
-  sourceId: string
-): Promise<RegistryTerm[]> {
-  if (source === "ols") {
+  if (source === "ols" || source === "ols4") {
     return fetchOlsTerms(sourceId)
   }
-  return fetchLovTerms(sourceId)
+  if (source === "lov") {
+    return fetchLovTerms(sourceId)
+  }
+
+  return []
 }

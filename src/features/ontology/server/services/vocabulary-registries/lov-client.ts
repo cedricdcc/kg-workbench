@@ -1,7 +1,7 @@
 import type { RegistrySearchResult, RegistryTerm } from "./types"
 
 const LOV_BASE = "https://lov.linkeddata.es/dataset/api/v2"
-const TIMEOUT_MS = 10000
+const TIMEOUT_MS = 3000
 
 export interface LovCatalogItem {
   uri: string
