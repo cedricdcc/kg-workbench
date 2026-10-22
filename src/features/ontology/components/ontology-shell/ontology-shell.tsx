@@ -32,6 +32,7 @@ import { OntologyDetailsDialog } from "../ontology-details-dialog/ontology-detai
 import type { OntologyDetailsTab } from "../ontology-details-dialog/types"
 import { DetailPanelShell } from "./detail-panel-shell"
 import { LeftBrowserPanel } from "./left-browser-panel"
+import { CqWorkbench } from "../cq-workbench"
 import {
   getDetailEmptyStateDescription,
   getDetailPanelTitle,
@@ -577,12 +578,14 @@ export function OntologyShell({
 
       <div className="flex min-h-0 flex-1">
         {viewMode === "questions" ? (
-          <div
-            id="cq-workbench-area"
-            className="flex flex-1 flex-col overflow-hidden bg-background"
-          >
-            {/* CqWorkbench placeholder for Task 2, wired in Task 6 */}
-          </div>
+          <CqWorkbench
+            ontologyId={currentDocument.id}
+            cqs={cqs}
+            classes={classes}
+            relations={relations}
+            modules={currentDocument.modules}
+            currentModuleId={resolvedActiveModuleId}
+          />
         ) : (
           <>
             {!isVisual && (

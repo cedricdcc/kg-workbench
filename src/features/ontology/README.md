@@ -8,8 +8,9 @@ scope:
   - module create, import, export, rename, duplicate, and delete flows
   - module, class, relation, and attribute metadata authoring
   - class, relation, relation attribute, and attribute CRUD
-  - browser/detail views and React Flow canvas state
+  - browser/detail views, visual React Flow canvas state, and dedicated competency question workbench
   - persisted layout and class-position state for visual mode and JSON round-trips
+  - competency question concept coverage evaluation (Subject, Predicate, Object triple mapping)
   - AI-assisted ontology draft generation and staged review from competency questions
   - reference vocabularies and standard ontology indexing (OLS4 & LOV)
   - zero-cost local vector similarity matching and semantic entity alignment
@@ -21,7 +22,9 @@ entry_points:
   - path: src/app/ontology/page.tsx
     purpose: Server route that resolves the active ontology document and initial data.
   - path: src/features/ontology/components/ontology-shell/ontology-shell.tsx
-    purpose: Client shell that coordinates browser, detail, visual, and ontology metadata dialog regions.
+    purpose: Client shell that coordinates schema browser, CQ workbench, visual canvas, and ontology dialog regions.
+  - path: src/features/ontology/components/cq-workbench/cq-workbench.tsx
+    purpose: Central competency question workbench coordinating coverage metrics bar, question list, and concept mapping inspector.
 server_entry_points:
   - path: src/features/ontology/server/queries/
     purpose: Focused read layer and client-callable query functions for ontology documents, structure, metadata, reference ontologies, and saved layout state.
@@ -62,23 +65,28 @@ update_this_readme_when:
 - `contextual graph closure`: Option B automatic discovery of direct parents and linked relations for adopted standard terms
 - `adopt class reconciliation`: in-place transformation of existing classes to standard terms without UUID churn or canvas layout disruption, with interactive remapping/deletion of connected relations and attribute retention controls
 - `defect linter`: real-time in-memory TypeScript rule engine mapping structural pitfalls to standard OOPS! codes (P29 cycles, P10 dangling edges, P04 orphan nodes, P24 duplicates, P11 inverse mismatch, P08 missing docs, P28 competing patterns)
-- `defect suppression`: per-ontology persistence of dismissed or accepted defect IDs in `ontologyDefectSuppressions`
-- `OWL export diagnostics`: pre-flight validation scaffolding that attaches diagnostic summary notes and pitfall warnings into RDF/OWL `rdfs:comment` annotations
+- `competency question (CQ)`: user requirement formulated as a natural language question and mapped to ontology triple concepts (`subject_class_id`, `predicate_relation_id`, `object_class_id`)
+- `CQ concept coverage`: evaluation metric classifying CQs as `full` (all 3 mapped), `partial` (1 or 2 concepts mapped), or `unmapped` (0 concepts mapped), with percentage reporting
+- `CQ workbench`: dedicated split-screen view (`?view=questions`) featuring coverage metrics bar, question list with search/filters/reordering, and concept mapping inspector
 
 ## Flow
 
 1. `src/app/ontology/page.tsx` resolves the active ontology document and its related data on the server.
-2. `OntologyShell` switches between browser mode and visual mode while keeping module and selection state local.
+2. `OntologyShell` manages a 3-way workspace mode switch synchronized to the URL (`?view=schema | questions | visual`):
+   - `Schema`: standard split browser and entity inspector
+   - `Questions`: full-workspace Competency Question Workbench with live coverage metrics and concept mapping inspector
+   - `Visual`: React Flow graph canvas workspace
 3. `module-tab-bar.tsx` handles module switching plus module-scoped overview, create/import, rename, duplicate, export, and delete actions.
-4. `left-browser-panel.tsx` wraps class, relation, and reference standard vocabulary browsing through `EntityTypeTabs` when the shell is in browser mode.
+4. `left-browser-panel.tsx` wraps class, relation, and reference standard vocabulary browsing through `EntityTypeTabs` when the shell is in schema mode.
 5. `visual-region.tsx` renders `OntologyCanvas` for React Flow editing and selection when the shell is in visual mode, including class example previews on nodes, selected relation example previews on edges, and defect warning markers on class nodes.
    Manual node and module moves stay local in the canvas state immediately and persist in the background without re-fitting the viewport on each drag save.
-6. `ontology-header.tsx` consolidates 4 landmarks (`DocumentSelector`, expanded `ontology-actions-menu.tsx`, `ontology-issues-pill.tsx`, and `visual-toggle.tsx`), removing header bloat and standalone buttons.
-7. `selection.ts` resolves class/relation selections, while `OntologyShell` also tracks explicit module overview selection.
-8. `detail-panel-shell.tsx` hosts tabbed class, relation, or module detail views with metadata editors for translations, notes, examples, instance rules, relation attributes, contextual defect callout banners, and inline competency-question authoring in the ontology details dialog.
-9. Server actions persist ontology structure changes, metadata rows, saved visual layout state, JSON round-trips, and OWL export generation.
-10. `ontology-issues-pill.tsx` displays concrete typed issue counts (`Error`, `Warning`, `Suggestion`, `Clean`) with zero arbitrary health percentages. Clicking opens `ontology-issues-sheet.tsx` (slide-over drawer with tabs for Structural Defects & Quick-Fixes, Semantic Redundancy Clusters, and Standard Vocabulary Recommendations with 1-click import).
-11. OWL export runs pre-flight validation and injects linter diagnostic notes into the exported ontology comments.
+6. `ontology-header.tsx` consolidates 4 landmarks (`DocumentSelector`, expanded `ontology-actions-menu.tsx`, `ontology-issues-pill.tsx`, and `ontology-view-toggle.tsx`), providing 3-way mode switching between Schema, Questions, and Visual Canvas.
+7. `cq-workbench.tsx` hosts the Competency Question Workbench with real-time coverage progress bar, text search with keyword highlighting, module & coverage filters, and concept mapping inspector with `ClassPicker` and `RelationPicker`.
+8. `selection.ts` resolves class/relation selections, while `OntologyShell` also tracks explicit module overview selection.
+9. `detail-panel-shell.tsx` hosts tabbed class, relation, or module detail views with metadata editors for translations, notes, examples, instance rules, relation attributes, and contextual defect callout banners.
+10. Server actions persist ontology structure changes, CQ mappings and module associations, metadata rows, saved visual layout state, JSON round-trips, and OWL export generation.
+11. `ontology-issues-pill.tsx` displays concrete typed issue counts (`Error`, `Warning`, `Suggestion`, `Clean`) with zero arbitrary health percentages. Clicking opens `ontology-issues-sheet.tsx` (slide-over drawer with tabs for Structural Defects & Quick-Fixes, Semantic Redundancy Clusters, and Standard Vocabulary Recommendations with 1-click import).
+12. OWL export runs pre-flight validation and injects linter diagnostic notes into the exported ontology comments.
 
 ## Constraints
 
