@@ -5,7 +5,12 @@ import { getDb } from "@/server/database"
 import { userApiKeys } from "@/server/db/schema"
 import { getUserIdFromCookies } from "@/server/user-identity"
 
-export type SupportedApiKeyProvider = "gemini"
+export type SupportedApiKeyProvider =
+  | "gemini"
+  | "bioportal"
+  | "agroportal"
+  | "ecoportal"
+  | string
 
 /**
  * Format a masked hint showing the last 4 characters of an API key.
@@ -69,6 +74,14 @@ export async function getEffectiveApiKey(
   // Fallback to server environment variables
   if (provider === "gemini") {
     const envKey = process.env.GEMINI_API_KEY?.trim()
+    return envKey || null
+  }
+  if (provider === "bioportal") {
+    const envKey = process.env.BIOPORTAL_API_KEY?.trim()
+    return envKey || null
+  }
+  if (provider === "agroportal") {
+    const envKey = process.env.AGROPORTAL_API_KEY?.trim()
     return envKey || null
   }
 
