@@ -19,6 +19,7 @@
 - **Risk**: LOW
 - **Depends on**: none
 - **Category**: bug
+- **Status**: DONE (Fixed in commit `5898ed3`)
 - **Planned at**: commit `4ebf3cc`, 2026-10-16
 
 ## Why this matters
@@ -188,11 +189,11 @@ test("migration file for extraction_runs ontology cascade exists with valid vers
 
 ## Done criteria
 
-- [ ] `npm exec pnpm -- typecheck` exits 0 with zero errors
-- [ ] `npm exec pnpm -- lint` exits 0 with zero errors
-- [ ] `npm exec pnpm -- test` exits 0 with all migration and deletion tests passing
-- [ ] Migration filename matches `^(\d{14})_.+\.sql$` format
-- [ ] `plans/README.md` status row updated to DONE
+- [x] `npm exec pnpm -- typecheck` exits 0 with zero errors
+- [x] `npm exec pnpm -- lint` exits 0 with zero errors
+- [x] `npm exec pnpm -- test` exits 0 with all migration and deletion tests passing
+- [x] Migration filename matches `^(\d{14})_.+\.sql$` format
+- [x] `plans/README.md` status row updated to DONE (commit `5898ed3`)
 
 ## STOP conditions
 

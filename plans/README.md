@@ -8,7 +8,7 @@ honor its STOP conditions, and update your row when done.
 
 | Plan                                              | Title                                                               | Priority | Effort | Depends on | Status |
 | ------------------------------------------------- | ------------------------------------------------------------------- | -------- | ------ | ---------- | ------ |
-| [001](001-fix-ontology-delete-cascade.md)         | Fix Ontology Delete Cascade on Connected Extraction Runs            | P1       | S      | —          | TODO   |
+| [001](001-fix-ontology-delete-cascade.md)         | Fix Ontology Delete Cascade on Connected Extraction Runs            | P1       | S      | —          | DONE (`5898ed3`) |
 | [002](002-atomic-ontology-import-transactions.md) | Atomic Ontology Import Transactions                                 | P1       | S      | —          | TODO   |
 | [003](003-fix-fact-table-html-dom-structure.md)   | Fix Fact Table HTML DOM Structure & Scroll Blowout                  | P1       | S      | —          | TODO   |
 | [004](004-ontology-quality-quickfix-refresh.md)   | Ontology Quality Quick Fix Client Revalidation                      | P1       | S      | —          | TODO   |
