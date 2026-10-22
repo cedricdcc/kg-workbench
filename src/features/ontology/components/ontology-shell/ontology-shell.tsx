@@ -1,7 +1,8 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { usePathname, useRouter, useSearchParams } from "next/navigation"
+import { useRouter } from "next/navigation"
+import { usePathname, useSearchParams } from "next/navigation"
 
 import type {
   OntologyDocument,
