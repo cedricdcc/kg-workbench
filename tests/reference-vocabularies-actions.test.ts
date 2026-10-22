@@ -45,3 +45,50 @@ test("getReferenceOntologyTerms returns an empty array for empty ontologyId", as
   assert.ok(Array.isArray(terms))
   assert.equal(terms.length, 0)
 })
+
+test("testRegistryEndpoint probes a registry and returns valid result structure", async () => {
+  const { testRegistryEndpoint } =
+    await import("../src/features/ontology/server/actions/reference-vocabularies")
+  const result = await testRegistryEndpoint({
+    providerId: "bartoc",
+    endpointUrl: "https://bartoc.org/api/voc",
+    testQuery: "sensor",
+  })
+  assert.equal(typeof result.ok, "boolean")
+  assert.equal(typeof result.latencyMs, "number")
+  assert.equal(typeof result.statusCode, "number")
+})
+
+test("saveEndpointSnapshot, getEndpointSnapshots and deleteEndpointSnapshot cycle", async () => {
+  process.env.DATABASE_URL =
+    process.env.DATABASE_URL ||
+    "postgresql://postgres:55a64bfd04c37dbb0af0dfe60c3b60bf@127.0.0.1:5433/postgres"
+  const {
+    saveEndpointSnapshot,
+    getEndpointSnapshots,
+    deleteEndpointSnapshot,
+  } = await import("../src/features/ontology/server/actions/reference-vocabularies")
+
+  const saved = await saveEndpointSnapshot({
+    providerId: "bartoc",
+    endpointUrl: "https://bartoc.org/api/voc",
+    statusCode: 200,
+    latencyMs: 120,
+    queryParams: "?search=sensor",
+    responsePayload: JSON.stringify([{ uri: "http://example.org", prefLabel: { en: "Test" } }]),
+    detectedVocabCount: 1,
+  })
+
+  assert.ok(saved.id)
+
+  const snapshots = await getEndpointSnapshots("bartoc")
+  assert.ok(Array.isArray(snapshots))
+  const found = snapshots.find((s) => s.id === saved.id)
+  assert.ok(found)
+  assert.equal(found?.providerId, "bartoc")
+
+  await deleteEndpointSnapshot(saved.id)
+
+  const afterDelete = await getEndpointSnapshots("bartoc")
+  assert.ok(!afterDelete.some((s) => s.id === saved.id))
+})

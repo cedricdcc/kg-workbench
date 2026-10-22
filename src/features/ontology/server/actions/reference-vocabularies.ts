@@ -1,6 +1,6 @@
 "use server"
 
-import { and, eq, ne, or } from "drizzle-orm"
+import { and, desc, eq, ne, or } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 import { routes } from "@/lib/routes"
 import { getDb } from "@/server/database"
@@ -8,6 +8,8 @@ import {
   ontologyClasses,
   referenceOntologies,
   referenceOntologyTerms,
+  registryEndpointSnapshots,
+  userApiKeys,
 } from "@/server/db/schema"
 import {
   assertOntologyDocumentAccess,
@@ -16,9 +18,14 @@ import {
 } from "@/server/group-access"
 import {
   fetchRegistryTerms,
+  getRegistryProvider,
   searchRegistries,
+  type EndpointTestResult,
   type RegistrySearchResult,
 } from "@/features/ontology/server/services/vocabulary-registries"
+import { formatKeyHint, getEffectiveApiKey } from "@/server/api-keys"
+import { encryptSecret } from "@/server/crypto"
+import { getUserIdFromCookies } from "@/server/user-identity"
 import {
   getLocalBatchEmbeddings,
   getLocalEmbedding,
@@ -30,7 +37,16 @@ export type AddReferenceOntologyInput = {
   prefix: string
   name: string
   baseIri: string
-  sourceRegistry: "ols" | "lov" | "custom"
+  sourceRegistry:
+    | "ols"
+    | "lov"
+    | "bartoc"
+    | "agroportal"
+    | "bioportal"
+    | "ecoportal"
+    | "eu_vocabularies"
+    | "custom"
+    | string
   sourceId: string
   version?: string
 }
@@ -361,4 +377,153 @@ export async function importReferenceOntologyFile(input: {
     name: inserted.name,
     termsSynced: toInsert.length,
   }
+}
+
+export interface SnapshotSummary {
+  id: string
+  providerId: string
+  endpointUrl: string
+  statusCode: number
+  latencyMs: number
+  queryParams?: string | null
+  responsePayload: string
+  detectedVocabCount: number
+  createdAt: string
+}
+
+export async function testRegistryEndpoint(input: {
+  providerId: string
+  endpointUrl: string
+  apiKey?: string
+  testQuery?: string
+}): Promise<EndpointTestResult> {
+  const provider =
+    getRegistryProvider(input.providerId) || getRegistryProvider("custom")
+  if (!provider) {
+    throw new Error(`Provider "${input.providerId}" not found.`)
+  }
+
+  let effectiveKey = input.apiKey?.trim()
+  if (!effectiveKey) {
+    effectiveKey = (await getEffectiveApiKey(input.providerId)) || undefined
+  }
+
+  return provider.testEndpoint(input.endpointUrl, effectiveKey, input.testQuery)
+}
+
+export async function saveEndpointSnapshot(input: {
+  providerId: string
+  endpointUrl: string
+  statusCode: number
+  latencyMs: number
+  queryParams?: string
+  responsePayload: string
+  detectedVocabCount: number
+}): Promise<{ id: string }> {
+  const db = getDb()
+  const groupKey = await getCurrentGroupKeyOrThrow().catch(() => "shared")
+
+  const [inserted] = await db
+    .insert(registryEndpointSnapshots)
+    .values({
+      group_key: groupKey,
+      provider_id: input.providerId,
+      endpoint_url: input.endpointUrl,
+      status_code: input.statusCode,
+      latency_ms: input.latencyMs,
+      query_params: input.queryParams || "",
+      response_payload: input.responsePayload,
+      detected_vocab_count: input.detectedVocabCount,
+    })
+    .returning()
+
+  if (!inserted) {
+    throw new Error("Failed to save endpoint snapshot.")
+  }
+
+  return { id: inserted.id }
+}
+
+export async function getEndpointSnapshots(
+  providerId?: string
+): Promise<SnapshotSummary[]> {
+  const db = getDb()
+  const groupKey = await getCurrentGroupKeyOrThrow().catch(() => "shared")
+
+  const condition = providerId
+    ? and(
+        eq(registryEndpointSnapshots.group_key, groupKey),
+        eq(registryEndpointSnapshots.provider_id, providerId)
+      )
+    : eq(registryEndpointSnapshots.group_key, groupKey)
+
+  const rows = await db
+    .select()
+    .from(registryEndpointSnapshots)
+    .where(condition)
+    .orderBy(desc(registryEndpointSnapshots.created_at))
+    .limit(50)
+
+  return rows.map((r) => ({
+    id: r.id,
+    providerId: r.provider_id,
+    endpointUrl: r.endpoint_url,
+    statusCode: r.status_code,
+    latencyMs: r.latency_ms,
+    queryParams: r.query_params,
+    responsePayload: r.response_payload,
+    detectedVocabCount: r.detected_vocab_count,
+    createdAt: r.created_at
+      ? new Date(r.created_at).toISOString()
+      : new Date().toISOString(),
+  }))
+}
+
+export async function deleteEndpointSnapshot(
+  snapshotId: string
+): Promise<void> {
+  const db = getDb()
+  await db
+    .delete(registryEndpointSnapshots)
+    .where(eq(registryEndpointSnapshots.id, snapshotId))
+}
+
+export async function saveRegistryApiKey(
+  provider: string,
+  apiKey: string
+): Promise<void> {
+  const trimmed = apiKey?.trim()
+  if (!trimmed) {
+    throw new Error("API key cannot be empty.")
+  }
+
+  const userId = await getUserIdFromCookies()
+  if (!userId) {
+    throw new Error("User session cookie not found.")
+  }
+
+  const { ciphertext, iv, tag } = encryptSecret(trimmed)
+  const keyHint = formatKeyHint(trimmed)
+
+  const db = getDb()
+  await db
+    .insert(userApiKeys)
+    .values({
+      user_id: userId,
+      provider,
+      encrypted_key: ciphertext,
+      iv,
+      tag,
+      key_hint: keyHint,
+    })
+    .onConflictDoUpdate({
+      target: [userApiKeys.user_id, userApiKeys.provider],
+      set: {
+        encrypted_key: ciphertext,
+        iv,
+        tag,
+        key_hint: keyHint,
+        updated_at: new Date().toISOString(),
+      },
+    })
 }
