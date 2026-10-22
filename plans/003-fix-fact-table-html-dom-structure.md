@@ -19,6 +19,7 @@
 - **Risk**: LOW
 - **Depends on**: none
 - **Category**: bug
+- **Status**: DONE (Fixed in commit `2f1eae4`)
 - **Planned at**: commit `4ebf3cc`, 2026-10-16
 
 ## Why this matters
@@ -229,11 +230,11 @@ test("FactTableRow does not wrap tr in TooltipProvider or render dialog as direc
 
 ## Done criteria
 
-- [ ] `npm exec pnpm -- typecheck` exits 0 with zero errors
-- [ ] `npm exec pnpm -- lint` exits 0 with zero errors
-- [ ] `npm exec pnpm -- test` exits 0 with new contract tests passing
-- [ ] `FactTableRow` contains zero non-`<tr>` top-level children
-- [ ] `plans/README.md` status row updated to DONE
+- [x] `npm exec pnpm -- typecheck` exits 0 with zero errors
+- [x] `npm exec pnpm -- lint` exits 0 with zero errors
+- [x] `npm exec pnpm -- test` exits 0 with new contract tests passing
+- [x] `FactTableRow` contains zero non-`<tr>` top-level children
+- [x] `plans/README.md` status row updated to DONE (commit `2f1eae4`)
 
 ## STOP conditions
 
