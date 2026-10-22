@@ -8,6 +8,7 @@ import {
   real,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core"
 
@@ -399,3 +400,28 @@ export const ontologyDefectSuppressions = pgTable(
     created_at: created_at(),
   }
 )
+
+export const userApiKeys = pgTable(
+  "user_api_keys",
+  {
+    id: generatedId(),
+    user_id: text("user_id").notNull(),
+    provider: text("provider").notNull(),
+    encrypted_key: text("encrypted_key").notNull(),
+    iv: text("iv").notNull(),
+    tag: text("tag").notNull(),
+    key_hint: text("key_hint").notNull(),
+    created_at: created_at(),
+    updated_at: timestamp("updated_at", {
+      withTimezone: true,
+      mode: "string",
+    }).defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("user_api_keys_user_provider_idx").on(
+      table.user_id,
+      table.provider
+    ),
+  ]
+)
+
