@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { useRouter } from "next/navigation"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 
 import type {
   OntologyDocument,
@@ -23,7 +23,7 @@ import { ClassBrowser } from "../class-browser/class-browser"
 import { ClassDetail } from "../class-detail/class-detail"
 import { EmptyState } from "../shared/empty-state"
 import { ModuleTabBar } from "../module-tab-bar"
-import { OntologyHeader } from "../ontology-header"
+import { OntologyHeader, type OntologyViewMode } from "../ontology-header"
 import { RelationBrowser } from "../relation-browser/relation-browser"
 import { RelationDetail } from "../relation-detail/relation-detail"
 import type { EntityType } from "../entity-type-tabs"
@@ -98,6 +98,30 @@ export function OntologyShell({
   relationAttributesByRelation,
 }: OntologyShellProps) {
   const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+
+  const rawView = searchParams.get("view")
+  const initialViewMode: OntologyViewMode =
+    rawView === "questions" || rawView === "visual" || rawView === "schema"
+      ? rawView
+      : "schema"
+
+  const [viewMode, setViewMode] = useState<OntologyViewMode>(initialViewMode)
+  const isVisual = viewMode === "visual"
+
+  function handleViewModeChange(mode: OntologyViewMode) {
+    setViewMode(mode)
+    const params = new URLSearchParams(searchParams.toString())
+    if (mode === "schema") {
+      params.delete("view")
+    } else {
+      params.set("view", mode)
+    }
+    const query = params.toString()
+    router.replace(`${pathname}${query ? `?${query}` : ""}`, { scroll: false })
+  }
+
   const [activeModuleId, setActiveModuleId] = useState<string | null>(null)
   const [activeEntityType, setActiveEntityType] =
     useState<EntityType>("classes")
@@ -108,7 +132,6 @@ export function OntologyShell({
   const [selectedModuleDetailId, setSelectedModuleDetailId] = useState<
     string | null
   >(null)
-  const [isVisual, setIsVisual] = useState(false)
   const [isDetailCollapsed, setIsDetailCollapsed] = useState(false)
   const [detailsOpen, setDetailsOpen] = useState(false)
   const [detailsTab, setDetailsTab] = useState<OntologyDetailsTab>("overview")
@@ -528,7 +551,12 @@ export function OntologyShell({
         languages={languages}
         localizedTexts={allLocalizedTexts}
         isVisual={isVisual}
-        onVisualToggle={setIsVisual}
+        viewMode={viewMode}
+        onViewModeChange={handleViewModeChange}
+        cqCount={cqs.length}
+        onVisualToggle={(visual) =>
+          handleViewModeChange(visual ? "visual" : "schema")
+        }
         onOpenOntologyDetails={() => openOntologyDetails("overview")}
         onOpenVocabularies={() => setReferenceDialogOpen(true)}
         issuesCounts={issuesCounts}
@@ -548,95 +576,106 @@ export function OntologyShell({
       />
 
       <div className="flex min-h-0 flex-1">
-        {!isVisual && (
-          <LeftBrowserPanel
-            activeType={activeEntityType}
-            onTypeChange={handleTypeChange}
-            classCount={filteredClasses.length}
-            relationCount={filteredRelations.length}
-            referenceCount={referenceVocabularies.length}
-            classBrowser={
-              <ClassBrowser
-                classes={filteredClasses}
-                relations={filteredRelations}
-                modules={currentDocument.modules}
-                notes={classNotes}
-                examples={classExamples}
+        {viewMode === "questions" ? (
+          <div
+            id="cq-workbench-area"
+            className="flex flex-1 flex-col overflow-hidden bg-background"
+          >
+            {/* CqWorkbench placeholder for Task 2, wired in Task 6 */}
+          </div>
+        ) : (
+          <>
+            {!isVisual && (
+              <LeftBrowserPanel
+                activeType={activeEntityType}
+                onTypeChange={handleTypeChange}
+                classCount={filteredClasses.length}
+                relationCount={filteredRelations.length}
+                referenceCount={referenceVocabularies.length}
+                classBrowser={
+                  <ClassBrowser
+                    classes={filteredClasses}
+                    relations={filteredRelations}
+                    modules={currentDocument.modules}
+                    notes={classNotes}
+                    examples={classExamples}
+                    ontologyId={currentDocument.id}
+                    languages={languages}
+                    defaultLanguage={currentDocument.default_language}
+                    activeModuleId={resolvedActiveModuleId}
+                    selectedId={resolvedSelectedEntityId}
+                    onSelect={handleSelectClass}
+                    onCreated={handleClassCreated}
+                  />
+                }
+                relationBrowser={
+                  <RelationBrowser
+                    relations={filteredRelations}
+                    relationAttributesByRelation={relationAttributesByRelation}
+                    classMap={classMap}
+                    notes={relationNotes}
+                    examples={relationExamples}
+                    ontologyId={currentDocument.id}
+                    allClasses={classes}
+                    modules={currentDocument.modules}
+                    languages={languages}
+                    defaultLanguage={currentDocument.default_language}
+                    currentModuleId={resolvedActiveModuleId}
+                    selectedId={resolvedSelectedEntityId}
+                    onSelect={handleSelectRelation}
+                    onCreated={handleRelationCreated}
+                  />
+                }
+                referenceBrowser={
+                  <ReferenceBrowser
+                    onOpenManage={() => setReferenceDialogOpen(true)}
+                    selectedTermId={selectedReferenceTerm?.curie}
+                    onSelectTerm={(term) => {
+                      setSelectedEntityKind(null)
+                      setSelectedEntityId(null)
+                      setSelectedModuleDetailId(null)
+                      setSelectedReferenceTerm(term)
+                      setIsDetailCollapsed(false)
+                    }}
+                  />
+                }
+              />
+            )}
+
+            {isVisual && (
+              <VisualRegion
                 ontologyId={currentDocument.id}
+                classes={classes}
+                relations={relations}
+                examples={examples}
+                notes={notes}
+                modules={currentDocument.modules}
                 languages={languages}
                 defaultLanguage={currentDocument.default_language}
                 activeModuleId={resolvedActiveModuleId}
-                selectedId={resolvedSelectedEntityId}
-                onSelect={handleSelectClass}
-                onCreated={handleClassCreated}
+                selectedEntityId={resolvedSelectedEntityId}
+                savedPositions={savedPositions}
+                savedModuleLayouts={savedModuleLayouts}
+                defectsByTargetId={defectsReport.defectsByTargetId}
+                onSelectClass={handleSelectClass}
+                onSelectRelation={handleSelectRelation}
+                onSelectModule={handleSelectModuleOverview}
+                onClassCreated={handleClassCreated}
+                onRelationCreated={handleRelationCreated}
               />
-            }
-            relationBrowser={
-              <RelationBrowser
-                relations={filteredRelations}
-                relationAttributesByRelation={relationAttributesByRelation}
-                classMap={classMap}
-                notes={relationNotes}
-                examples={relationExamples}
-                ontologyId={currentDocument.id}
-                allClasses={classes}
-                modules={currentDocument.modules}
-                languages={languages}
-                defaultLanguage={currentDocument.default_language}
-                currentModuleId={resolvedActiveModuleId}
-                selectedId={resolvedSelectedEntityId}
-                onSelect={handleSelectRelation}
-                onCreated={handleRelationCreated}
-              />
-            }
-            referenceBrowser={
-              <ReferenceBrowser
-                onOpenManage={() => setReferenceDialogOpen(true)}
-                selectedTermId={selectedReferenceTerm?.curie}
-                onSelectTerm={(term) => {
-                  setSelectedEntityKind(null)
-                  setSelectedEntityId(null)
-                  setSelectedModuleDetailId(null)
-                  setSelectedReferenceTerm(term)
-                  setIsDetailCollapsed(false)
-                }}
-              />
-            }
-          />
-        )}
+            )}
 
-        {isVisual && (
-          <VisualRegion
-            ontologyId={currentDocument.id}
-            classes={classes}
-            relations={relations}
-            examples={examples}
-            notes={notes}
-            modules={currentDocument.modules}
-            languages={languages}
-            defaultLanguage={currentDocument.default_language}
-            activeModuleId={resolvedActiveModuleId}
-            selectedEntityId={resolvedSelectedEntityId}
-            savedPositions={savedPositions}
-            savedModuleLayouts={savedModuleLayouts}
-            defectsByTargetId={defectsReport.defectsByTargetId}
-            onSelectClass={handleSelectClass}
-            onSelectRelation={handleSelectRelation}
-            onSelectModule={handleSelectModuleOverview}
-            onClassCreated={handleClassCreated}
-            onRelationCreated={handleRelationCreated}
-          />
+            <DetailPanelShell
+              title={detailPanelTitle}
+              isVisual={isVisual}
+              isCollapsed={isVisual && isDetailCollapsed}
+              onCollapse={() => setIsDetailCollapsed(true)}
+              onExpand={() => setIsDetailCollapsed(false)}
+            >
+              {detailContent}
+            </DetailPanelShell>
+          </>
         )}
-
-        <DetailPanelShell
-          title={detailPanelTitle}
-          isVisual={isVisual}
-          isCollapsed={isVisual && isDetailCollapsed}
-          onCollapse={() => setIsDetailCollapsed(true)}
-          onExpand={() => setIsDetailCollapsed(false)}
-        >
-          {detailContent}
-        </DetailPanelShell>
       </div>
 
       <OntologyDetailsDialog

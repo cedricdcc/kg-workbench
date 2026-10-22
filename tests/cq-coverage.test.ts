@@ -5,14 +5,20 @@ import {
   evaluateCqCoverage,
 } from "../src/features/ontology/utils/cq-coverage"
 
+import type { OntologyRelation } from "@/domain/ontology"
+import type {
+  OntologyClassWithAttributes,
+  OntologyCQWithModules,
+} from "@/features/ontology/server/queries"
+
 const mockClasses = [
   { id: "c1", name: "User" },
   { id: "c2", name: "Document" },
-] as any
+] as unknown as OntologyClassWithAttributes[]
 
 const mockRelations = [
   { id: "r1", name: "authoredBy", domain_class_id: "c2", range_class_id: "c1" },
-] as any
+] as unknown as OntologyRelation[]
 
 test("evaluateCqCoverage flags full coverage when subject, predicate, and object exist", () => {
   const cq = {
@@ -21,7 +27,7 @@ test("evaluateCqCoverage flags full coverage when subject, predicate, and object
     subject_class_id: "c2",
     predicate_relation_id: "r1",
     object_class_id: "c1",
-  } as any
+  } as unknown as OntologyCQWithModules
 
   const evaluated = evaluateCqCoverage(cq, mockClasses, mockRelations)
   assert.equal(evaluated.status, "full")
@@ -40,7 +46,7 @@ test("evaluateCqCoverage flags partial coverage when some concepts missing", () 
     subject_class_id: "c2",
     predicate_relation_id: null,
     object_class_id: null,
-  } as any
+  } as unknown as OntologyCQWithModules
 
   const evaluated = evaluateCqCoverage(cq, mockClasses, mockRelations)
   assert.equal(evaluated.status, "partial")
@@ -55,7 +61,7 @@ test("evaluateCqCoverage flags unmapped when no concepts mapped", () => {
     subject_class_id: null,
     predicate_relation_id: null,
     object_class_id: null,
-  } as any
+  } as unknown as OntologyCQWithModules
 
   const evaluated = evaluateCqCoverage(cq, mockClasses, mockRelations)
   assert.equal(evaluated.status, "unmapped")
@@ -71,7 +77,7 @@ test("calculateCqCoverageSummary aggregates metrics and calculates percentage", 
     },
     { id: "2", subject_class_id: "c2" },
     { id: "3" },
-  ] as any
+  ] as unknown as OntologyCQWithModules[]
 
   const summary = calculateCqCoverageSummary(cqs, mockClasses, mockRelations)
   assert.equal(summary.totalCount, 3)

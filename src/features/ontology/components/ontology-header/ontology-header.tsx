@@ -29,7 +29,11 @@ import type {
 import { DocumentSelector } from "./document-selector"
 import { DeleteConfirmationDialog } from "./delete-confirmation-dialog"
 import { OntologyActionsMenu } from "./ontology-actions-menu"
-import { VisualToggle } from "./visual-toggle"
+import {
+  OntologyViewToggle,
+  type OntologyViewMode,
+} from "./ontology-view-toggle"
+export type { OntologyViewMode }
 import { OntologyIssuesPill } from "./ontology-issues-pill"
 import type { OntologyDefectReport } from "@/features/ontology/utils/linter"
 import type { IssuesCounts } from "@/features/ontology/utils/issues-summary"
@@ -43,6 +47,9 @@ export interface OntologyHeaderProps {
   localizedTexts: OntologyLocalizedText[]
   isVisual: boolean
   onVisualToggle?: (checked: boolean) => void
+  viewMode?: OntologyViewMode
+  onViewModeChange?: (mode: OntologyViewMode) => void
+  cqCount?: number
   onOpenOntologyDetails?: () => void
   onOpenVocabularies?: () => void
   issuesCounts?: IssuesCounts
@@ -60,6 +67,9 @@ export function OntologyHeader({
   localizedTexts,
   isVisual,
   onVisualToggle,
+  viewMode,
+  onViewModeChange,
+  cqCount = 0,
   onOpenOntologyDetails,
   onOpenVocabularies,
   issuesCounts,
@@ -228,11 +238,15 @@ export function OntologyHeader({
         />
       )}
 
-      {/* Landmark 4: Visual Canvas / Table View Toggle */}
-      <VisualToggle
-        isVisual={hasCurrentDocument && isVisual}
+      {/* Landmark 4: View Mode Switch (Schema | Questions | Visual) */}
+      <OntologyViewToggle
+        viewMode={viewMode ?? (isVisual ? "visual" : "schema")}
         disabled={!hasCurrentDocument}
-        onVisualToggle={onVisualToggle ?? (() => undefined)}
+        cqCount={cqCount}
+        onViewModeChange={(mode) => {
+          onViewModeChange?.(mode)
+          onVisualToggle?.(mode === "visual")
+        }}
       />
 
       {/* Dialogs spawned from actions */}
