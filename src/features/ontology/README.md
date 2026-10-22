@@ -12,7 +12,9 @@ scope:
   - persisted layout and class-position state for visual mode and JSON round-trips
   - competency question concept coverage evaluation (Subject, Predicate, Object triple mapping)
   - AI-assisted ontology draft generation and staged review from competency questions
-  - reference vocabularies and standard ontology indexing (OLS4 & LOV)
+  - reference vocabularies and standard ontology indexing (OLS4, BARTOC, OntoPortal Alliance, EU Vocabularies, LOV)
+  - pluggable multi-registry provider subsystem with circuit breaker and resilient parallel aggregator
+  - live endpoint tester workbench with latency diagnostics, response payload inspection, and snapshot persistence
   - zero-cost local vector similarity matching and semantic entity alignment
   - real-time in-memory ontology defect linter and OOPS! pitfall mapping engine
   - defect suppressions persistence and quick-fix actions (clearing parent cycles, pruning dangling relations)
@@ -60,7 +62,9 @@ update_this_readme_when:
 - `class position`: saved node position for visual mode
 - `module layout`: saved module bounds for the canvas
 - `export dependency`: class or relation reference that crosses the current export selection and needs an explicit decision
-- `reference ontology`: external vocabulary or standard ontology (e.g. SOSA/SSN, ENVO, Schema.org) cached locally from OLS4/LOV
+- `reference ontology`: external vocabulary or standard ontology (e.g. SOSA/SSN, ENVO, Schema.org) cached locally from OLS4, BARTOC, OntoPortal, EU Vocabularies, or LOV
+- `registry provider`: pluggable adapter implementing normalized vocabulary discovery, search, term extraction, and endpoint diagnostics
+- `endpoint snapshot`: persisted diagnostic payload and response metadata stored in PostgreSQL for offline replay and schema analysis
 - `vector alignment`: zero-cost local 384-d semantic embedding matching suggesting reuse, subClassOf, or equivalence for entities
 - `contextual graph closure`: Option B automatic discovery of direct parents and linked relations for adopted standard terms
 - `adopt class reconciliation`: in-place transformation of existing classes to standard terms without UUID churn or canvas layout disruption, with interactive remapping/deletion of connected relations and attribute retention controls
