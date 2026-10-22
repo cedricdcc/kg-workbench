@@ -19,11 +19,9 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import {
-  deleteUserApiKey,
-  saveUserApiKey,
-  testUserApiKey,
-} from "@/features/settings/server"
+import { deleteUserApiKey } from "@/features/settings/server/actions/delete-api-key"
+import { saveUserApiKey } from "@/features/settings/server/actions/save-api-key"
+import { testUserApiKey } from "@/features/settings/server/actions/test-api-key"
 import type { ApiKeyCardProps } from "./types"
 
 export function ApiKeyCard({ status, onStatusChange }: ApiKeyCardProps) {

@@ -1,6 +1,6 @@
 "use client"
 
-import type { ProviderConfigStatus } from "@/features/settings/server"
+import type { ProviderConfigStatus } from "@/features/settings/server/types"
 import { ApiKeysSection } from "../api-keys-section/api-keys-section"
 
 interface SettingsShellProps {

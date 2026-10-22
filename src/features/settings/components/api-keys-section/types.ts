@@ -1,4 +1,4 @@
-import type { ProviderConfigStatus } from "@/features/settings/server"
+import type { ProviderConfigStatus } from "@/features/settings/server/types"
 
 export interface ApiKeyCardProps {
   status: ProviderConfigStatus

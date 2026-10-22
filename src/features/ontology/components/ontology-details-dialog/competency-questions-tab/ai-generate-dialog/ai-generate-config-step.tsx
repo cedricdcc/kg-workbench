@@ -1,8 +1,11 @@
 "use client"
 
 import { useState } from "react"
-import { Check, Cpu, Loader2, RefreshCw, Sparkles } from "lucide-react"
+import { Check, Cpu, ExternalLink, Loader2, RefreshCw, Sparkles } from "lucide-react"
+import Link from "next/link"
 import { toast } from "sonner"
+
+import { routes } from "@/lib/routes"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -125,14 +128,23 @@ export function AiGenerateConfigStep({
       {provider === "gemini" && (
         <div className="space-y-3.5 rounded-md border p-3.5">
           <div className="space-y-1.5">
-            <Label htmlFor="gemini-key" className="text-xs font-medium">
-              Gemini API Key
-            </Label>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="gemini-key" className="text-xs font-medium">
+                Gemini API Key
+              </Label>
+              <Link
+                href={routes.settings.root}
+                className="text-[11px] text-muted-foreground hover:text-foreground inline-flex items-center gap-1 transition-colors"
+              >
+                Manage in Settings
+                <ExternalLink className="h-3 w-3" />
+              </Link>
+            </div>
             <div className="flex gap-2">
               <Input
                 id="gemini-key"
                 type="password"
-                placeholder="Leave blank to use server GEMINI_API_KEY, or paste key"
+                placeholder="Using key from Settings/Environment, or paste override"
                 value={geminiApiKey}
                 onChange={(e) => {
                   setGeminiApiKey(e.target.value)
