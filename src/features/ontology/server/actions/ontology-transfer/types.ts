@@ -5,6 +5,13 @@ export interface ImportOntologyFromJsonResult {
   warnings: string[]
 }
 
+export interface ImportOntologyFromTurtleInput {
+  content: string
+  fileName?: string
+}
+
+export type ImportOntologyFromTurtleResult = ImportOntologyFromJsonResult
+
 export interface BuildOntologyExportInput {
   exportLanguage: string
   missingTranslationBehavior: "fallback" | "strict"

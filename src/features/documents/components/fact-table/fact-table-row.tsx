@@ -6,12 +6,7 @@ import { CheckCheck, Loader2, RotateCcw, X } from "lucide-react"
 import type { EntityWithAttributes } from "@/domain/documents"
 import { ClassPicker } from "@/components/shared/class-picker"
 import { Button } from "@/components/ui/button"
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { getReviewStatusStyles } from "@/lib/colors"
 import { cn } from "@/lib/utils"
 import { useDocumentsWorkspace } from "../../hooks/documents-workspace-state"
@@ -138,22 +133,12 @@ export function FactTableRow({
 
   return (
     <>
-      <PendingEntityClassDialog
-        dialogType={mutations.dialogType}
-        affectedFacts={mutations.affectedFacts}
-        currentClassName={currentClassName}
-        pendingClassName={pendingClassName}
-        onConfirm={mutations.handleConfirmEntityClass}
-        onCancel={mutations.handleCancelEntityClass}
-      />
-
-      <TooltipProvider>
-        <tr
-          className={cn(
-            rowClassName,
-            primaryAnchor ? "border-b-0" : "border-b"
-          )}
-        >
+      <tr
+        className={cn(
+          rowClassName,
+          primaryAnchor ? "border-b-0" : "border-b"
+        )}
+      >
           <td className="w-8 px-2 py-1.5 align-middle">
             <input
               type="checkbox"
@@ -307,6 +292,14 @@ export function FactTableRow({
           </td>
 
           <td className="w-20 px-2 py-1.5 text-right align-middle">
+            <PendingEntityClassDialog
+              dialogType={mutations.dialogType}
+              affectedFacts={mutations.affectedFacts}
+              currentClassName={currentClassName}
+              pendingClassName={pendingClassName}
+              onConfirm={mutations.handleConfirmEntityClass}
+              onCancel={mutations.handleCancelEntityClass}
+            />
             {!(status === "rejected" && structurallyUnmapped) && (
               <div className="flex items-center justify-end gap-0.5">
                 {(status === "accepted" || status === "rejected") && (
@@ -396,7 +389,6 @@ export function FactTableRow({
             rowClassName={rowClassName}
           />
         ) : null}
-      </TooltipProvider>
     </>
   )
 }

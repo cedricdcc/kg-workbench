@@ -13,6 +13,7 @@ import type {
   OntologyClassWithAttributes,
 } from "@/features/ontology/server/queries"
 import { OntologyCanvas } from "../../flow/ontology-canvas"
+import type { OntologyDefect } from "../../utils/linter"
 
 interface VisualRegionProps {
   ontologyId: string
@@ -27,6 +28,7 @@ interface VisualRegionProps {
   selectedEntityId: string | null
   savedPositions: ClassPositionsByModule
   savedModuleLayouts: ModuleLayoutMap
+  defectsByTargetId?: Record<string, OntologyDefect[]>
   onSelectClass: (classId: string) => void
   onSelectRelation: (relationId: string) => void
   onSelectModule: (moduleId: string) => void
@@ -47,6 +49,7 @@ export function VisualRegion({
   selectedEntityId,
   savedPositions,
   savedModuleLayouts,
+  defectsByTargetId,
   onSelectClass,
   onSelectRelation,
   onSelectModule,
@@ -68,6 +71,7 @@ export function VisualRegion({
         selectedEntityId={selectedEntityId}
         savedPositions={savedPositions}
         savedModuleLayouts={savedModuleLayouts}
+        defectsByTargetId={defectsByTargetId}
         onSelectClass={onSelectClass}
         onSelectRelation={onSelectRelation}
         onSelectModule={onSelectModule}

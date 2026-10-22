@@ -11,6 +11,23 @@ import type { OntologyModule, OntologyRelation } from "@/domain/ontology"
 
 import type { OntologyClassWithAttributes } from "../../server/queries"
 import type { ClassNodeData, OntologyEdge, OntologyNode } from "../types"
+import type { OntologyDefect } from "../../utils/linter"
+
+function getDefectInfo(
+  classId: string,
+  defectsByTargetId?: Record<string, OntologyDefect[]>
+) {
+  const classDefects = defectsByTargetId?.[classId]
+  if (!classDefects || classDefects.length === 0) {
+    return { hasDefect: false, defectSeverity: undefined, defectCount: 0 }
+  }
+  const defectSeverity = classDefects.some((d) => d.severity === "error")
+    ? ("error" as const)
+    : classDefects.some((d) => d.severity === "warning")
+    ? ("warning" as const)
+    : ("info" as const)
+  return { hasDefect: true, defectSeverity, defectCount: classDefects.length }
+}
 
 export function buildModuleView(
   allClasses: OntologyClassWithAttributes[],
@@ -21,7 +38,8 @@ export function buildModuleView(
   modules: OntologyModule[],
   activeModuleId: string,
   modulePositions: Record<string, { x: number; y: number }> | undefined,
-  classColors: Map<string, string>
+  classColors: Map<string, string>,
+  defectsByTargetId?: Record<string, OntologyDefect[]>
 ): { nodes: OntologyNode[]; edges: OntologyEdge[] } {
   const moduleClasses = allClasses.filter((c) => c.module_id === activeModuleId)
   const moduleClassIds = new Set(moduleClasses.map((c) => c.id))
@@ -59,6 +77,7 @@ export function buildModuleView(
           noteCount: classNoteCountByClassId.get(cls.id) ?? 0,
           examples: classExamplesByClassId.get(cls.id) ?? [],
           external: false,
+          ...getDefectInfo(cls.id, defectsByTargetId),
         },
       })
     ),
@@ -83,6 +102,7 @@ export function buildModuleView(
             noteCount: classNoteCountByClassId.get(cls.id) ?? 0,
             examples: classExamplesByClassId.get(cls.id) ?? [],
             external: true,
+            ...getDefectInfo(cls.id, defectsByTargetId),
           },
         } satisfies Node<ClassNodeData, "classNode">,
       ]

@@ -21,6 +21,7 @@ import {
 import { getAllowedBulkActions, type BulkAction } from "../../utils/fact-status"
 import { getFactCompleteness } from "../../utils/fact-completeness"
 import { useDocumentsWorkspace } from "../../hooks/documents-workspace-state"
+import { TooltipProvider } from "@/components/ui/tooltip"
 import { FactTableHeader } from "./fact-table-header"
 import { FactTableRow } from "./fact-table-row"
 import { FactTableSectionRows } from "./fact-table-section-rows"
@@ -224,74 +225,76 @@ export function FactTable({ onRevealInspector }: FactTableProps) {
     : sortedFacts.length === 0
 
   return (
-    <div className="flex h-full flex-col">
-      <FactTableToolbar
-        allVisibleSelected={
-          selectedIds.size === allVisibleFacts.length &&
-          allVisibleFacts.length > 0
-        }
-        allowedActions={allowedBulkActions}
-        groupBySection={groupBySection}
-        isBulkPending={isBulkPending}
-        selectedCount={selectedIds.size}
-        visibleCount={allVisibleFacts.length}
-        onBulkReview={handleBulkReview}
-        onToggleSelectAll={toggleSelectAll}
-        onGroupBySectionChange={setGroupBySection}
-        onExpandAll={handleExpandAll}
-        onCollapseAll={handleCollapseAll}
-      />
+    <TooltipProvider delayDuration={200}>
+      <div className="flex h-full flex-col">
+        <FactTableToolbar
+          allVisibleSelected={
+            selectedIds.size === allVisibleFacts.length &&
+            allVisibleFacts.length > 0
+          }
+          allowedActions={allowedBulkActions}
+          groupBySection={groupBySection}
+          isBulkPending={isBulkPending}
+          selectedCount={selectedIds.size}
+          visibleCount={allVisibleFacts.length}
+          onBulkReview={handleBulkReview}
+          onToggleSelectAll={toggleSelectAll}
+          onGroupBySectionChange={setGroupBySection}
+          onExpandAll={handleExpandAll}
+          onCollapseAll={handleCollapseAll}
+        />
 
-      <div className="min-h-0 flex-1 overflow-auto">
-        {isEmpty ? (
-          <p className="px-4 py-6 text-center text-xs text-muted-foreground">
-            No facts match the current filter.
-          </p>
-        ) : (
-          <table className="w-full table-fixed text-xs">
-            <FactTableHeader
-              sortField={sortField}
-              sortDir={sortDir}
-              onSort={handleSort}
-            />
-            <tbody>
-              {groupBySection
-                ? sectionGroups.map((group) => (
-                    <FactTableSectionRows
-                      key={group.sectionId}
-                      group={group}
-                      open={openSectionIds.has(group.sectionId)}
-                      documentId={documentId}
-                      completenessOntology={ontology ?? null}
-                      entityById={entityById}
-                      selectedIds={selectedIds}
-                      onRevealInspector={onRevealInspector}
-                      onOpenChange={(open) =>
-                        handleSectionOpenChange(group.sectionId, open)
-                      }
-                      onSectionFilterChange={handleSectionFilterChange}
-                      onCrossChapterFilterChange={
-                        handleCrossChapterFilterChange
-                      }
-                      onSelectChange={handleSelectChange}
-                    />
-                  ))
-                : sortedFacts.map((fact) => (
-                    <FactTableRow
-                      key={fact.id}
-                      fact={fact}
-                      documentId={documentId}
-                      completenessOntology={ontology ?? null}
-                      entityById={entityById}
-                      selectedIds={selectedIds}
-                      onRevealInspector={onRevealInspector}
-                      onSelectChange={handleSelectChange}
-                    />
-                  ))}
-            </tbody>
-          </table>
-        )}
+        <div className="min-h-0 flex-1 overflow-auto">
+          {isEmpty ? (
+            <p className="px-4 py-6 text-center text-xs text-muted-foreground">
+              No facts match the current filter.
+            </p>
+          ) : (
+            <table className="w-full table-fixed text-xs">
+              <FactTableHeader
+                sortField={sortField}
+                sortDir={sortDir}
+                onSort={handleSort}
+              />
+              <tbody>
+                {groupBySection
+                  ? sectionGroups.map((group) => (
+                      <FactTableSectionRows
+                        key={group.sectionId}
+                        group={group}
+                        open={openSectionIds.has(group.sectionId)}
+                        documentId={documentId}
+                        completenessOntology={ontology ?? null}
+                        entityById={entityById}
+                        selectedIds={selectedIds}
+                        onRevealInspector={onRevealInspector}
+                        onOpenChange={(open) =>
+                          handleSectionOpenChange(group.sectionId, open)
+                        }
+                        onSectionFilterChange={handleSectionFilterChange}
+                        onCrossChapterFilterChange={
+                          handleCrossChapterFilterChange
+                        }
+                        onSelectChange={handleSelectChange}
+                      />
+                    ))
+                  : sortedFacts.map((fact) => (
+                      <FactTableRow
+                        key={fact.id}
+                        fact={fact}
+                        documentId={documentId}
+                        completenessOntology={ontology ?? null}
+                        entityById={entityById}
+                        selectedIds={selectedIds}
+                        onRevealInspector={onRevealInspector}
+                        onSelectChange={handleSelectChange}
+                      />
+                    ))}
+              </tbody>
+            </table>
+          )}
+        </div>
       </div>
-    </div>
+    </TooltipProvider>
   )
 }

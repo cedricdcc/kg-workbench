@@ -8,6 +8,23 @@ import type {
   OntologyClassWithAttributes,
 } from "../../server/queries"
 import type { OntologyEdge, OntologyNode } from "../types"
+import type { OntologyDefect } from "../../utils/linter"
+
+function getDefectInfo(
+  classId: string,
+  defectsByTargetId?: Record<string, OntologyDefect[]>
+) {
+  const classDefects = defectsByTargetId?.[classId]
+  if (!classDefects || classDefects.length === 0) {
+    return { hasDefect: false, defectSeverity: undefined, defectCount: 0 }
+  }
+  const defectSeverity = classDefects.some((d) => d.severity === "error")
+    ? ("error" as const)
+    : classDefects.some((d) => d.severity === "warning")
+    ? ("warning" as const)
+    : ("info" as const)
+  return { hasDefect: true, defectSeverity, defectCount: classDefects.length }
+}
 
 const GROUP_PADDING_X = 20
 const GROUP_PADDING_TOP = 36
@@ -27,7 +44,8 @@ export function buildAllModulesView(
   modules: OntologyModule[],
   savedModuleLayouts: ModuleLayoutMap | undefined,
   savedPositions: ClassPositionsByModule | undefined,
-  classColors: Map<string, string>
+  classColors: Map<string, string>,
+  defectsByTargetId?: Record<string, OntologyDefect[]>
 ): { nodes: OntologyNode[]; edges: OntologyEdge[] } {
   const groupWidth = NODE_WIDTH + 2 * GROUP_PADDING_X
 
@@ -125,6 +143,7 @@ export function buildAllModulesView(
           noteCount: classNoteCountByClassId.get(cls.id) ?? 0,
           examples: classExamplesByClassId.get(cls.id) ?? [],
           external: false,
+          ...getDefectInfo(cls.id, defectsByTargetId),
         },
       })
     })

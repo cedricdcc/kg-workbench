@@ -8,6 +8,7 @@ export * from "./types"
 export * from "./prompt-builder"
 export * from "./gemini-provider"
 export * from "./ollama-provider"
+export * from "./draft-guardrails"
 
 export async function executeAiGeneration(
   context: PromptContext,

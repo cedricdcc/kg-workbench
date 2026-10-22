@@ -24,6 +24,7 @@ import {
 import {
   executeAiGeneration,
   listGeminiModels,
+  autoHealOntologyDraft,
   type AiGenerationOptions,
   type GeminiModelInfo,
 } from "@/features/ontology/server/services/ai-ontology-generator"
@@ -161,7 +162,12 @@ export async function generateOntologyDraft(
     }
   }
 
-  return draft
+  const { draft: healedDraft, healedIssues } = autoHealOntologyDraft(draft, classes)
+  if (healedIssues.length > 0) {
+    console.info(`[generateOntologyDraft] Auto-healed ${healedIssues.length} issues:`, healedIssues)
+  }
+
+  return healedDraft
 }
 
 export async function applyOntologyDraft(
@@ -173,9 +179,25 @@ export async function applyOntologyDraft(
     throw new Error("Ontology ID is required.")
   }
 
-  const draft = GeneratedOntologyDraftSchema.parse(rawDraft)
+  const parsedDraft = GeneratedOntologyDraftSchema.parse(rawDraft)
   const db = getDb()
   await assertOntologyDocumentAccess(trimmedId, db)
+
+  const existingClassesBefore = await db
+    .select({ id: ontologyClasses.id, name: ontologyClasses.name })
+    .from(ontologyClasses)
+    .where(eq(ontologyClasses.ontology_id, trimmedId))
+
+  const { draft, healedIssues } = autoHealOntologyDraft(
+    parsedDraft,
+    existingClassesBefore
+  )
+  if (healedIssues.length > 0) {
+    console.info(
+      `[applyOntologyDraft] Auto-healed ${healedIssues.length} issues:`,
+      healedIssues
+    )
+  }
 
   let createdModules = 0
   let createdClasses = 0
@@ -282,6 +304,20 @@ export async function applyOntologyDraft(
                 createdClasses++
               }
             }
+          }
+        }
+      }
+
+      // Wire parent class relationships if parentClassName was provided
+      for (const cls of draft.classes) {
+        if (cls.parentClassName) {
+          const parentId = classMap.get(cls.parentClassName.toLowerCase())
+          const classId = classMap.get(cls.name.toLowerCase())
+          if (parentId && classId && parentId !== classId) {
+            await tx
+              .update(ontologyClasses)
+              .set({ parent_class_id: parentId })
+              .where(eq(ontologyClasses.id, classId))
           }
         }
       }

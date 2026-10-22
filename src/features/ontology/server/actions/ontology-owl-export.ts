@@ -4,7 +4,14 @@ import {
   buildOntologyExport,
   type BuildOntologyExportInput,
 } from "./ontology-transfer"
-import { buildOwlOntology } from "../owl-export/owl-builder"
+import {
+  buildOwlOntology,
+  convertToLinterEntities,
+} from "../owl-export/owl-builder"
+import {
+  runOntologyLinter,
+  type OntologyDefectReport,
+} from "@/features/ontology/utils/linter"
 
 export type BuildOntologyOwlExportInput = Omit<
   BuildOntologyExportInput,
@@ -16,6 +23,7 @@ export type BuildOntologyOwlExportInput = Omit<
 export interface BuildOntologyOwlExportResult {
   content: string
   fileName: string
+  defectsReport?: OntologyDefectReport
 }
 
 export async function buildOntologyOwlExport({
@@ -37,8 +45,16 @@ export async function buildOntologyOwlExport({
     includeVisual: false,
   })
 
+  const { classes, relations } = convertToLinterEntities(jsonExport.payload)
+  const defectsReport = runOntologyLinter({ classes, relations })
+
   return {
-    content: buildOwlOntology({ baseIri, ontology: jsonExport.payload }),
+    content: buildOwlOntology({
+      baseIri,
+      ontology: jsonExport.payload,
+      defectsReport,
+    }),
     fileName: jsonExport.fileName.replace(/\.json$/i, ".owl"),
+    defectsReport,
   }
 }

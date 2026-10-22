@@ -2,6 +2,10 @@
 
 import { buildOntologyExportInternal } from "./build-ontology-export"
 import { importOntologyFromJsonInternal } from "./import-ontology-from-json"
+import {
+  importOntologyFromTurtle,
+  importOntologyFromTurtleInternal,
+} from "./import-ontology-from-turtle"
 import type {
   BuildOntologyExportInput,
   BuildOntologyExportResult,
@@ -12,7 +16,11 @@ export type {
   BuildOntologyExportInput,
   BuildOntologyExportResult,
   ImportOntologyFromJsonResult,
+  ImportOntologyFromTurtleInput,
+  ImportOntologyFromTurtleResult,
 } from "./types"
+
+export { importOntologyFromTurtleInternal }
 
 export async function buildOntologyExport(
   input: BuildOntologyExportInput
@@ -25,3 +33,5 @@ export async function importOntologyFromJson(
 ): Promise<ImportOntologyFromJsonResult> {
   return importOntologyFromJsonInternal(file)
 }
+
+export { importOntologyFromTurtle }

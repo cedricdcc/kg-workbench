@@ -26,6 +26,8 @@ import { EntityInstances } from "../shared/entity-instances/entity-instances"
 import { LocalizedTextEditor } from "../shared/localized-text-editor/localized-text-editor"
 import { NotesEditor } from "../shared/notes-editor/notes-editor"
 import { SemanticAlignmentsCard } from "../shared/semantic-alignments-card/semantic-alignments-card"
+import { DefectCalloutBanner } from "../shared/defect-callout-banner"
+import type { OntologyDefect } from "@/features/ontology/utils/linter"
 
 interface ClassDetailProps {
   cls: OntologyClassWithAttributes
@@ -46,6 +48,8 @@ interface ClassDetailProps {
     languages: OntologyLanguage[]
     defaultLanguage?: string | null
   }
+  activeDefects?: OntologyDefect[]
+  onQuickFix?: (defect: OntologyDefect) => void
 }
 
 export function ClassDetail({
@@ -58,6 +62,9 @@ export function ClassDetail({
   languages,
   defaultLanguage,
   localizedTexts,
+  activeDefects,
+  onQuickFix,
+
   notes,
   examples,
   attributeMetadata,
@@ -110,6 +117,13 @@ export function ClassDetail({
       </TabsList>
 
       <TabsContent value="general" className="mt-1.5 space-y-6">
+        {activeDefects && activeDefects.length > 0 && (
+          <DefectCalloutBanner
+            defects={activeDefects}
+            onQuickFix={onQuickFix}
+          />
+        )}
+
         <ClassDetailHeader
           cls={cls}
           modules={modules}

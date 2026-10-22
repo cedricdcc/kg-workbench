@@ -13,6 +13,10 @@ scope:
   - AI-assisted ontology draft generation and staged review from competency questions
   - reference vocabularies and standard ontology indexing (OLS4 & LOV)
   - zero-cost local vector similarity matching and semantic entity alignment
+  - real-time in-memory ontology defect linter and OOPS! pitfall mapping engine
+  - defect suppressions persistence and quick-fix actions (clearing parent cycles, pruning dangling relations)
+  - contextual defect warning callouts in detail views and visual canvas node badges
+  - AI generation guardrails and OWL export pre-flight linter diagnostics notes scaffolding
 entry_points:
   - path: src/app/ontology/page.tsx
     purpose: Server route that resolves the active ontology document and initial data.
@@ -27,6 +31,8 @@ server_entry_points:
     purpose: AI-assisted ontology draft generation from competency questions with local vector grounding, contextual expansion, and transactional persistence.
   - path: src/features/ontology/server/services/ai-relation-reconciliation.ts
     purpose: On-demand AI relation reconciliation and property remapping suggestion service using Gemini.
+  - path: src/features/ontology/utils/linter/
+    purpose: Pure TypeScript defect linter rule engine, OOPS! pitfall taxonomy, and in-memory health analysis.
 update_this_readme_when:
   - route composition changes
   - shell or canvas flow changes
@@ -55,6 +61,9 @@ update_this_readme_when:
 - `vector alignment`: zero-cost local 384-d semantic embedding matching suggesting reuse, subClassOf, or equivalence for entities
 - `contextual graph closure`: Option B automatic discovery of direct parents and linked relations for adopted standard terms
 - `adopt class reconciliation`: in-place transformation of existing classes to standard terms without UUID churn or canvas layout disruption, with interactive remapping/deletion of connected relations and attribute retention controls
+- `defect linter`: real-time in-memory TypeScript rule engine mapping structural pitfalls to standard OOPS! codes (P29 cycles, P10 dangling edges, P04 orphan nodes, P24 duplicates, P11 inverse mismatch, P08 missing docs, P28 competing patterns)
+- `defect suppression`: per-ontology persistence of dismissed or accepted defect IDs in `ontologyDefectSuppressions`
+- `OWL export diagnostics`: pre-flight validation scaffolding that attaches diagnostic summary notes and pitfall warnings into RDF/OWL `rdfs:comment` annotations
 
 ## Flow
 
@@ -62,12 +71,14 @@ update_this_readme_when:
 2. `OntologyShell` switches between browser mode and visual mode while keeping module and selection state local.
 3. `module-tab-bar.tsx` handles module switching plus module-scoped overview, create/import, rename, duplicate, export, and delete actions.
 4. `left-browser-panel.tsx` wraps class, relation, and reference standard vocabulary browsing through `EntityTypeTabs` when the shell is in browser mode.
-5. `visual-region.tsx` renders `OntologyCanvas` for React Flow editing and selection when the shell is in visual mode, including class example previews on nodes and selected relation example previews on edges.
+5. `visual-region.tsx` renders `OntologyCanvas` for React Flow editing and selection when the shell is in visual mode, including class example previews on nodes, selected relation example previews on edges, and defect warning markers on class nodes.
    Manual node and module moves stay local in the canvas state immediately and persist in the background without re-fitting the viewport on each drag save.
-6. `ontology-header.tsx` handles ontology creation, JSON import, import-format guidance, and export dialog entry points.
+6. `ontology-header.tsx` consolidates 4 landmarks (`DocumentSelector`, expanded `ontology-actions-menu.tsx`, `ontology-issues-pill.tsx`, and `visual-toggle.tsx`), removing header bloat and standalone buttons.
 7. `selection.ts` resolves class/relation selections, while `OntologyShell` also tracks explicit module overview selection.
-8. `detail-panel-shell.tsx` hosts tabbed class, relation, or module detail views with metadata editors for translations, notes, examples, instance rules, relation attributes, and inline competency-question authoring in the ontology details dialog.
+8. `detail-panel-shell.tsx` hosts tabbed class, relation, or module detail views with metadata editors for translations, notes, examples, instance rules, relation attributes, contextual defect callout banners, and inline competency-question authoring in the ontology details dialog.
 9. Server actions persist ontology structure changes, metadata rows, saved visual layout state, JSON round-trips, and OWL export generation.
+10. `ontology-issues-pill.tsx` displays concrete typed issue counts (`Error`, `Warning`, `Suggestion`, `Clean`) with zero arbitrary health percentages. Clicking opens `ontology-issues-sheet.tsx` (slide-over drawer with tabs for Structural Defects & Quick-Fixes, Semantic Redundancy Clusters, and Standard Vocabulary Recommendations with 1-click import).
+11. OWL export runs pre-flight validation and injects linter diagnostic notes into the exported ontology comments.
 
 ## Constraints
 

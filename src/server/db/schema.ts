@@ -103,7 +103,9 @@ export const documentParagraphs = pgTable("document_paragraphs", {
 export const extractionRuns = pgTable("extraction_runs", {
   id: generatedId(),
   document_id: uuid("document_id").notNull(),
-  ontology_id: uuid("ontology_id"),
+  ontology_id: uuid("ontology_id").references(() => ontologyDocuments.id, {
+    onDelete: "set null",
+  }),
   status: text("status").notNull().default("pending"),
   started_at: timestamp("started_at", { withTimezone: true, mode: "string" }),
   completed_at: timestamp("completed_at", {
@@ -382,6 +384,18 @@ export const ontologyClassRestrictions = pgTable(
     }),
     restriction_type: text("restriction_type").notNull(), // 'min_cardinality' | 'max_cardinality' | 'exact_cardinality'
     cardinality_value: integer("cardinality_value").notNull().default(1),
+    created_at: created_at(),
+  }
+)
+
+export const ontologyDefectSuppressions = pgTable(
+  "ontology_defect_suppressions",
+  {
+    id: generatedId(),
+    ontology_id: uuid("ontology_id")
+      .notNull()
+      .references(() => ontologyDocuments.id, { onDelete: "cascade" }),
+    defect_id: text("defect_id").notNull(),
     created_at: created_at(),
   }
 )

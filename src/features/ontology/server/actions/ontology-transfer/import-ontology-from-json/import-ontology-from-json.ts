@@ -16,30 +16,51 @@ export async function importOntologyFromJsonInternal(
     ),
     warnings: string[] = [],
     db = getDb()
-  const { ontologyId, idMaps } = await persistOntologyStructure({
-    db,
-    parsed,
-    fileName: file.name,
-    warnings,
+  const ontologyId = await db.transaction(async (tx) => {
+    const { ontologyId, idMaps } = await persistOntologyStructure({
+      db: tx,
+      parsed,
+      fileName: file.name,
+      warnings,
+    })
+    const pendingCQExampleRefs = await persistCompetencyQuestions({
+      db: tx,
+      ontologyId,
+      parsed,
+      idMaps,
+      warnings,
+    })
+    await persistImportMetadata({
+      db: tx,
+      ontologyId,
+      parsed,
+      idMaps,
+      warnings,
+    })
+    await persistImportExamples({
+      db: tx,
+      ontologyId,
+      parsed,
+      idMaps,
+      pendingCQExampleRefs,
+      warnings,
+    })
+    if (parsed.visual) {
+      await appendVisualInserts({
+        db: tx,
+        ontologyId,
+        parsed,
+        warnings,
+        idMaps,
+      })
+    }
+    return ontologyId
   })
-  const pendingCQExampleRefs = await persistCompetencyQuestions({
-    db,
-    ontologyId,
-    parsed,
-    idMaps,
-    warnings,
-  })
-  await persistImportMetadata({ db, ontologyId, parsed, idMaps, warnings })
-  await persistImportExamples({
-    db,
-    ontologyId,
-    parsed,
-    idMaps,
-    pendingCQExampleRefs,
-    warnings,
-  })
-  if (parsed.visual)
-    await appendVisualInserts({ db, ontologyId, parsed, warnings, idMaps })
-  revalidatePath(routes.ontology.root)
+
+  try {
+    revalidatePath(routes.ontology.root)
+  } catch {
+    // revalidatePath is unavailable in node test runner environments
+  }
   return { ontologyId, warnings }
 }

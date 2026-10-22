@@ -32,6 +32,8 @@ import { LocalizedTextEditor } from "../shared/localized-text-editor/localized-t
 import { NotesEditor } from "../shared/notes-editor/notes-editor"
 import { SemanticAlignmentsCard } from "../shared/semantic-alignments-card/semantic-alignments-card"
 import { RelationAttributes } from "./relation-attributes/relation-attributes"
+import { DefectCalloutBanner } from "../shared/defect-callout-banner"
+import type { OntologyDefect } from "@/features/ontology/utils/linter"
 
 const CARDINALITY_OPTIONS = [
   "one-to-one",
@@ -59,6 +61,8 @@ interface RelationDetailProps {
     languages: OntologyLanguage[]
     defaultLanguage?: string | null
   }
+  activeDefects?: OntologyDefect[]
+  onQuickFix?: (defect: OntologyDefect) => void
 }
 
 export function RelationDetail({
@@ -74,6 +78,8 @@ export function RelationDetail({
   examples,
   relationAttributes,
   attributeMetadata,
+  activeDefects,
+  onQuickFix,
 }: RelationDetailProps) {
   const [isPending, startTransition] = useTransition()
 
@@ -122,6 +128,13 @@ export function RelationDetail({
       </TabsList>
 
       <TabsContent value="general" className="mt-1.5 space-y-6">
+        {activeDefects && activeDefects.length > 0 && (
+          <DefectCalloutBanner
+            defects={activeDefects}
+            onQuickFix={onQuickFix}
+          />
+        )}
+
         <section className="space-y-4">
           <div className="flex flex-col gap-4 md:flex-row md:flex-wrap md:items-start">
             <div className="w-full min-w-0 md:w-fit">

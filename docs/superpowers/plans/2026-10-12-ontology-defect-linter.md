@@ -2,20 +2,22 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build a pre-flight ontology defect linter and quality verification system in KG Workbench (adopted from `open-ontologies`), providing real-time static analysis in the UI and server guardrails for AI generation and imports.
+**Goal:** Build a pre-flight ontology defect linter and quality verification system in KG Workbench (adopted from `open-ontologies` with standard OOPS! Pitfall mappings), providing real-time static analysis in the UI and server guardrails for AI generation and OWL/JSON import/export.
 
-**Architecture:** A zero-dependency pure TypeScript rule engine (`src/features/ontology/utils/linter/`) executes in-memory with sub-5ms performance. In the client, `OntologyShell` computes defects reactively via `useMemo`, driving a compact health status pill in `OntologyHeader`, an interactive slide-over drawer (`OntologyDefectsSheet`), detail panel banners, and canvas node badges. In the backend, the same engine validates and auto-heals AI drafts and imported files before committing to PostgreSQL.
+**Architecture:** A zero-dependency pure TypeScript rule engine (`src/features/ontology/utils/linter/`) executes in-memory with sub-5ms performance. In the client, `OntologyShell` computes defects reactively via `useMemo`, driving a compact health status pill in `OntologyHeader`, an interactive slide-over drawer (`OntologyDefectsSheet`), detail panel banners, and canvas node badges in `class-node.tsx`. In the backend, the same engine validates and auto-heals AI drafts and generates diagnostics notes for OWL/JSON import and export.
 
-**Tech Stack:** Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS, shadcn/ui, TanStack Query, Drizzle ORM, Supabase PostgreSQL, Vitest.
+**Tech Stack:** Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS, shadcn/ui, TanStack Query, Drizzle ORM, Supabase PostgreSQL, Node.js native test runner (`node:test` via `tsx`).
 
-**Spec:** [docs/superpowers/specs/2026-10-12-ontology-defect-linter-design.md](file:///c:/Users/cedricd/Documents/Github/kg-workbench/docs/superpowers/specs/2026-10-12-ontology-defect-linter-design.md)
+**Spec:** [docs/superpowers/specs/2026-10-12-ontology-defect-linter-design.md](file:///c:/Users/cedri/Documents/github/kg-workbench/docs/superpowers/specs/2026-10-12-ontology-defect-linter-design.md)
 
 ## Global Constraints
 - Pure TypeScript for the linter engine: zero external npm dependencies, works identically in Node.js server actions and browser client components.
 - Sub-5ms execution time for ontologies with hundreds of classes and relations ($O(V + E)$ graph algorithms).
-- Use `npm exec pnpm -- test` for running vitest tests on Windows.
+- Run tests via `npm exec pnpm -- test` (uses Node's native test runner via `tsx` on `tests/*.test.ts`).
 - Reuse existing shadcn primitives (`Sheet`, `Badge`, `Button`, `Tooltip`, `Alert`) before introducing custom wrappers.
-- Suppressed rules must persist across reloads in database table `ontology_defect_suppressions`.
+- Suppressed rules must persist across reloads in database table `ontology_defect_suppressions` with a matching baseline migration in `drizzle/baseline/`.
+- Annotate rules with standard OOPS! Pitfall mappings (e.g. `P29`, `P04`, `P10`, `P11`, `P24`).
+- Add OWL export scaffolding: pre-export linter validation adds diagnostic notes to ontology annotations and returns warning payloads.
 
 ## Review Focus
 - Deep subclass cycles ($A \rightarrow B \rightarrow C \rightarrow A$) must be detected and all participating classes flagged, without infinite recursion or stack overflows.
@@ -23,10 +25,11 @@
 - Multiple relations sharing the same non-existent domain or range ID must not cause duplicate crashes or false positives.
 - Suppressing a defect must update the live count reactively without requiring a page reload.
 - AI draft generation auto-heal must cleanly remove cyclic parent links and dangling relations without corrupting the rest of the draft.
+- OWL export scaffolding must attach linter diagnostics notes to the exported ontology payload.
 
 ---
 
-### Task 1: Core Defect Types & Pure Rule Engine
+### Task 1: Core Defect Types & Pure Rule Engine (with OOPS! Mappings)
 
 **Files:**
 - Create: `src/features/ontology/utils/linter/types.ts`
@@ -44,31 +47,31 @@
 
 Create `tests/ontology-linter.test.ts` covering:
 - Clean ontology returns 0 defects and `hasErrors: false`.
-- Self-parent loop ($A \rightarrow A$) emits `subclass_cycle` error.
-- Multi-step cycle ($A \rightarrow B \rightarrow C \rightarrow A$) emits `subclass_cycle` error.
-- Dangling relation domain/range emits `dangling_relation_domain` / `dangling_relation_range` error.
-- Disconnected class emits `orphan_class` warning.
-- Near-duplicate names (`Patient_Record` vs `patient_record`) emits `near_duplicate_class` warning.
+- Self-parent loop ($A \rightarrow A$) emits `subclass_cycle` error with OOPS! pitfall `P29`.
+- Multi-step cycle ($A \rightarrow B \rightarrow C \rightarrow A$) emits `subclass_cycle` error with OOPS! pitfall `P29`.
+- Dangling relation domain/range emits `dangling_relation_domain` / `dangling_relation_range` error with OOPS! pitfall `P10`.
+- Disconnected class emits `orphan_class` warning with OOPS! pitfall `P04`.
+- Near-duplicate names (`Patient_Record` vs `patient_record`) emits `near_duplicate_class` warning with OOPS! pitfall `P24`.
 - Competing pattern (`DeviceType` with multi-subclass parent `Device`) emits `competing_modelling_pattern` warning.
-- Inverse relation inconsistency emits `inverse_inconsistent` warning.
-- Empty description emits `missing_description` info.
+- Inverse relation inconsistency emits `inverse_inconsistent` warning with OOPS! pitfall `P11`.
+- Empty description emits `missing_description` info with OOPS! pitfall `P08`.
 - Suppressed IDs are excluded from primary counts and moved to suppressed list.
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `npm exec pnpm -- test tests/ontology-linter.test.ts`
+Run: `npm exec pnpm -- test`
 Expected: FAIL (modules not found)
 
 - [ ] **Step 3: Implement `types.ts`, `rules.ts`, and `index.ts` in `src/features/ontology/utils/linter/`**
 
 Implement:
-- `types.ts`: Define `OntologyDefectSeverity`, `OntologyDefectKind`, `OntologyDefect`, `OntologyDefectReport`.
+- `types.ts`: Define `OntologyDefectSeverity`, `OntologyDefectKind`, `OntologyDefect` (including `oopsPitfallId`), `OntologyDefectReport`.
 - `rules.ts`: Implement `checkSubclassCycles`, `checkDanglingRelations`, `checkOrphanClasses`, `checkNearDuplicates`, `checkCompetingPatterns`, `checkInverseRelations`, `checkMetadataCompleteness`.
 - `index.ts`: Implement `runOntologyLinter` with deterministic defect IDs and fast `defectsByTargetId` index.
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `npm exec pnpm -- test tests/ontology-linter.test.ts`
+Run: `npm exec pnpm -- test`
 Expected: PASS
 
 - [ ] **Step 5: Commit**
@@ -84,6 +87,7 @@ git commit --no-verify -m "feat(ontology): implement pure defect linter engine a
 
 **Files:**
 - Modify: `src/server/db/schema.ts`
+- Create: `drizzle/baseline/20261012000000_ontology_defect_suppressions.sql`
 - Create: `src/features/ontology/server/queries/defect-suppressions.ts`
 - Create: `src/features/ontology/server/actions/defect-suppressions.ts`
 - Test: `tests/defect-suppressions.test.ts`
@@ -93,35 +97,33 @@ git commit --no-verify -m "feat(ontology): implement pure defect linter engine a
 - Produces:
   - Table `ontology_defect_suppressions` (`id`, `ontology_id`, `defect_id`, `created_at`)
   - Query: `getDefectSuppressions(ontologyId: string): Promise<string[]>`
-  - Action: `toggleDefectSuppression(ontologyId: string, defectId: string, suppress: boolean): Promise<ActionResult>`
+  - Action: `toggleDefectSuppression(ontologyId: string, defectId: string, suppress: boolean): Promise<{ success: boolean }>`
 
 - [ ] **Step 1: Write the failing test for defect suppressions query and action**
 
-Create `tests/defect-suppressions.test.ts` testing:
-- Fetching suppressions returns an empty list for fresh ontology.
-- Toggling suppression on persists the `defect_id`.
-- Toggling suppression off removes the `defect_id`.
+Create `tests/defect-suppressions.test.ts` testing schema columns and suppression logic.
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `npm exec pnpm -- test tests/defect-suppressions.test.ts`
+Run: `npm exec pnpm -- test`
 Expected: FAIL
 
-- [ ] **Step 3: Implement database table and server actions**
+- [ ] **Step 3: Implement database table, baseline SQL migration, queries, and server actions**
 
 - Add `ontologyDefectSuppressions` to `src/server/db/schema.ts`.
+- Add migration `drizzle/baseline/20261012000000_ontology_defect_suppressions.sql`.
 - Implement `getDefectSuppressions` in `src/features/ontology/server/queries/defect-suppressions.ts`.
 - Implement `toggleDefectSuppression` in `src/features/ontology/server/actions/defect-suppressions.ts`.
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `npm exec pnpm -- test tests/defect-suppressions.test.ts`
+Run: `npm exec pnpm -- test`
 Expected: PASS
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/server/db/schema.ts src/features/ontology/server/queries/defect-suppressions.ts src/features/ontology/server/actions/defect-suppressions.ts tests/defect-suppressions.test.ts
+git add src/server/db/schema.ts drizzle/baseline/20261012000000_ontology_defect_suppressions.sql src/features/ontology/server/queries/defect-suppressions.ts src/features/ontology/server/actions/defect-suppressions.ts tests/defect-suppressions.test.ts
 git commit --no-verify -m "feat(ontology): add database schema and server actions for defect suppressions"
 ```
 
@@ -133,7 +135,6 @@ git commit --no-verify -m "feat(ontology): add database schema and server action
 - Create: `src/features/ontology/components/ontology-header/ontology-defects-pill.tsx`
 - Modify: `src/features/ontology/components/ontology-header/ontology-header.tsx`
 - Modify: `src/features/ontology/components/ontology-shell/ontology-shell.tsx`
-- Test: `tests/ontology-defects-pill.test.tsx`
 
 **Interfaces:**
 - Consumes: `OntologyDefectReport` from linter engine
@@ -143,35 +144,25 @@ git commit --no-verify -m "feat(ontology): add database schema and server action
     - Red badge `X Errors · Y Warnings` when errors exist.
     - Amber badge `Y Warnings` when only warnings exist.
     - Blue badge `Z Info` when only info items exist.
-  - Clicking calls `onOpenDefectsSheet()`.
+  - Clicking triggers `onOpenDefectsSheet()`.
 
-- [ ] **Step 1: Write the failing component test**
+- [ ] **Step 1: Implement `OntologyDefectsPill`**
 
-Create `tests/ontology-defects-pill.test.tsx`:
-- Render with 0 defects: renders `Clean` pill.
-- Render with 1 error, 2 warnings: renders `1 Error · 2 Warnings` red badge.
-- Render with 3 warnings: renders `3 Warnings` amber badge.
-- Clicking triggers `onOpenDefectsSheet`.
+Create `src/features/ontology/components/ontology-header/ontology-defects-pill.tsx` with proper variants and icons.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [ ] **Step 2: Integrate into `OntologyHeader` and `OntologyShell`**
 
-Run: `npm exec pnpm -- test tests/ontology-defects-pill.test.tsx`
-Expected: FAIL
+Connect `defectsReport` calculation in `OntologyShell` and pass to `OntologyHeader`.
 
-- [ ] **Step 3: Implement `OntologyDefectsPill` and integrate into `OntologyHeader`**
+- [ ] **Step 3: Verify build and test suite**
 
-- Create `src/features/ontology/components/ontology-header/ontology-defects-pill.tsx`.
-- Wire `OntologyDefectsPill` into `OntologyHeader` JSX right beside `VisualToggle`.
-
-- [ ] **Step 4: Run test to verify it passes**
-
-Run: `npm exec pnpm -- test tests/ontology-defects-pill.test.tsx`
+Run: `npm exec pnpm -- test`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 4: Commit**
 
 ```bash
-git add src/features/ontology/components/ontology-header/ tests/ontology-defects-pill.test.tsx
+git add src/features/ontology/components/ontology-header/ src/features/ontology/components/ontology-shell/
 git commit --no-verify -m "feat(ontology): implement compact health status pill in ontology header"
 ```
 
@@ -182,7 +173,7 @@ git commit --no-verify -m "feat(ontology): implement compact health status pill 
 **Files:**
 - Create: `src/features/ontology/components/ontology-defects/ontology-defects-sheet.tsx`
 - Create: `src/features/ontology/components/ontology-defects/defect-card.tsx`
-- Test: `tests/ontology-defects-sheet.test.tsx`
+- Modify: `src/features/ontology/components/ontology-shell/ontology-shell.tsx`
 
 **Interfaces:**
 - Consumes:
@@ -194,34 +185,27 @@ git commit --no-verify -m "feat(ontology): implement compact health status pill 
   - `onQuickFix?: (defect: OntologyDefect) => void`
 - Produces: Slide-over drawer with tabs: `All`, `Errors`, `Warnings`, `Info`, `Suppressed`.
 
-- [ ] **Step 1: Write component test for `OntologyDefectsSheet`**
+- [ ] **Step 1: Implement `DefectCard`**
 
-Create `tests/ontology-defects-sheet.test.tsx`:
-- Renders defect counts in tabs.
-- Filter switching displays matching defect cards.
-- Clicking "View Entity" calls `onSelectEntity(targetId, targetType)`.
-- Clicking "Suppress" triggers suppression handler.
-- Quick fix button for self-parent cycle calls parent clear action.
+Build `src/features/ontology/components/ontology-defects/defect-card.tsx` with severity badges, OOPS! pitfall tags, target labels, explanation callouts, and action buttons (`View Entity`, `Quick Fix`, `Suppress`).
 
-- [ ] **Step 2: Run test to verify it fails**
+- [ ] **Step 2: Implement `OntologyDefectsSheet`**
 
-Run: `npm exec pnpm -- test tests/ontology-defects-sheet.test.tsx`
-Expected: FAIL
+Build `src/features/ontology/components/ontology-defects/ontology-defects-sheet.tsx` using shadcn `Sheet`, `SheetContent`, and `Tabs`.
 
-- [ ] **Step 3: Implement `OntologyDefectsSheet` and `DefectCard`**
+- [ ] **Step 3: Wire into `OntologyShell`**
 
-- Build `src/features/ontology/components/ontology-defects/defect-card.tsx` with severity badges, target labels, explanation callouts, and action buttons.
-- Build `src/features/ontology/components/ontology-defects/ontology-defects-sheet.tsx` using shadcn `Sheet`, `SheetContent`, and `Tabs`.
+Connect sheet state and quick fix actions (e.g. clear parent for cycle, delete relation for dangling relation).
 
-- [ ] **Step 4: Run test to verify it passes**
+- [ ] **Step 4: Verify test suite**
 
-Run: `npm exec pnpm -- test tests/ontology-defects-sheet.test.tsx`
+Run: `npm exec pnpm -- test`
 Expected: PASS
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/features/ontology/components/ontology-defects/ tests/ontology-defects-sheet.test.tsx
+git add src/features/ontology/components/ontology-defects/ src/features/ontology/components/ontology-shell/
 git commit --no-verify -m "feat(ontology): implement interactive ontology defects slide-over sheet"
 ```
 
@@ -232,109 +216,98 @@ git commit --no-verify -m "feat(ontology): implement interactive ontology defect
 **Files:**
 - Modify: `src/features/ontology/components/class-detail/class-detail.tsx`
 - Modify: `src/features/ontology/components/relation-detail/relation-detail.tsx`
+- Modify: `src/features/ontology/flow/class-node.tsx`
 - Modify: `src/features/ontology/components/ontology-shell/ontology-shell.tsx`
-- Modify: `src/features/ontology/flow/nodes/ontology-node.tsx`
-- Test: `tests/detail-defect-callouts.test.tsx`
 
 **Interfaces:**
 - Consumes: `defectsByTargetId: Record<string, OntologyDefect[]>`
 - Produces:
   - Alert banner at top of `ClassDetail` if selected class has active defects.
   - Alert banner at top of `RelationDetail` if selected relation has active defects.
-  - Warning/error badge icon on canvas nodes with active errors.
+  - Warning/error badge icon on canvas nodes in `class-node.tsx`.
 
-- [ ] **Step 1: Write test for detail callout banners**
+- [ ] **Step 1: Implement callout banner in `ClassDetail` and `RelationDetail`**
 
-Create `tests/detail-defect-callouts.test.tsx`:
-- When class has a cycle defect, `ClassDetail` renders the alert banner.
-- When relation has a dangling range defect, `RelationDetail` renders the alert banner.
+Render alert banner with defect severity, title, explanation, and quick fix.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [ ] **Step 2: Add visual defect badge in `class-node.tsx`**
 
-Run: `npm exec pnpm -- test tests/detail-defect-callouts.test.tsx`
-Expected: FAIL
+Render subtle warning/error badge in the class node header when `defectsByTargetId[class.id]` has defects.
 
-- [ ] **Step 3: Implement callout banners in Class/Relation detail views and canvas node badge**
+- [ ] **Step 3: Verify test suite**
 
-- Add defect banner alert to `ClassDetail` and `RelationDetail`.
-- Pass error flag to React Flow `OntologyNode` to render visual error marker.
-
-- [ ] **Step 4: Run test to verify it passes**
-
-Run: `npm exec pnpm -- test tests/detail-defect-callouts.test.tsx`
+Run: `npm exec pnpm -- test`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 4: Commit**
 
 ```bash
-git add src/features/ontology/components/class-detail/ src/features/ontology/components/relation-detail/ src/features/ontology/flow/nodes/ tests/detail-defect-callouts.test.tsx
+git add src/features/ontology/components/class-detail/ src/features/ontology/components/relation-detail/ src/features/ontology/flow/class-node.tsx src/features/ontology/components/ontology-shell/
 git commit --no-verify -m "feat(ontology): add contextual defect callout banners in detail views and canvas"
 ```
 
 ---
 
-### Task 6: Server Pipeline Guardrails (AI Generation & Import/Export)
+### Task 6: Server Pipeline Guardrails & OWL Export Scaffolding
 
 **Files:**
 - Modify: `src/features/ontology/server/actions/generate-ontology.ts`
-- Modify: `src/features/ontology/server/actions/ontology-transfer/import-ontology-from-json.ts`
 - Modify: `src/features/ontology/server/owl-export/owl-builder/build-owl-ontology-payload.ts`
 - Test: `tests/ai-linter-guardrail.test.ts`
-- Test: `tests/import-export-linter.test.ts`
+- Test: `tests/owl-export-linter.test.ts`
 
 **Interfaces:**
 - Consumes: `runOntologyLinter` from `src/features/ontology/utils/linter`
 - Produces:
   - In `generate-ontology.ts`: auto-heals cycles and dangling relation references before persistence.
-  - In `importOntologyFromJson`: returns defect summary alongside import status.
-  - In `buildOwlOntologyPayload`: returns diagnostic warnings if exporting an ontology with fatal errors.
+  - In `build-owl-ontology-payload.ts`: runs linter, attaches diagnostics notes to exported OWL comments (`rdfs:comment` scaffolding), and includes diagnostics report in export payload.
 
-- [ ] **Step 1: Write failing tests for AI generation auto-heal and import validation**
+- [ ] **Step 1: Write failing tests for AI generation auto-heal and OWL export scaffolding**
 
-Create `tests/ai-linter-guardrail.test.ts` and `tests/import-export-linter.test.ts`:
-- Draft with hallucinated cycle ($A \rightarrow B \rightarrow A$) has parent link automatically cleared.
-- Draft with dangling relation edge has edge filtered out with warning logged.
-- JSON import parses and reports defect counts.
+Create `tests/ai-linter-guardrail.test.ts` and `tests/owl-export-linter.test.ts`:
+- AI draft with hallucinated cycle ($A \rightarrow B \rightarrow A$) has parent link automatically cleared.
+- AI draft with dangling relation edge has edge filtered out with warning logged.
+- OWL export payload includes linter diagnostics notes and metadata when defects exist.
 
 - [ ] **Step 2: Run tests to verify they fail**
 
-Run: `npm exec pnpm -- test tests/ai-linter-guardrail.test.ts tests/import-export-linter.test.ts`
+Run: `npm exec pnpm -- test`
 Expected: FAIL
 
-- [ ] **Step 3: Implement server guardrails and auto-heal in actions**
+- [ ] **Step 3: Implement server guardrails and OWL export scaffolding**
 
 - Update `generate-ontology.ts` to run linter on generated draft and auto-heal cyclic parents and dangling edges.
-- Update `import-ontology-from-json.ts` and `build-owl-ontology-payload.ts` with defect validation checks.
+- Update `build-owl-ontology-payload.ts` with defect validation check and diagnostic notes scaffolding.
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `npm exec pnpm -- test tests/ai-linter-guardrail.test.ts tests/import-export-linter.test.ts`
+Run: `npm exec pnpm -- test`
 Expected: PASS
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/features/ontology/server/ tests/ai-linter-guardrail.test.ts tests/import-export-linter.test.ts
-git commit --no-verify -m "feat(ontology): add defect linter guardrails to AI draft generation and import/export"
+git add src/features/ontology/server/ tests/ai-linter-guardrail.test.ts tests/owl-export-linter.test.ts
+git commit --no-verify -m "feat(ontology): add defect linter guardrails to AI draft generation and OWL export scaffolding"
 ```
 
 ---
 
-### Task 7: Full Integration, End-to-End Verification & Lint
+### Task 7: Full Integration, End-to-End Verification & Documentation Update
 
 **Files:**
-- Modify: `src/features/ontology/components/ontology-shell/ontology-shell.tsx`
+- Update: `src/features/ontology/README.md`
 - Run: Full test suite & ESLint
 
-- [ ] **Step 1: Run complete test suite**
+- [ ] **Step 1: Update `src/features/ontology/README.md`**
+
+Document the new static defect linter, OOPS! mapping, and OWL export diagnostics notes.
+
+- [ ] **Step 2: Run complete test suite and lint**
 
 Run: `npm exec pnpm -- test`
-Expected: All tests pass.
-
-- [ ] **Step 2: Run linter on codebase**
-
 Run: `npm exec pnpm -- lint`
-Expected: No lint or TypeScript compilation errors.
+Expected: All tests pass and lint is clean.
 
 - [ ] **Step 3: Commit and tag completion**
 
