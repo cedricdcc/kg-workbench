@@ -1,6 +1,6 @@
 "use client"
 
-import { BookOpen, Network } from "lucide-react"
+import { BookOpen, Network, Settings } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 
@@ -68,8 +68,24 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
-      <SidebarFooter className="items-end">
-        <SidebarTrigger />
+      <SidebarFooter className="gap-2">
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              asChild
+              isActive={pathname.startsWith(routes.settings.root)}
+              tooltip="Settings"
+            >
+              <Link href={routes.settings.root}>
+                <Settings />
+                <span>Settings</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+        <div className="flex justify-end">
+          <SidebarTrigger />
+        </div>
       </SidebarFooter>
     </Sidebar>
   )

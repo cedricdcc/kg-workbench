@@ -27,7 +27,7 @@ export async function getUserApiKeysStatus(): Promise<ProviderConfigStatus[]> {
         .from(userApiKeys)
         .where(eq(userApiKeys.user_id, userId))
     }
-  } catch (error) {
+  } catch {
     // Database or cookie context might not be available
   }
 

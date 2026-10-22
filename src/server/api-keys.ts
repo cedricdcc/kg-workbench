@@ -62,7 +62,7 @@ export async function getEffectiveApiKey(
         }
       }
     }
-  } catch (error) {
+  } catch {
     // Database or cookie store might not be available or initialized
   }
 
