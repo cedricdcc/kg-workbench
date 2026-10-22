@@ -12,4 +12,7 @@ export const routes = {
     root: "/knowledge-graph",
     document: (id: string) => `/knowledge-graph/${id}`,
   },
+  settings: {
+    root: "/settings",
+  },
 } as const
