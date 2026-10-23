@@ -19,18 +19,27 @@ export type PromptContext = {
   }>
 }
 
-export type GeminiGenerationOptions = {
+export type BaseGenerationOptions = {
+  vocabulariesToImport?: Array<{
+    prefix: string
+    name: string
+    baseIri: string
+    sourceRegistry: string
+    sourceId: string
+  }>
+}
+
+export type GeminiGenerationOptions = BaseGenerationOptions & {
   provider: "gemini"
   apiKey?: string
   model?: string
 }
 
-export type OllamaGenerationOptions = {
+export type OllamaGenerationOptions = BaseGenerationOptions & {
   provider: "ollama"
   baseUrl?: string
   model?: string
 }
 
 export type AiGenerationOptions =
-  | GeminiGenerationOptions
-  | OllamaGenerationOptions
+  GeminiGenerationOptions | OllamaGenerationOptions

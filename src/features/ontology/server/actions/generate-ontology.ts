@@ -11,9 +11,18 @@ import {
   ontologyClasses,
   ontologyCompetencyQuestionModules,
   ontologyCompetencyQuestions,
+  ontologyCqTriples,
   ontologyModules,
   ontologyRelations,
 } from "@/server/db/schema"
+import {
+  addReferenceOntology,
+  syncReferenceOntology,
+} from "@/features/ontology/server/actions/reference-vocabularies"
+import {
+  discoverCandidateRegistries,
+  type DiscoveredVocabularyItem,
+} from "@/features/ontology/server/services/vocabulary-registries"
 import {
   getOntologyClasses,
   getOntologyCQs,
@@ -46,6 +55,39 @@ export type ApplyDraftResult = {
   updatedCQs: number
 }
 
+export async function getRegistryDiscoveryCandidates(
+  ontologyId: string
+): Promise<{
+  activeVocabularies: DiscoveredVocabularyItem[]
+  recommendedVocabularies: DiscoveredVocabularyItem[]
+}> {
+  const trimmedId = ontologyId?.trim()
+  if (!trimmedId) {
+    throw new Error("Ontology ID is required.")
+  }
+
+  const db = getDb()
+  await assertOntologyDocumentAccess(trimmedId, db)
+
+  const [document, cqs] = await Promise.all([
+    getOntologyDocument(trimmedId),
+    getOntologyCQs(trimmedId),
+  ])
+
+  if (!document) {
+    throw new Error("Ontology document not found.")
+  }
+
+  const validCQs = cqs.filter(
+    (cq) => cq.question && cq.question.trim().length > 0
+  )
+  return discoverCandidateRegistries(
+    trimmedId,
+    document.usecase || "",
+    validCQs
+  )
+}
+
 export async function generateOntologyDraft(
   ontologyId: string,
   options: AiGenerationOptions
@@ -57,6 +99,23 @@ export async function generateOntologyDraft(
 
   const db = getDb()
   await assertOntologyDocumentAccess(trimmedId, db)
+
+  // 0. Import any user-confirmed candidate vocabularies first
+  if (options.vocabulariesToImport && options.vocabulariesToImport.length > 0) {
+    for (const v of options.vocabulariesToImport) {
+      try {
+        const added = await addReferenceOntology(v)
+        if (added?.id) {
+          await syncReferenceOntology(added.id)
+        }
+      } catch (err) {
+        console.warn(
+          `[generateOntologyDraft] Failed to auto-import vocabulary "${v.prefix}":`,
+          err
+        )
+      }
+    }
+  }
 
   const [document, modules, classes, relations, cqs] = await Promise.all([
     getOntologyDocument(trimmedId),
@@ -70,7 +129,9 @@ export async function generateOntologyDraft(
     throw new Error("Ontology document not found.")
   }
 
-  const validCQs = cqs.filter((cq) => cq.question && cq.question.trim().length > 0)
+  const validCQs = cqs.filter(
+    (cq) => cq.question && cq.question.trim().length > 0
+  )
   if (validCQs.length === 0) {
     throw new Error(
       "Ontology has no competency questions to analyze. Please add competency questions first."
@@ -162,9 +223,15 @@ export async function generateOntologyDraft(
     }
   }
 
-  const { draft: healedDraft, healedIssues } = autoHealOntologyDraft(draft, classes)
+  const { draft: healedDraft, healedIssues } = autoHealOntologyDraft(
+    draft,
+    classes
+  )
   if (healedIssues.length > 0) {
-    console.info(`[generateOntologyDraft] Auto-healed ${healedIssues.length} issues:`, healedIssues)
+    console.info(
+      `[generateOntologyDraft] Auto-healed ${healedIssues.length} issues:`,
+      healedIssues
+    )
   }
 
   return healedDraft
@@ -248,7 +315,8 @@ export async function applyOntologyDraft(
 
       for (const cls of draft.classes) {
         const lower = cls.name.toLowerCase()
-        const targetModuleId = moduleMap.get(cls.moduleName.toLowerCase()) ?? null
+        const targetModuleId =
+          moduleMap.get(cls.moduleName.toLowerCase()) ?? null
 
         if (!classMap.has(lower)) {
           const [inserted] = await tx
@@ -371,7 +439,9 @@ export async function applyOntologyDraft(
           const targetCurieLower = cls.alignment.targetCurie.toLowerCase()
           const rangeId =
             classMap.get(targetCurieLower) ||
-            classMap.get((cls.alignment.targetCurie.split(":")[1] || "").toLowerCase())
+            classMap.get(
+              (cls.alignment.targetCurie.split(":")[1] || "").toLowerCase()
+            )
 
           if (domainId && rangeId) {
             const key = `subclassof:${domainId}:${rangeId}`
@@ -411,20 +481,47 @@ export async function applyOntologyDraft(
           continue
         }
 
-        const subjectClassId =
-          classMap.get(mapping.subjectClassName.toLowerCase()) ?? null
-        const predicateRelationId =
-          relationNameMap.get(mapping.predicateRelationName.toLowerCase()) ?? null
-        const objectClassId =
-          classMap.get(mapping.objectClassName.toLowerCase()) ?? null
+        // Delete previous triples for this CQ
+        await tx
+          .delete(ontologyCqTriples)
+          .where(eq(ontologyCqTriples.cq_id, mapping.cqId))
 
-        if (subjectClassId || predicateRelationId || objectClassId) {
+        let order = 0
+        let firstSubId: string | null = null
+        let firstPredId: string | null = null
+        let firstObjId: string | null = null
+
+        for (const t of mapping.triples ?? []) {
+          const subId = classMap.get(t.subjectClassName.toLowerCase()) ?? null
+          const predId =
+            relationNameMap.get(t.predicateRelationName.toLowerCase()) ?? null
+          const objId = classMap.get(t.objectClassName.toLowerCase()) ?? null
+
+          if (order === 0) {
+            firstSubId = subId
+            firstPredId = predId
+            firstObjId = objId
+          }
+
+          if (subId || predId || objId) {
+            await tx.insert(ontologyCqTriples).values({
+              cq_id: mapping.cqId,
+              sort_order: order,
+              subject_class_id: subId,
+              predicate_relation_id: predId,
+              object_class_id: objId,
+            })
+            order++
+          }
+        }
+
+        if (firstSubId || firstPredId || firstObjId) {
           await tx
             .update(ontologyCompetencyQuestions)
             .set({
-              subject_class_id: subjectClassId,
-              predicate_relation_id: predicateRelationId,
-              object_class_id: objectClassId,
+              subject_class_id: firstSubId,
+              predicate_relation_id: firstPredId,
+              object_class_id: firstObjId,
             })
             .where(
               and(
