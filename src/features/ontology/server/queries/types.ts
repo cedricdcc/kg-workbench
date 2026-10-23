@@ -2,6 +2,7 @@ import type {
   OntologyAttribute,
   OntologyClass,
   OntologyCompetencyQuestion,
+  OntologyCqTriple,
   OntologyDocument,
   OntologyModule,
 } from "@/domain/ontology"
@@ -28,6 +29,7 @@ export type ModuleLayoutMap = Record<
 
 export type OntologyCQWithModules = OntologyCompetencyQuestion & {
   modules: Pick<OntologyModule, "id" | "name">[]
+  triples: OntologyCqTriple[]
 }
 
 export type OntologyMetadataTarget =

@@ -14,6 +14,8 @@ export interface EvaluatedCqCoverage {
   subjectClassName?: string
   predicateRelationName?: string
   objectClassName?: string
+  totalTriples: number
+  mappedTriples: number
 }
 
 export interface CqCoverageSummary {
@@ -32,6 +34,63 @@ export function evaluateCqCoverage(
   classes: OntologyClassWithAttributes[],
   relations: OntologyRelation[]
 ): EvaluatedCqCoverage {
+  const triples = cq.triples ?? []
+
+  if (triples.length > 0) {
+    let fullyMappedTriples = 0
+    let partiallyMappedTriples = 0
+
+    for (const t of triples) {
+      const hasSub = Boolean(
+        t.subject_class_id && classes.some((c) => c.id === t.subject_class_id)
+      )
+      const hasPred = Boolean(
+        t.predicate_relation_id &&
+        relations.some((r) => r.id === t.predicate_relation_id)
+      )
+      const hasObj = Boolean(
+        t.object_class_id && classes.some((c) => c.id === t.object_class_id)
+      )
+
+      if (hasSub && hasPred && hasObj) {
+        fullyMappedTriples++
+      } else if (hasSub || hasPred || hasObj) {
+        partiallyMappedTriples++
+      }
+    }
+
+    let status: CqCoverageStatus = "unmapped"
+    if (fullyMappedTriples === triples.length) {
+      status = "full"
+    } else if (fullyMappedTriples > 0 || partiallyMappedTriples > 0) {
+      status = "partial"
+    }
+
+    const firstTriple = triples[0]
+    const firstSub = firstTriple?.subject_class_id
+      ? classes.find((c) => c.id === firstTriple.subject_class_id)
+      : undefined
+    const firstPred = firstTriple?.predicate_relation_id
+      ? relations.find((r) => r.id === firstTriple.predicate_relation_id)
+      : undefined
+    const firstObj = firstTriple?.object_class_id
+      ? classes.find((c) => c.id === firstTriple.object_class_id)
+      : undefined
+
+    return {
+      status,
+      hasSubject: Boolean(firstSub),
+      hasPredicate: Boolean(firstPred),
+      hasObject: Boolean(firstObj),
+      subjectClassName: firstSub?.name,
+      predicateRelationName: firstPred?.name,
+      objectClassName: firstObj?.name,
+      totalTriples: triples.length,
+      mappedTriples: fullyMappedTriples,
+    }
+  }
+
+  // Fallback to legacy single-triple columns
   const subjectClass = cq.subject_class_id
     ? classes.find((c) => c.id === cq.subject_class_id)
     : undefined
@@ -55,6 +114,12 @@ export function evaluateCqCoverage(
     status = "partial"
   }
 
+  const legacyHasAny = Boolean(
+    cq.subject_class_id || cq.predicate_relation_id || cq.object_class_id
+  )
+  const totalTriples = legacyHasAny ? 1 : 0
+  const mappedTriples = status === "full" ? 1 : 0
+
   return {
     status,
     hasSubject,
@@ -63,6 +128,8 @@ export function evaluateCqCoverage(
     subjectClassName: subjectClass?.name,
     predicateRelationName: predicateRelation?.name,
     objectClassName: objectClass?.name,
+    totalTriples,
+    mappedTriples,
   }
 }
 

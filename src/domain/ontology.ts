@@ -4,6 +4,7 @@ import {
   ontologyClasses,
   ontologyCompetencyQuestionModules,
   ontologyCompetencyQuestions,
+  ontologyCqTriples,
   ontologyDocuments,
   ontologyExamples,
   ontologyLanguages,
@@ -38,6 +39,9 @@ export type OntologyCompetencyQuestion = DatabaseRow<
 export type OntologyCompetencyQuestionInsert = DatabaseInsert<
   typeof ontologyCompetencyQuestions
 >
+
+export type OntologyCqTriple = DatabaseRow<typeof ontologyCqTriples>
+export type OntologyCqTripleInsert = DatabaseInsert<typeof ontologyCqTriples>
 
 export type OntologyCompetencyQuestionModule = DatabaseRow<
   typeof ontologyCompetencyQuestionModules
