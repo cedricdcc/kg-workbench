@@ -22,7 +22,7 @@ import {
 import {
   discoverCandidateRegistries,
   type DiscoveredVocabularyItem,
-} from "@/features/ontology/server/services/vocabulary-registries"
+} from "@/features/ontology/server/services/vocabulary-registries/domain-discovery"
 import {
   getOntologyClasses,
   getOntologyCQs,

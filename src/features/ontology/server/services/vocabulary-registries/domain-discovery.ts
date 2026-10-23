@@ -1,5 +1,3 @@
-import { getDb } from "@/server/database"
-import { referenceOntologies } from "@/server/db/schema"
 import { searchAllRegistries } from "./aggregator"
 
 export interface DiscoveredVocabularyItem {
@@ -118,6 +116,8 @@ export async function discoverCandidateRegistries(
   >()
 
   try {
+    const { getDb } = await import("@/server/database")
+    const { referenceOntologies } = await import("@/server/db/schema")
     const db = getDb()
     const active = await db.select().from(referenceOntologies)
     for (const r of active) {

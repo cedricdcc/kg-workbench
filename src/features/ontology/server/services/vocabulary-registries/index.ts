@@ -6,7 +6,7 @@ import type { RegistryTerm } from "./types"
 export * from "./types"
 export * from "./providers"
 export * from "./aggregator"
-export * from "./domain-discovery"
+export type * from "./domain-discovery"
 export { parseOlsTerm, parseLovTerm }
 
 export async function fetchRegistryTerms(

@@ -62,12 +62,9 @@ test("testRegistryEndpoint probes a registry and returns valid result structure"
 test("saveEndpointSnapshot, getEndpointSnapshots and deleteEndpointSnapshot cycle", async () => {
   process.env.DATABASE_URL =
     process.env.DATABASE_URL ||
-    "postgresql://postgres:55a64bfd04c37dbb0af0dfe60c3b60bf@127.0.0.1:5433/postgres"
-  const {
-    saveEndpointSnapshot,
-    getEndpointSnapshots,
-    deleteEndpointSnapshot,
-  } = await import("../src/features/ontology/server/actions/reference-vocabularies")
+    "postgresql://postgres:cbca93016c7c6612ba0c1bb0d1465c66@127.0.0.1:5433/postgres"
+  const { saveEndpointSnapshot, getEndpointSnapshots, deleteEndpointSnapshot } =
+    await import("../src/features/ontology/server/actions/reference-vocabularies")
 
   const saved = await saveEndpointSnapshot({
     providerId: "bartoc",
@@ -75,7 +72,9 @@ test("saveEndpointSnapshot, getEndpointSnapshots and deleteEndpointSnapshot cycl
     statusCode: 200,
     latencyMs: 120,
     queryParams: "?search=sensor",
-    responsePayload: JSON.stringify([{ uri: "http://example.org", prefLabel: { en: "Test" } }]),
+    responsePayload: JSON.stringify([
+      { uri: "http://example.org", prefLabel: { en: "Test" } },
+    ]),
     detectedVocabCount: 1,
   })
 
