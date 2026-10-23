@@ -20,6 +20,7 @@ export async function executeAiGeneration(
     return requestGeminiDraft(prompt, {
       apiKey: options.apiKey,
       model: options.model,
+      candidateModels: options.candidateModels,
     })
   }
 
@@ -30,5 +31,7 @@ export async function executeAiGeneration(
     })
   }
 
-  throw new Error(`Unsupported AI provider: ${(options as { provider: string }).provider}`)
+  throw new Error(
+    `Unsupported AI provider: ${(options as { provider: string }).provider}`
+  )
 }

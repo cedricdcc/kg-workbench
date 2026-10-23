@@ -33,6 +33,7 @@ export type GeminiGenerationOptions = BaseGenerationOptions & {
   provider: "gemini"
   apiKey?: string
   model?: string
+  candidateModels?: string[]
 }
 
 export type OllamaGenerationOptions = BaseGenerationOptions & {
