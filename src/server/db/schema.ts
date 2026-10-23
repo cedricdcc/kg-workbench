@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm"
 import {
   boolean,
   doublePrecision,
+  index,
   integer,
   pgTable,
   primaryKey,
@@ -246,6 +247,36 @@ export const ontologyCompetencyQuestionModules = pgTable(
   (table) => [primaryKey({ columns: [table.cq_id, table.module_id] })]
 )
 
+export const ontologyCqTriples = pgTable(
+  "ontology_cq_triples",
+  {
+    id: generatedId(),
+    cq_id: uuid("cq_id")
+      .notNull()
+      .references(() => ontologyCompetencyQuestions.id, {
+        onDelete: "cascade",
+      }),
+    sort_order: integer("sort_order").notNull().default(0),
+    subject_class_id: uuid("subject_class_id").references(
+      () => ontologyClasses.id,
+      { onDelete: "set null" }
+    ),
+    predicate_relation_id: uuid("predicate_relation_id").references(
+      () => ontologyRelations.id,
+      { onDelete: "set null" }
+    ),
+    object_class_id: uuid("object_class_id").references(
+      () => ontologyClasses.id,
+      { onDelete: "set null" }
+    ),
+    subject_example_id: uuid("subject_example_id"),
+    predicate_example_id: uuid("predicate_example_id"),
+    object_example_id: uuid("object_example_id"),
+    created_at: created_at().notNull(),
+  },
+  (table) => [index("idx_cq_triples_cq_id").on(table.cq_id)]
+)
+
 export const factRelationAttributeValues = pgTable(
   "fact_relation_attribute_values",
   {
@@ -425,16 +456,18 @@ export const userApiKeys = pgTable(
   ]
 )
 
-export const registryEndpointSnapshots = pgTable("registry_endpoint_snapshots", {
-  id: generatedId(),
-  group_key: text("group_key").notNull().default("shared"),
-  provider_id: text("provider_id").notNull(),
-  endpoint_url: text("endpoint_url").notNull(),
-  status_code: integer("status_code").notNull(),
-  latency_ms: integer("latency_ms").notNull(),
-  query_params: text("query_params"),
-  response_payload: text("response_payload").notNull(),
-  detected_vocab_count: integer("detected_vocab_count").notNull().default(0),
-  created_at: created_at(),
-})
-
+export const registryEndpointSnapshots = pgTable(
+  "registry_endpoint_snapshots",
+  {
+    id: generatedId(),
+    group_key: text("group_key").notNull().default("shared"),
+    provider_id: text("provider_id").notNull(),
+    endpoint_url: text("endpoint_url").notNull(),
+    status_code: integer("status_code").notNull(),
+    latency_ms: integer("latency_ms").notNull(),
+    query_params: text("query_params"),
+    response_payload: text("response_payload").notNull(),
+    detected_vocab_count: integer("detected_vocab_count").notNull().default(0),
+    created_at: created_at(),
+  }
+)
