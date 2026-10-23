@@ -1,6 +1,5 @@
 import { describe, it } from "node:test"
 import assert from "node:assert/strict"
-// @ts-expect-error - testing for export before implementation
 import { ontologyCqTriples } from "../src/server/db/schema"
 
 describe("ontologyCqTriples schema", () => {

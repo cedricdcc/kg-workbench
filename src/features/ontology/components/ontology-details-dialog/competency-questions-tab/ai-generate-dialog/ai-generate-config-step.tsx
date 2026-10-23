@@ -1,7 +1,14 @@
 "use client"
 
 import { useState } from "react"
-import { Check, Cpu, ExternalLink, Loader2, RefreshCw, Sparkles } from "lucide-react"
+import {
+  Check,
+  Cpu,
+  ExternalLink,
+  Loader2,
+  RefreshCw,
+  Sparkles,
+} from "lucide-react"
 import Link from "next/link"
 import { toast } from "sonner"
 
@@ -97,14 +104,15 @@ export function AiGenerateConfigStep({
     <form onSubmit={handleSubmit} className="space-y-5">
       <div className="rounded-lg border bg-muted/40 p-3.5 text-sm text-muted-foreground">
         <p>
-          AI will analyze all <strong className="text-foreground">{cqCount}</strong>{" "}
-          competency questions in this ontology to discover functional modules,
-          entity classes with attributes, and relation edges.
+          AI will analyze all{" "}
+          <strong className="text-foreground">{cqCount}</strong> competency
+          questions in this ontology to discover functional modules, entity
+          classes with attributes, and relation edges.
         </p>
       </div>
 
       <div className="space-y-2">
-        <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+        <Label className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
           AI Provider
         </Label>
         <Tabs
@@ -134,7 +142,7 @@ export function AiGenerateConfigStep({
               </Label>
               <Link
                 href={routes.settings.root}
-                className="text-[11px] text-muted-foreground hover:text-foreground inline-flex items-center gap-1 transition-colors"
+                className="inline-flex items-center gap-1 text-[11px] text-muted-foreground transition-colors hover:text-foreground"
               >
                 Manage in Settings
                 <ExternalLink className="h-3 w-3" />
@@ -171,8 +179,8 @@ export function AiGenerateConfigStep({
               </Button>
             </div>
             <p className="text-[11px] text-muted-foreground">
-              Click &quot;Check &amp; Fetch Models&quot; to test your key and load
-              available Gemini models.
+              Click &quot;Check &amp; Fetch Models&quot; to test your key and
+              load available Gemini models.
             </p>
           </div>
 
@@ -264,7 +272,7 @@ export function AiGenerateConfigStep({
           ) : (
             <>
               <Sparkles className="h-4 w-4" />
-              Analyze & Generate Draft
+              Next: Discover Standards →
             </>
           )}
         </Button>

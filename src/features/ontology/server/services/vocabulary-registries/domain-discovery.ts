@@ -176,7 +176,7 @@ export async function discoverCandidateRegistries(
             prefix: res.prefix,
             name: res.name || res.prefix.toUpperCase(),
             baseIri: res.baseIri || "",
-            sourceRegistry: res.sourceRegistry,
+            sourceRegistry: res.source,
             sourceId: res.sourceId || res.prefix,
             description:
               res.description || `Discovered standard ontology for ${kw}`,

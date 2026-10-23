@@ -73,11 +73,28 @@ export const GeneratedCQMappingSchema = z
         },
       ]
     }
-    return {
+    const first = triples[0]
+    const out: {
+      cqId: string
+      moduleNames: string[]
+      subjectClassName?: string
+      predicateRelationName?: string
+      objectClassName?: string
+      triples: Array<{
+        subjectClassName: string
+        predicateRelationName: string
+        objectClassName: string
+      }>
+    } = {
       cqId: data.cqId,
       moduleNames: data.moduleNames,
+      subjectClassName: first?.subjectClassName ?? data.subjectClassName,
+      predicateRelationName:
+        first?.predicateRelationName ?? data.predicateRelationName,
+      objectClassName: first?.objectClassName ?? data.objectClassName,
       triples,
     }
+    return out
   })
 
 export const ContextualConnectionSchema = z.object({

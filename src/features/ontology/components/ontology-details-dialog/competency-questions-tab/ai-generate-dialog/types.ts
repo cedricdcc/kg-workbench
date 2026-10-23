@@ -1,4 +1,4 @@
-export type AiGenerateDialogStep = "config" | "review"
+export type AiGenerateDialogStep = "config" | "standards" | "review"
 export type ProviderType = "gemini" | "ollama"
 
 export interface AiGenerateDialogProps {

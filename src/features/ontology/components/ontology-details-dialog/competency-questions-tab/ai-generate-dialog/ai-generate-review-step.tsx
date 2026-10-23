@@ -1,13 +1,27 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { ArrowLeft, Check, ChevronDown, ChevronRight, Layers, Link2, Loader2, Network, Sparkles, Tag } from "lucide-react"
+import {
+  ArrowLeft,
+  Check,
+  ChevronDown,
+  ChevronRight,
+  Layers,
+  Link2,
+  Loader2,
+  Network,
+  Sparkles,
+  Tag,
+} from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import type { EntityAlignment, GeneratedOntologyDraft } from "@/features/ontology/schemas/ai-generation"
+import type {
+  EntityAlignment,
+  GeneratedOntologyDraft,
+} from "@/features/ontology/schemas/ai-generation"
 import { ContextualExpansionSection } from "./contextual-expansion-section"
 
 interface ReviewStepProps {
@@ -45,7 +59,7 @@ function AlignmentBadgeView({ alignment }: { alignment?: EntityAlignment }) {
         </Badge>
 
         {typeof alignment.similarityScore === "number" && (
-          <span className="text-[10px] text-muted-foreground font-mono">
+          <span className="font-mono text-[10px] text-muted-foreground">
             {Math.round(alignment.similarityScore * 100)}% match
           </span>
         )}
@@ -70,7 +84,7 @@ function AlignmentBadgeView({ alignment }: { alignment?: EntityAlignment }) {
       </div>
 
       {showRationale && alignment.rationale && (
-        <div className="rounded border-l-2 border-primary/40 bg-muted/40 p-1.5 text-[11px] italic text-muted-foreground">
+        <div className="rounded border-l-2 border-primary/40 bg-muted/40 p-1.5 text-[11px] text-muted-foreground italic">
           {alignment.rationale}
         </div>
       )}
@@ -102,8 +116,11 @@ export function AiGenerateReviewStep({
   const [selectedCQs, setSelectedCQs] = useState<Set<string>>(
     () => new Set(draft.cqMappings.map((m) => m.cqId))
   )
-  const [selectedContextualCuries, setSelectedContextualCuries] = useState<Set<string>>(
-    () => new Set((draft.suggestedContext || []).map((c) => c.curie.toLowerCase()))
+  const [selectedContextualCuries, setSelectedContextualCuries] = useState<
+    Set<string>
+  >(
+    () =>
+      new Set((draft.suggestedContext || []).map((c) => c.curie.toLowerCase()))
   )
 
   const [activeTab, setActiveTab] = useState("modules")
@@ -151,7 +168,9 @@ export function AiGenerateReviewStep({
     if (selectedContextualCuries.size === all.length) {
       setSelectedContextualCuries(new Set())
     } else {
-      setSelectedContextualCuries(new Set(all.map((c) => c.curie.toLowerCase())))
+      setSelectedContextualCuries(
+        new Set(all.map((c) => c.curie.toLowerCase()))
+      )
     }
   }
 
@@ -183,6 +202,17 @@ export function AiGenerateReviewStep({
 
   return (
     <div className="flex flex-col space-y-4">
+      <div className="flex items-center justify-between gap-2 rounded-md border border-primary/25 bg-primary/5 px-3 py-2 text-xs">
+        <div className="flex items-center gap-1.5 font-medium text-foreground">
+          <Sparkles className="h-3.5 w-3.5 text-primary" />
+          <span>Formal OWL 2 Schema</span>
+        </div>
+        <span className="text-[11px] text-muted-foreground">
+          Provides domain/range typed relations and standard alignments as the
+          foundational data model for fact extraction.
+        </span>
+      </div>
+
       <div className="flex items-center justify-between border-b pb-2 text-xs text-muted-foreground">
         <span>Review and adjust the proposed elements before saving.</span>
         <div className="flex flex-wrap gap-2">
@@ -196,13 +226,17 @@ export function AiGenerateReviewStep({
             {filteredDraft.relations.length} Relations
           </Badge>
           <Badge variant="secondary" className="text-[11px]">
-            {filteredDraft.cqMappings.length} CQ Links
+            {filteredDraft.cqMappings.length} CQ Paths
           </Badge>
-          {filteredDraft.suggestedContext && filteredDraft.suggestedContext.length > 0 && (
-            <Badge variant="outline" className="border-primary/40 bg-primary/10 text-[11px] text-primary">
-              +{filteredDraft.suggestedContext.length} Contextual
-            </Badge>
-          )}
+          {filteredDraft.suggestedContext &&
+            filteredDraft.suggestedContext.length > 0 && (
+              <Badge
+                variant="outline"
+                className="border-primary/40 bg-primary/10 text-[11px] text-primary"
+              >
+                +{filteredDraft.suggestedContext.length} Contextual
+              </Badge>
+            )}
         </div>
       </div>
 
@@ -394,35 +428,70 @@ export function AiGenerateReviewStep({
                       className="mt-0.5 h-4 w-4 rounded border-border"
                     />
                     <div className="flex-1 space-y-1">
-                      <div className="text-xs font-medium text-foreground">
-                        Question #{idx + 1}
+                      <div className="flex items-center justify-between">
+                        <div className="text-xs font-medium text-foreground">
+                          Question #{idx + 1}
+                        </div>
+                        {mapping.triples && mapping.triples.length > 1 && (
+                          <Badge
+                            variant="outline"
+                            className="text-[10px] text-primary"
+                          >
+                            {mapping.triples.length} hops
+                          </Badge>
+                        )}
                       </div>
-                      <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
-                        <span>Subject:</span>
-                        <Badge variant="secondary" className="text-[10px]">
-                          {mapping.subjectClassName}
-                        </Badge>
-                        <span>Predicate:</span>
-                        <Badge variant="outline" className="text-[10px]">
-                          {mapping.predicateRelationName}
-                        </Badge>
-                        <span>Object:</span>
-                        <Badge variant="secondary" className="text-[10px]">
-                          {mapping.objectClassName}
-                        </Badge>
+
+                      <div className="flex flex-wrap items-center gap-1.5 pt-1 text-xs text-muted-foreground">
+                        {mapping.triples && mapping.triples.length > 0 ? (
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            {mapping.triples.map((t, tIdx) => (
+                              <div
+                                key={tIdx}
+                                className="flex items-center gap-1 rounded border border-border/60 bg-muted/30 px-1.5 py-0.5"
+                              >
+                                {tIdx > 0 && (
+                                  <span className="mr-0.5 font-bold text-muted-foreground/50">
+                                    →
+                                  </span>
+                                )}
+                                <Badge
+                                  variant="secondary"
+                                  className="px-1 py-0 text-[10px]"
+                                >
+                                  {t.subjectClassName}
+                                </Badge>
+                                <span className="font-mono text-[10px] font-medium text-primary">
+                                  ──{t.predicateRelationName}──►
+                                </span>
+                                <Badge
+                                  variant="secondary"
+                                  className="px-1 py-0 text-[10px]"
+                                >
+                                  {t.objectClassName}
+                                </Badge>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="text-[11px] text-muted-foreground italic">
+                            No triple bindings proposed
+                          </div>
+                        )}
+
                         {mapping.moduleNames.length > 0 && (
-                          <>
-                            <span className="ml-1">Modules:</span>
+                          <div className="ml-2 flex items-center gap-1">
+                            <span className="text-[10px]">Modules:</span>
                             {mapping.moduleNames.map((m) => (
                               <Badge
                                 key={m}
                                 variant="outline"
-                                className="bg-muted/50 text-[10px]"
+                                className="bg-muted/50 px-1 py-0 text-[10px]"
                               >
                                 {m}
                               </Badge>
                             ))}
-                          </>
+                          </div>
                         )}
                       </div>
                     </div>
