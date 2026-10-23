@@ -15,10 +15,8 @@ Guidelines:
 1. Modules: Identify logical cohesive functional domain packages (e.g. "OrderManagement", "Catalog", "UserAccount").
 2. Classes: Extract core domain entities. Every class must be assigned to exactly one moduleName. Identify essential primitive attributes (with dataType from xsd:string, xsd:integer, xsd:decimal, xsd:boolean, xsd:dateTime).
 3. Relations: Identify direct relationships between classes (domainClassName -> predicate relation name -> rangeClassName).
-4. Competency Question Mappings: For every competency question provided, map:
-   - subjectClassName: The primary entity class representing the subject.
-   - predicateRelationName: The relationship name linking subject to object.
-   - objectClassName: The target entity class representing the object.
+4. Competency Question Graph Patterns: For every competency question provided, decompose the question into the sequence of connected triples (the graph pattern) required to answer it:
+   - triples: An array of 1 or more connected triples [{ subjectClassName, predicateRelationName, objectClassName }]. For multi-hop questions (e.g. "Which sensors measure temperature on station?"), generate consecutive hops sharing intermediate classes (e.g. [Station, hasSensor, Sensor] and [Sensor, measuresProperty, Temperature]). All classes and relations appearing in triples MUST also be declared in the classes and relations sections.
    - moduleNames: An array of 1 or more module names relevant to this question.
 5. Reuse & Alignment: If existing modules, classes, or relations are provided, reuse matching names whenever appropriate rather than introducing redundant aliases.
 6. Standard Vocabularies & Alignment: If candidate standard terms are provided below, leverage them where appropriate by specifying the optional "alignment" object on classes or relations:
@@ -26,11 +24,13 @@ Guidelines:
    - targetCurie: Standard CURIE (e.g. "sosa:Observation", "sosa:Platform").
    - targetIri: Standard canonical IRI.
    - rationale: A concise sentence explaining why this standard concept fits the Competency Question.
+7. Functioning OWL Ontology Data Model: The resulting schema must form a coherent, formal OWL ontology where relations specify clear domain and range classes, establishing the foundational schema for knowledge graph fact extraction.
 
 Output MUST be strictly valid JSON conforming to the requested schema. Return JSON only.`
 
   const candidateTermsSection =
-    context.candidateReferenceTerms && context.candidateReferenceTerms.length > 0
+    context.candidateReferenceTerms &&
+    context.candidateReferenceTerms.length > 0
       ? `\nCandidate Standard Vocabulary Terms (from active reference ontologies):\n${JSON.stringify(
           context.candidateReferenceTerms.map((t) => ({
             curie: t.curie,

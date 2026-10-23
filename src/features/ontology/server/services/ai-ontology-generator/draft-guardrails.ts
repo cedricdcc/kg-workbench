@@ -34,7 +34,8 @@ export function autoHealOntologyDraft(
     const visited = new Set<string>()
     visited.add(cls.name.toLowerCase())
 
-    let parentName: string | null | undefined = cls.parentClassName.toLowerCase()
+    let parentName: string | null | undefined =
+      cls.parentClassName.toLowerCase()
     let isCyclic = false
 
     while (parentName) {
@@ -84,16 +85,74 @@ export function autoHealOntologyDraft(
         !domainValid && !rangeValid
           ? `domain "${rel.domainClassName}" and range "${rel.rangeClassName}" do not exist`
           : !domainValid
-          ? `domain "${rel.domainClassName}" does not exist`
-          : `range "${rel.rangeClassName}" does not exist`
+            ? `domain "${rel.domainClassName}" does not exist`
+            : `range "${rel.rangeClassName}" does not exist`
 
-      healedIssues.push(
-        `Removed dangling relation "${rel.name}": ${missing}.`
-      )
+      healedIssues.push(`Removed dangling relation "${rel.name}": ${missing}.`)
       return false
     }
     return true
   })
+
+  // 3. Auto-heal missing classes & relations referenced in CQ multi-triple mappings
+  const defaultModuleName = clonedDraft.modules[0]?.name ?? "Core"
+  if (clonedDraft.modules.length === 0) {
+    clonedDraft.modules.push({ name: "Core", description: "Default module" })
+  }
+
+  const existingRelKeys = new Set(
+    clonedDraft.relations.map(
+      (r) =>
+        `${r.name.toLowerCase()}:${r.domainClassName.toLowerCase()}:${r.rangeClassName.toLowerCase()}`
+    )
+  )
+
+  for (const mapping of clonedDraft.cqMappings) {
+    for (const t of mapping.triples ?? []) {
+      const subLower = t.subjectClassName.toLowerCase()
+      const objLower = t.objectClassName.toLowerCase()
+
+      if (!validClassNames.has(subLower)) {
+        clonedDraft.classes.push({
+          name: t.subjectClassName,
+          description: `Auto-generated from CQ mapping`,
+          moduleName: mapping.moduleNames[0] || defaultModuleName,
+          attributes: [],
+        })
+        validClassNames.add(subLower)
+        healedIssues.push(
+          `Synthesized missing class "${t.subjectClassName}" referenced in CQ mapping.`
+        )
+      }
+
+      if (!validClassNames.has(objLower)) {
+        clonedDraft.classes.push({
+          name: t.objectClassName,
+          description: `Auto-generated from CQ mapping`,
+          moduleName: mapping.moduleNames[0] || defaultModuleName,
+          attributes: [],
+        })
+        validClassNames.add(objLower)
+        healedIssues.push(
+          `Synthesized missing class "${t.objectClassName}" referenced in CQ mapping.`
+        )
+      }
+
+      const relKey = `${t.predicateRelationName.toLowerCase()}:${subLower}:${objLower}`
+      if (!existingRelKeys.has(relKey)) {
+        clonedDraft.relations.push({
+          name: t.predicateRelationName,
+          description: `Auto-generated from CQ mapping`,
+          domainClassName: t.subjectClassName,
+          rangeClassName: t.objectClassName,
+        })
+        existingRelKeys.add(relKey)
+        healedIssues.push(
+          `Synthesized missing relation "${t.predicateRelationName}" connecting "${t.subjectClassName}" -> "${t.objectClassName}".`
+        )
+      }
+    }
+  }
 
   return { draft: clonedDraft, healedIssues }
 }

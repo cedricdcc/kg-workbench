@@ -42,13 +42,43 @@ export const GeneratedRelationSchema = z.object({
   alignment: EntityAlignmentSchema.optional(),
 })
 
-export const GeneratedCQMappingSchema = z.object({
-  cqId: z.string().uuid(),
+export const GeneratedCQTripleSchema = z.object({
   subjectClassName: z.string().trim().min(1),
   predicateRelationName: z.string().trim().min(1),
   objectClassName: z.string().trim().min(1),
-  moduleNames: z.array(z.string().trim()).default([]),
 })
+
+export const GeneratedCQMappingSchema = z
+  .object({
+    cqId: z.string().uuid(),
+    subjectClassName: z.string().trim().optional(),
+    predicateRelationName: z.string().trim().optional(),
+    objectClassName: z.string().trim().optional(),
+    moduleNames: z.array(z.string().trim()).default([]),
+    triples: z.array(GeneratedCQTripleSchema).optional().default([]),
+  })
+  .transform((data) => {
+    let triples = data.triples ?? []
+    if (
+      triples.length === 0 &&
+      data.subjectClassName &&
+      data.predicateRelationName &&
+      data.objectClassName
+    ) {
+      triples = [
+        {
+          subjectClassName: data.subjectClassName,
+          predicateRelationName: data.predicateRelationName,
+          objectClassName: data.objectClassName,
+        },
+      ]
+    }
+    return {
+      cqId: data.cqId,
+      moduleNames: data.moduleNames,
+      triples,
+    }
+  })
 
 export const ContextualConnectionSchema = z.object({
   curie: z.string(),
@@ -71,8 +101,11 @@ export type GeneratedAttribute = z.infer<typeof GeneratedAttributeSchema>
 export type GeneratedClass = z.infer<typeof GeneratedClassSchema>
 export type GeneratedModule = z.infer<typeof GeneratedModuleSchema>
 export type GeneratedRelation = z.infer<typeof GeneratedRelationSchema>
+export type GeneratedCQTriple = z.infer<typeof GeneratedCQTripleSchema>
 export type GeneratedCQMapping = z.infer<typeof GeneratedCQMappingSchema>
-export type GeneratedOntologyDraft = z.infer<typeof GeneratedOntologyDraftSchema>
+export type GeneratedOntologyDraft = z.infer<
+  typeof GeneratedOntologyDraftSchema
+>
 export type GeneratedOntologyDraftInput = z.input<
   typeof GeneratedOntologyDraftSchema
 >
