@@ -14,6 +14,7 @@ import {
   deleteCQ,
   setCQModules,
   updateCQ,
+  updateCQTriples,
 } from "@/features/ontology/server/actions/competency-questions"
 import {
   calculateCqCoverageSummary,
@@ -71,19 +72,32 @@ export function CqWorkbench({
       // Text search
       if (filters.search.trim()) {
         const query = filters.search.toLowerCase()
-        const questionMatches = (cq.question ?? "").toLowerCase().includes(query)
+        const questionMatches = (cq.question ?? "")
+          .toLowerCase()
+          .includes(query)
         const evalItem = evaluationsById[cq.id]
-        const subjectMatches = evalItem?.subjectClassName?.toLowerCase().includes(query) ?? false
-        const predicateMatches = evalItem?.predicateRelationName?.toLowerCase().includes(query) ?? false
-        const objectMatches = evalItem?.objectClassName?.toLowerCase().includes(query) ?? false
-        if (!questionMatches && !subjectMatches && !predicateMatches && !objectMatches) {
+        const subjectMatches =
+          evalItem?.subjectClassName?.toLowerCase().includes(query) ?? false
+        const predicateMatches =
+          evalItem?.predicateRelationName?.toLowerCase().includes(query) ??
+          false
+        const objectMatches =
+          evalItem?.objectClassName?.toLowerCase().includes(query) ?? false
+        if (
+          !questionMatches &&
+          !subjectMatches &&
+          !predicateMatches &&
+          !objectMatches
+        ) {
           return false
         }
       }
 
       // Module filter
       if (filters.moduleId) {
-        const hasModule = (cq.modules ?? []).some((m) => m.id === filters.moduleId)
+        const hasModule = (cq.modules ?? []).some(
+          (m) => m.id === filters.moduleId
+        )
         if (!hasModule) return false
       }
 
@@ -109,7 +123,9 @@ export function CqWorkbench({
   }, [cqs, selectedCqId])
 
   // Keep selection valid when filters or items change
-  const effectiveSelectedId = activeCq ? activeCq.id : filteredCqs[0]?.id ?? null
+  const effectiveSelectedId = activeCq
+    ? activeCq.id
+    : (filteredCqs[0]?.id ?? null)
 
   function handleFilterChange(updates: Partial<CqFilterState>) {
     setFilters((prev) => ({ ...prev, ...updates }))
@@ -119,7 +135,9 @@ export function CqWorkbench({
   async function handleAddCq(customQuestion?: string) {
     try {
       const created = await createCQ(ontologyId, {
-        question: customQuestion ?? "What domain concept or fact must this ontology specify?",
+        question:
+          customQuestion ??
+          "What domain concept or fact must this ontology specify?",
         sortOrder: cqs.length,
       })
 
@@ -131,7 +149,9 @@ export function CqWorkbench({
       router.refresh()
       toast.success("Competency question created.")
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to create question.")
+      toast.error(
+        err instanceof Error ? err.message : "Failed to create question."
+      )
     }
   }
 
@@ -144,6 +164,12 @@ export function CqWorkbench({
         predicateRelationId: cq.predicate_relation_id,
         objectClassId: cq.object_class_id,
         sortOrder: cqs.length,
+        triples: (cq.triples ?? []).map((t, idx) => ({
+          subjectClassId: t.subject_class_id,
+          predicateRelationId: t.predicate_relation_id,
+          objectClassId: t.object_class_id,
+          sortOrder: idx,
+        })),
       })
 
       const moduleIds = (cq.modules ?? []).map((m) => m.id)
@@ -155,7 +181,9 @@ export function CqWorkbench({
       router.refresh()
       toast.success("Question duplicated.")
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to duplicate question.")
+      toast.error(
+        err instanceof Error ? err.message : "Failed to duplicate question."
+      )
     }
   }
 
@@ -170,7 +198,9 @@ export function CqWorkbench({
       router.refresh()
       toast.success("Question deleted.")
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to delete question.")
+      toast.error(
+        err instanceof Error ? err.message : "Failed to delete question."
+      )
     }
   }
 
@@ -182,11 +212,13 @@ export function CqWorkbench({
       router.refresh()
       toast.success("Question formulation saved.")
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to update question.")
+      toast.error(
+        err instanceof Error ? err.message : "Failed to update question."
+      )
     }
   }
 
-  // Action: Update Concept Mapping
+  // Action: Update Concept Mapping (single-triple fallback)
   async function handleUpdateMapping(mapping: {
     subjectClassId: string | null
     predicateRelationId: string | null
@@ -198,7 +230,29 @@ export function CqWorkbench({
       router.refresh()
       toast.success("Concept mapping updated.")
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to update concept mapping.")
+      toast.error(
+        err instanceof Error ? err.message : "Failed to update concept mapping."
+      )
+    }
+  }
+
+  // Action: Update Multi-Triple Graph Pattern
+  async function handleUpdateTriples(
+    triples: Array<{
+      subjectClassId: string | null
+      predicateRelationId: string | null
+      objectClassId: string | null
+    }>
+  ) {
+    if (!effectiveSelectedId) return
+    try {
+      await updateCQTriples(effectiveSelectedId, triples)
+      router.refresh()
+      toast.success("Concept mapping updated.")
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Failed to update concept mapping."
+      )
     }
   }
 
@@ -215,7 +269,11 @@ export function CqWorkbench({
       await setCQModules(activeCq.id, Array.from(currentIds))
       router.refresh()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to update module association.")
+      toast.error(
+        err instanceof Error
+          ? err.message
+          : "Failed to update module association."
+      )
     }
   }
 
@@ -237,7 +295,9 @@ export function CqWorkbench({
       ])
       router.refresh()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to reorder question.")
+      toast.error(
+        err instanceof Error ? err.message : "Failed to reorder question."
+      )
     }
   }
 
@@ -256,7 +316,7 @@ export function CqWorkbench({
       {/* Main Split Workbench: List (50%) | Inspector (50%) */}
       <div className="flex min-h-0 flex-1">
         {/* Left/Center Pane: CQ List Panel */}
-        <div className="w-1/2 min-w-[340px] max-w-2xl border-r border-border/60">
+        <div className="w-1/2 max-w-2xl min-w-[340px] border-r border-border/60">
           <CqListPanel
             cqs={filteredCqs}
             evaluationsById={evaluationsById}
@@ -271,7 +331,7 @@ export function CqWorkbench({
         </div>
 
         {/* Right Pane: Concept Mapping & Detail Inspector */}
-        <div className="flex-1 min-w-[380px] bg-card/20">
+        <div className="min-w-[380px] flex-1 bg-card/20">
           <CqDetailPanel
             cq={activeCq}
             classes={classes}
@@ -280,6 +340,7 @@ export function CqWorkbench({
             currentModuleId={filters.moduleId}
             onUpdateQuestion={handleUpdateQuestion}
             onUpdateMapping={handleUpdateMapping}
+            onUpdateTriples={handleUpdateTriples}
             onToggleModule={handleToggleModule}
             onDelete={() => {
               if (activeCq) handleDeleteCq(activeCq.id)

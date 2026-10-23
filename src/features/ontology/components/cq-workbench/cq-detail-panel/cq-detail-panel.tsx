@@ -13,7 +13,10 @@ import type {
   OntologyCQWithModules,
 } from "@/features/ontology/server/queries"
 import { routes } from "@/lib/routes"
-import { CqConceptMappingCard } from "./cq-concept-mapping-card"
+import {
+  CqConceptMappingCard,
+  type EditableTriple,
+} from "./cq-concept-mapping-card"
 import { CqModuleSelector } from "./cq-module-selector"
 
 interface CqDetailPanelProps {
@@ -28,6 +31,7 @@ interface CqDetailPanelProps {
     predicateRelationId: string | null
     objectClassId: string | null
   }) => Promise<void>
+  onUpdateTriples?: (triples: EditableTriple[]) => Promise<void>
   onToggleModule: (moduleId: string) => Promise<void>
   onDelete: () => Promise<void>
 }
@@ -35,14 +39,16 @@ interface CqDetailPanelProps {
 export function CqDetailPanel(props: CqDetailPanelProps) {
   if (!props.cq) {
     return (
-      <div className="flex h-full flex-col items-center justify-center p-8 text-center text-muted-foreground bg-card/20">
-        <div className="rounded-full bg-muted p-4 mb-3">
+      <div className="flex h-full flex-col items-center justify-center bg-card/20 p-8 text-center text-muted-foreground">
+        <div className="mb-3 rounded-full bg-muted p-4">
           <HelpCircle className="h-8 w-8 text-muted-foreground/50" />
         </div>
-        <h3 className="text-sm font-semibold text-foreground">No Question Selected</h3>
-        <p className="mt-1 text-xs text-muted-foreground max-w-sm">
-          Select a competency question from the list on the left to review its formulation,
-          map concepts, and inspect its ontological coverage.
+        <h3 className="text-sm font-semibold text-foreground">
+          No Question Selected
+        </h3>
+        <p className="mt-1 max-w-sm text-xs text-muted-foreground">
+          Select a competency question from the list on the left to review its
+          formulation, map concepts, and inspect its ontological coverage.
         </p>
       </div>
     )
@@ -63,6 +69,7 @@ function CqDetailPanelEditor({
   currentModuleId = null,
   onUpdateQuestion,
   onUpdateMapping,
+  onUpdateTriples,
   onToggleModule,
   onDelete,
 }: CqDetailPanelEditorProps) {
@@ -91,9 +98,12 @@ function CqDetailPanelEditor({
         {/* Header with Title and Delete action */}
         <div className="flex items-center justify-between border-b border-border/50 pb-4">
           <div>
-            <h2 className="text-base font-semibold text-foreground">Question Inspector</h2>
+            <h2 className="text-base font-semibold text-foreground">
+              Question Inspector
+            </h2>
             <p className="text-xs text-muted-foreground">
-              Define question requirements and map to ontology classes and relations
+              Define question requirements and map to ontology classes and
+              relations
             </p>
           </div>
 
@@ -103,7 +113,7 @@ function CqDetailPanelEditor({
             onClick={onDelete}
             className="h-8 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive"
           >
-            <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+            <Trash2 className="mr-1.5 h-3.5 w-3.5" />
             <span>Delete</span>
           </Button>
         </div>
@@ -119,7 +129,7 @@ function CqDetailPanelEditor({
                 size="sm"
                 onClick={handleSaveQuestion}
                 disabled={isSavingQuestion}
-                className="h-7 px-2.5 text-xs gap-1"
+                className="h-7 gap-1 px-2.5 text-xs"
               >
                 <Save className="h-3 w-3" />
                 <span>Save Text</span>
@@ -132,12 +142,13 @@ function CqDetailPanelEditor({
             onBlur={handleSaveQuestion}
             rows={3}
             placeholder="Formulate the competency question..."
-            className="text-xs resize-y"
+            className="resize-y text-xs"
           />
         </div>
 
         {/* Section 2: Concept Mapping Card */}
         <CqConceptMappingCard
+          triples={cq.triples}
           subjectClassId={cq.subject_class_id}
           predicateRelationId={cq.predicate_relation_id}
           objectClassId={cq.object_class_id}
@@ -145,27 +156,18 @@ function CqDetailPanelEditor({
           relations={relations}
           modules={modules}
           currentModuleId={currentModuleId}
-          onSubjectChange={(id) =>
-            onUpdateMapping({
-              subjectClassId: id,
-              predicateRelationId: cq.predicate_relation_id,
-              objectClassId: cq.object_class_id,
-            })
-          }
-          onPredicateChange={(id) =>
-            onUpdateMapping({
-              subjectClassId: cq.subject_class_id,
-              predicateRelationId: id,
-              objectClassId: cq.object_class_id,
-            })
-          }
-          onObjectChange={(id) =>
-            onUpdateMapping({
-              subjectClassId: cq.subject_class_id,
-              predicateRelationId: cq.predicate_relation_id,
-              objectClassId: id,
-            })
-          }
+          onUpdateTriples={async (updatedTriples) => {
+            if (onUpdateTriples) {
+              await onUpdateTriples(updatedTriples)
+            } else {
+              const first = updatedTriples[0]
+              await onUpdateMapping({
+                subjectClassId: first?.subjectClassId ?? null,
+                predicateRelationId: first?.predicateRelationId ?? null,
+                objectClassId: first?.objectClassId ?? null,
+              })
+            }
+          }}
         />
 
         {/* Section 3: Module Associations */}
@@ -180,9 +182,12 @@ function CqDetailPanelEditor({
         {/* Section 4: Fact Inspector Bridge */}
         <div className="flex items-center justify-between rounded-xl border border-border/50 bg-muted/20 p-4">
           <div className="flex flex-col gap-0.5">
-            <span className="text-xs font-semibold text-foreground">Knowledge Graph Verification</span>
+            <span className="text-xs font-semibold text-foreground">
+              Knowledge Graph Verification
+            </span>
             <span className="text-[11px] text-muted-foreground">
-              Inspect extracted facts and instances answering this question in the document viewer
+              Inspect extracted facts and instances answering this question in
+              the document viewer
             </span>
           </div>
 

@@ -33,18 +33,14 @@ interface CqListItemProps {
   canMoveDown?: boolean
 }
 
-function HighlightedText({
-  text,
-  query,
-}: {
-  text: string
-  query?: string
-}) {
+function HighlightedText({ text, query }: { text: string; query?: string }) {
   if (!query || !query.trim()) {
     return <span>{text || "(Empty question)"}</span>
   }
 
-  const parts = text.split(new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`, "gi"))
+  const parts = text.split(
+    new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`, "gi")
+  )
 
   return (
     <span>
@@ -79,11 +75,26 @@ export function CqListItem({
 }: CqListItemProps) {
   const coveragePill = useMemo(() => {
     if (coverage.status === "full") {
+      if (coverage.totalTriples > 1) {
+        return (
+          <span className="inline-flex items-center gap-1.5 rounded border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-700 dark:text-emerald-300">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+            <span className="rounded bg-emerald-500/20 px-1 py-0 text-[10px] font-semibold">
+              {coverage.totalTriples} hops
+            </span>
+            <span className="max-w-[220px] truncate">
+              {coverage.subjectClassName} → … → {coverage.objectClassName}
+            </span>
+          </span>
+        )
+      }
+
       return (
         <span className="inline-flex items-center gap-1 rounded border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-700 dark:text-emerald-300">
           <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-          <span className="truncate max-w-[260px]">
-            {coverage.subjectClassName} → {coverage.predicateRelationName} → {coverage.objectClassName}
+          <span className="max-w-[260px] truncate">
+            {coverage.subjectClassName} → {coverage.predicateRelationName} →{" "}
+            {coverage.objectClassName}
           </span>
         </span>
       )
@@ -97,9 +108,14 @@ export function CqListItem({
       ].join(" → ")
 
       return (
-        <span className="inline-flex items-center gap-1 rounded border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:text-amber-300">
+        <span className="inline-flex items-center gap-1.5 rounded border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:text-amber-300">
           <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
-          <span className="truncate max-w-[260px]">Partial: {parts}</span>
+          {coverage.totalTriples > 1 && (
+            <span className="rounded bg-amber-500/20 px-1 py-0 text-[10px] font-semibold">
+              {coverage.mappedTriples}/{coverage.totalTriples} hops
+            </span>
+          )}
+          <span className="max-w-[220px] truncate">Partial: {parts}</span>
         </span>
       )
     }
@@ -115,7 +131,7 @@ export function CqListItem({
   return (
     <div
       onClick={onSelect}
-      className={`group relative flex flex-col gap-2 rounded-lg border p-3 text-left transition-all cursor-pointer ${
+      className={`group relative flex cursor-pointer flex-col gap-2 rounded-lg border p-3 text-left transition-all ${
         isSelected
           ? "border-primary bg-primary/5 shadow-xs ring-1 ring-primary/30"
           : "border-border/60 bg-card hover:border-border hover:bg-muted/20"
@@ -123,13 +139,13 @@ export function CqListItem({
     >
       <div className="flex items-start justify-between gap-2">
         {/* Question Text */}
-        <p className="text-sm font-medium leading-snug text-foreground flex-1">
+        <p className="flex-1 text-sm leading-snug font-medium text-foreground">
           <HighlightedText text={cq.question} query={searchQuery} />
         </p>
 
         {/* Action Controls */}
         <div
-          className="flex items-center gap-0.5 opacity-80 group-hover:opacity-100 transition-opacity"
+          className="flex items-center gap-0.5 opacity-80 transition-opacity group-hover:opacity-100"
           onClick={(e) => e.stopPropagation()}
         >
           {onMoveUp && (
@@ -186,7 +202,7 @@ export function CqListItem({
       </div>
 
       {/* Meta Row: Concept Mapping & Modules */}
-      <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-border/40">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/40 pt-1">
         <div>{coveragePill}</div>
 
         {/* Module Tags */}
