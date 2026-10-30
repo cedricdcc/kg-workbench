@@ -5,6 +5,7 @@ import {
   shouldMoveToDeadLetter,
   buildClaimJobSql,
   failJob,
+  claimJob,
 } from "../src/server/events/queue"
 import type { DbOrTx } from "../src/server/events/types"
 
@@ -61,6 +62,61 @@ test("failJob delays next retry with future locked_until timestamp (Reviewer Fin
   assert.ok(values.locked_until)
 
   const lockedUntilTime = new Date(values.locked_until as string).getTime()
-  assert.ok(lockedUntilTime >= before + 9000, "locked_until should be at least 9s in future")
-  assert.ok(lockedUntilTime <= before + 12000, "locked_until should be around 10s in future")
+  assert.ok(
+    lockedUntilTime >= before + 9000,
+    "locked_until should be at least 9s in future"
+  )
+  assert.ok(
+    lockedUntilTime <= before + 12000,
+    "locked_until should be around 10s in future"
+  )
+})
+
+test("claimJob returns null when no matching pending job exists", async () => {
+  const fakeDb = {
+    execute: () => Promise.resolve({ rows: [] }),
+  }
+
+  const result = await claimJob(
+    fakeDb as unknown as DbOrTx,
+    "extractor",
+    "worker-1"
+  )
+  assert.equal(result, null)
+})
+
+test("claimJob returns claimed job and attaches domain event payload when present", async () => {
+  const mockJob = {
+    id: "job-100",
+    event_id: "evt-200",
+    target_worker: "extractor",
+    status: "claimed",
+    priority: 50,
+    attempts: 1,
+    max_attempts: 3,
+    locked_by: "worker-1",
+  }
+
+  const mockPayload = { documentId: "doc-1", provider: "ollama" }
+
+  const fakeDb = {
+    execute: () => Promise.resolve({ rows: [mockJob] }),
+    select: () => ({
+      from: () => ({
+        where: () => ({
+          limit: () => Promise.resolve([{ payload: mockPayload }]),
+        }),
+      }),
+    }),
+  }
+
+  const result = await claimJob(
+    fakeDb as unknown as DbOrTx,
+    "extractor",
+    "worker-1"
+  )
+
+  assert.ok(result)
+  assert.equal(result.job.id, "job-100")
+  assert.deepEqual(result.eventPayload, mockPayload)
 })
