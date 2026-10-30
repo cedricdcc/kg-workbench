@@ -4,6 +4,7 @@ import {
   doublePrecision,
   index,
   integer,
+  jsonb,
   pgTable,
   primaryKey,
   real,
@@ -471,3 +472,56 @@ export const registryEndpointSnapshots = pgTable(
     created_at: created_at(),
   }
 )
+
+export const domainEvents = pgTable("domain_events", {
+  id: generatedId(),
+  event_type: text("event_type").notNull(),
+  aggregate_type: text("aggregate_type").notNull(),
+  aggregate_id: uuid("aggregate_id").notNull(),
+  payload: jsonb("payload").notNull(),
+  created_at: created_at(),
+})
+
+export const jobQueue = pgTable(
+  "job_queue",
+  {
+    id: generatedId(),
+    event_id: uuid("event_id").references(() => domainEvents.id, {
+      onDelete: "cascade",
+    }),
+    target_worker: text("target_worker").notNull(),
+    status: text("status").notNull().default("pending"),
+    priority: integer("priority").notNull().default(0),
+    attempts: integer("attempts").notNull().default(0),
+    max_attempts: integer("max_attempts").notNull().default(3),
+    locked_by: text("locked_by"),
+    locked_until: timestamp("locked_until", {
+      withTimezone: true,
+      mode: "string",
+    }),
+    result: jsonb("result"),
+    error_details: text("error_details"),
+    created_at: created_at(),
+    updated_at: timestamp("updated_at", {
+      withTimezone: true,
+      mode: "string",
+    }).defaultNow(),
+  },
+  (table) => [
+    index("job_queue_worker_status_priority_idx").on(
+      table.target_worker,
+      table.status,
+      table.priority
+    ),
+  ]
+)
+
+export const systemServices = pgTable("system_services", {
+  id: text("id").primaryKey(),
+  display_name: text("display_name").notNull(),
+  status: text("status").notNull().default("offline"),
+  capabilities: jsonb("capabilities").notNull(),
+  last_heartbeat: created_at(),
+  metadata: jsonb("metadata"),
+})
+
