@@ -11,6 +11,7 @@ scope:
   - browser/detail views, visual React Flow canvas state, and dedicated competency question workbench
   - persisted layout and class-position state for visual mode and JSON round-trips
   - competency question concept coverage evaluation (Subject, Predicate, Object triple mapping)
+  - pre-flight blast radius impact analysis and safety confirmation modal before class or relation deletion
   - AI-assisted ontology draft generation and staged review from competency questions
   - reference vocabularies and standard ontology indexing (OLS4, BARTOC, OntoPortal Alliance, EU Vocabularies, LOV)
   - pluggable multi-registry provider subsystem with circuit breaker and resilient parallel aggregator
@@ -32,6 +33,8 @@ server_entry_points:
     purpose: Focused read layer and client-callable query functions for ontology documents, structure, metadata, reference ontologies, and saved layout state.
   - path: src/features/ontology/server/actions/
     purpose: Focused write actions for ontology CRUD, JSON import/export, module transfer, visual layout persistence, atomic class reconciliation, and reference vocabularies sync.
+  - path: src/features/ontology/server/blast-radius/
+    purpose: Pre-flight blast radius calculation engine, dependency graph traversal, and deterministic risk scoring matrix (0-100 severity).
   - path: src/features/ontology/server/actions/generate-ontology.ts
     purpose: AI-assisted ontology draft generation from competency questions with local vector grounding, contextual expansion, and transactional persistence.
   - path: src/features/ontology/server/services/ai-relation-reconciliation.ts
@@ -72,6 +75,7 @@ update_this_readme_when:
 - `competency question (CQ)`: user requirement formulated as a natural language question and mapped to ontology triple concepts (`subject_class_id`, `predicate_relation_id`, `object_class_id`)
 - `CQ concept coverage`: evaluation metric classifying CQs as `full` (all 3 mapped), `partial` (1 or 2 concepts mapped), or `unmapped` (0 concepts mapped), with percentage reporting
 - `CQ workbench`: dedicated split-screen view (`?view=questions`) featuring coverage metrics bar, question list with search/filters/reordering, and concept mapping inspector
+- `blast radius analysis`: pre-flight risk evaluation quantifying broken CQs, affected extracted facts, orphaned subclasses, and invalidated relations before class or relation deletion
 
 ## Flow
 
@@ -90,7 +94,8 @@ update_this_readme_when:
 9. `detail-panel-shell.tsx` hosts tabbed class, relation, or module detail views with metadata editors for translations, notes, examples, instance rules, relation attributes, and contextual defect callout banners.
 10. Server actions persist ontology structure changes, CQ mappings and module associations, metadata rows, saved visual layout state, JSON round-trips, and OWL export generation.
 11. `ontology-issues-pill.tsx` displays concrete typed issue counts (`Error`, `Warning`, `Suggestion`, `Clean`) with zero arbitrary health percentages. Clicking opens `ontology-issues-sheet.tsx` (slide-over drawer with tabs for Structural Defects & Quick-Fixes, Semantic Redundancy Clusters, and Standard Vocabulary Recommendations with 1-click import).
-12. OWL export runs pre-flight validation and injects linter diagnostic notes into the exported ontology comments.
+12. Pre-flight Blast Radius dialog (`BlastRadiusModal`) intercepts class and relation deletion in `ClassDetail` and `RelationDetail`, rendering severity level, broken CQ list, orphaned subclasses, and requiring explicit acknowledgment for critical impact.
+13. OWL export runs pre-flight validation and injects linter diagnostic notes into the exported ontology comments.
 
 ## Constraints
 

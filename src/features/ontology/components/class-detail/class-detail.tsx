@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useTransition } from "react"
+import { useMemo, useState } from "react"
 import { Trash2 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -28,6 +28,7 @@ import { NotesEditor } from "../shared/notes-editor/notes-editor"
 import { SemanticAlignmentsCard } from "../shared/semantic-alignments-card/semantic-alignments-card"
 import { DefectCalloutBanner } from "../shared/defect-callout-banner"
 import type { OntologyDefect } from "@/features/ontology/utils/linter"
+import { BlastRadiusModal } from "../blast-radius-modal/blast-radius-modal"
 
 interface ClassDetailProps {
   cls: OntologyClassWithAttributes
@@ -69,7 +70,7 @@ export function ClassDetail({
   examples,
   attributeMetadata,
 }: ClassDetailProps) {
-  const [isPending, startTransition] = useTransition()
+  const [isBlastRadiusOpen, setIsBlastRadiusOpen] = useState(false)
 
   const classMap = useMemo(
     () => new Map(allClasses.map((c) => [c.id, c])),
@@ -92,144 +93,154 @@ export function ClassDetail({
   )
 
   function handleDelete() {
-    if (!confirm(`Delete class "${cls.name}"? This cannot be undone.`)) return
-    startTransition(async () => {
-      await deleteClass(cls.id)
-    })
+    setIsBlastRadiusOpen(true)
   }
 
   return (
-    <Tabs defaultValue="general" className="min-w-0 px-6 pt-3 pb-6">
-      <TabsList className="w-full justify-start" variant="line">
-        <TabsTrigger value="general">General</TabsTrigger>
-        <TabsTrigger value="instances">
-          Instances ({examples.length})
-        </TabsTrigger>
-        <TabsTrigger value="attributes">
-          Attributes ({cls.attributes.length}
-          {inheritedInfo.inheritedAttributes.length > 0
-            ? ` + ${inheritedInfo.inheritedAttributes.length}`
-            : ""}
-          )
-        </TabsTrigger>
-        <TabsTrigger value="relations">Relations ({relationCount})</TabsTrigger>
-        <TabsTrigger value="notes">Notes ({notes.length})</TabsTrigger>
-      </TabsList>
+    <>
+      <Tabs defaultValue="general" className="min-w-0 px-6 pt-3 pb-6">
+        <TabsList className="w-full justify-start" variant="line">
+          <TabsTrigger value="general">General</TabsTrigger>
+          <TabsTrigger value="instances">
+            Instances ({examples.length})
+          </TabsTrigger>
+          <TabsTrigger value="attributes">
+            Attributes ({cls.attributes.length}
+            {inheritedInfo.inheritedAttributes.length > 0
+              ? ` + ${inheritedInfo.inheritedAttributes.length}`
+              : ""}
+            )
+          </TabsTrigger>
+          <TabsTrigger value="relations">
+            Relations ({relationCount})
+          </TabsTrigger>
+          <TabsTrigger value="notes">Notes ({notes.length})</TabsTrigger>
+        </TabsList>
 
-      <TabsContent value="general" className="mt-1.5 space-y-6">
-        {activeDefects && activeDefects.length > 0 && (
-          <DefectCalloutBanner
-            defects={activeDefects}
-            onQuickFix={onQuickFix}
-          />
-        )}
+        <TabsContent value="general" className="mt-1.5 space-y-6">
+          {activeDefects && activeDefects.length > 0 && (
+            <DefectCalloutBanner
+              defects={activeDefects}
+              onQuickFix={onQuickFix}
+            />
+          )}
 
-        <ClassDetailHeader
-          cls={cls}
-          modules={modules}
-          allClasses={allClasses}
-          relations={relations}
-          ontologyId={ontologyId}
-        />
-
-        <section>
-          <LocalizedTextEditor
-            ontologyId={ontologyId}
-            target={{ type: "class", id: cls.id }}
-            languages={languages}
-            localizedTexts={localizedTexts}
-            defaultLanguage={defaultLanguage}
-            fields={[
-              {
-                name: "name",
-                label: "Name",
-                canonicalValue: cls.name,
-                onSaveCanonical: (name) => updateClass(cls.id, { name }),
-              },
-              {
-                name: "description",
-                label: "Description",
-                canonicalValue: cls.description,
-                multiline: true,
-                placeholder: "No description",
-                onSaveCanonical: (description) =>
-                  updateClass(cls.id, { description }),
-              },
-            ]}
-          />
-        </section>
-
-        <section>
-          <SemanticAlignmentsCard
-            ontologyId={ontologyId}
-            entityId={cls.id}
-            entityName={cls.name}
-            entityType="class"
+          <ClassDetailHeader
             cls={cls}
+            modules={modules}
             allClasses={allClasses}
             relations={relations}
+            ontologyId={ontologyId}
           />
-        </section>
 
-        <div>
-          <Button
-            variant="destructive"
-            size="sm"
-            onClick={handleDelete}
-            disabled={isPending}
-          >
-            <Trash2 className="mr-1.5 h-3.5 w-3.5" />
-            Delete class
-          </Button>
-        </div>
-      </TabsContent>
+          <section>
+            <LocalizedTextEditor
+              ontologyId={ontologyId}
+              target={{ type: "class", id: cls.id }}
+              languages={languages}
+              localizedTexts={localizedTexts}
+              defaultLanguage={defaultLanguage}
+              fields={[
+                {
+                  name: "name",
+                  label: "Name",
+                  canonicalValue: cls.name,
+                  onSaveCanonical: (name) => updateClass(cls.id, { name }),
+                },
+                {
+                  name: "description",
+                  label: "Description",
+                  canonicalValue: cls.description,
+                  multiline: true,
+                  placeholder: "No description",
+                  onSaveCanonical: (description) =>
+                    updateClass(cls.id, { description }),
+                },
+              ]}
+            />
+          </section>
 
-      <TabsContent value="instances" className="mt-1.5 space-y-6">
-        <EntityInstances
-          ontologyId={ontologyId}
-          target={{ type: "class", id: cls.id }}
-          instancePolicy={cls.instance_policy}
-          examples={examples}
-          instanceCandidateLabel="Allowed instance"
-          candidatePluralLabel="allowed instances"
-          onInstancePolicyChange={(nextPolicy) =>
-            updateClass(cls.id, { instancePolicy: nextPolicy })
-          }
-        />
-      </TabsContent>
+          <section>
+            <SemanticAlignmentsCard
+              ontologyId={ontologyId}
+              entityId={cls.id}
+              entityName={cls.name}
+              entityType="class"
+              cls={cls}
+              allClasses={allClasses}
+              relations={relations}
+            />
+          </section>
 
-      <TabsContent value="attributes" className="mt-1.5 space-y-6">
-        <AttributeTable
-          key={cls.id}
-          ontologyId={ontologyId}
-          classId={cls.id}
-          attributes={cls.attributes}
-          inheritedAttributes={inheritedInfo.inheritedAttributes}
-          languages={attributeMetadata.languages}
-          defaultLanguage={attributeMetadata.defaultLanguage}
-          localizedTexts={attributeMetadata.localizedTexts}
-          notes={attributeMetadata.notes}
-          examples={attributeMetadata.examples}
-        />
-      </TabsContent>
+          <div>
+            <Button variant="destructive" size="sm" onClick={handleDelete}>
+              <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+              Delete class
+            </Button>
+          </div>
+        </TabsContent>
 
-      <TabsContent value="relations" className="mt-1.5 space-y-6">
-        <ClassDetailRelations
-          classId={cls.id}
-          relations={relations}
-          inheritedRelations={inheritedInfo.inheritedRelations}
-          classMap={classMap}
-          onNavigateToRelation={onNavigateToRelation}
-        />
-      </TabsContent>
+        <TabsContent value="instances" className="mt-1.5 space-y-6">
+          <EntityInstances
+            ontologyId={ontologyId}
+            target={{ type: "class", id: cls.id }}
+            instancePolicy={cls.instance_policy}
+            examples={examples}
+            instanceCandidateLabel="Allowed instance"
+            candidatePluralLabel="allowed instances"
+            onInstancePolicyChange={(nextPolicy) =>
+              updateClass(cls.id, { instancePolicy: nextPolicy })
+            }
+          />
+        </TabsContent>
 
-      <TabsContent value="notes" className="mt-1.5 space-y-6">
-        <NotesEditor
-          ontologyId={ontologyId}
-          target={{ type: "class", id: cls.id }}
-          notes={notes}
-        />
-      </TabsContent>
-    </Tabs>
+        <TabsContent value="attributes" className="mt-1.5 space-y-6">
+          <AttributeTable
+            key={cls.id}
+            ontologyId={ontologyId}
+            classId={cls.id}
+            attributes={cls.attributes}
+            inheritedAttributes={inheritedInfo.inheritedAttributes}
+            languages={attributeMetadata.languages}
+            defaultLanguage={attributeMetadata.defaultLanguage}
+            localizedTexts={attributeMetadata.localizedTexts}
+            notes={attributeMetadata.notes}
+            examples={attributeMetadata.examples}
+          />
+        </TabsContent>
+
+        <TabsContent value="relations" className="mt-1.5 space-y-6">
+          <ClassDetailRelations
+            classId={cls.id}
+            relations={relations}
+            inheritedRelations={inheritedInfo.inheritedRelations}
+            classMap={classMap}
+            onNavigateToRelation={onNavigateToRelation}
+          />
+        </TabsContent>
+
+        <TabsContent value="notes" className="mt-1.5 space-y-6">
+          <NotesEditor
+            ontologyId={ontologyId}
+            target={{ type: "class", id: cls.id }}
+            notes={notes}
+          />
+        </TabsContent>
+      </Tabs>
+
+      <BlastRadiusModal
+        open={isBlastRadiusOpen}
+        onOpenChange={setIsBlastRadiusOpen}
+        target={{
+          type: "class",
+          id: cls.id,
+          name: cls.name,
+          ontologyId,
+        }}
+        onConfirmDelete={async () => {
+          await deleteClass(cls.id)
+        }}
+      />
+    </>
   )
 }
