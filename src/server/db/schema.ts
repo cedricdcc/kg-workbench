@@ -521,7 +521,8 @@ export const systemServices = pgTable("system_services", {
   display_name: text("display_name").notNull(),
   status: text("status").notNull().default("offline"),
   capabilities: jsonb("capabilities").notNull(),
-  last_heartbeat: created_at(),
+  last_heartbeat: timestamp("last_heartbeat", { withTimezone: true, mode: "string" }).defaultNow(),
   metadata: jsonb("metadata"),
 })
+
 
