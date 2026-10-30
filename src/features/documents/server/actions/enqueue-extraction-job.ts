@@ -1,6 +1,6 @@
 import { getDb } from "@/server/db"
 import { publishDomainEvent } from "@/server/events/outbox"
-import type { DomainEventInput } from "@/server/events/types"
+import type { DbOrTx, DomainEventInput } from "@/server/events/types"
 
 export type ExtractionJobOptions = {
   provider?: string
@@ -31,20 +31,27 @@ export function buildExtractionEventPayload(
 export async function enqueueExtractionJob(
   documentId: string,
   ontologyDocumentId: string,
-  options: ExtractionJobOptions = {}
+  options: ExtractionJobOptions = {},
+  tx?: DbOrTx
 ) {
-  const db = getDb()
   const payload = buildExtractionEventPayload(
     documentId,
     ontologyDocumentId,
     options
   )
 
-  const result = await db.transaction(async (tx) => {
-    return await publishDomainEvent(tx, payload, {
-      priority: options.priority ?? 50,
-      targetWorker: "extractor",
-    })
+  const publishOpts = {
+    priority: options.priority ?? 50,
+    targetWorker: "extractor",
+  }
+
+  if (tx) {
+    return await publishDomainEvent(tx, payload, publishOpts)
+  }
+
+  const db = getDb()
+  const result = await db.transaction(async (transactionTx) => {
+    return await publishDomainEvent(transactionTx, payload, publishOpts)
   })
 
   return result

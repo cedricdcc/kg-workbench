@@ -1,7 +1,10 @@
 import type { Metadata } from "next"
 
 import { SettingsShell } from "@/features/settings/components/settings-shell/settings-shell"
-import { getUserApiKeysStatus } from "@/features/settings/server"
+import {
+  getSystemServices,
+  getUserApiKeysStatus,
+} from "@/features/settings/server"
 
 export const metadata: Metadata = {
   title: "Settings - KG Workbench",
@@ -9,7 +12,15 @@ export const metadata: Metadata = {
 }
 
 export default async function SettingsPage() {
-  const initialStatuses = await getUserApiKeysStatus()
+  const [initialStatuses, initialServices] = await Promise.all([
+    getUserApiKeysStatus(),
+    getSystemServices(),
+  ])
 
-  return <SettingsShell initialStatuses={initialStatuses} />
+  return (
+    <SettingsShell
+      initialStatuses={initialStatuses}
+      initialServices={initialServices}
+    />
+  )
 }

@@ -15,4 +15,11 @@ export const routes = {
   settings: {
     root: "/settings",
   },
+  api: {
+    system: {
+      services: {
+        heartbeat: "/api/system/services/heartbeat",
+      },
+    },
+  },
 } as const

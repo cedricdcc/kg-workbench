@@ -4,7 +4,9 @@ import {
   calculateRetryBackoff,
   shouldMoveToDeadLetter,
   buildClaimJobSql,
+  failJob,
 } from "../src/server/events/queue"
+import type { DbOrTx } from "../src/server/events/types"
 
 test("calculateRetryBackoff applies exponential delay with floor", () => {
   assert.equal(calculateRetryBackoff(1), 10) // 2^1 * 5s = 10s
@@ -19,10 +21,46 @@ test("shouldMoveToDeadLetter triggers when attempts reach maxAttempts", () => {
   assert.equal(shouldMoveToDeadLetter(4, 3), true)
 })
 
-test("buildClaimJobSql generates SKIP LOCKED query containing target worker", () => {
+test("buildClaimJobSql generates SKIP LOCKED query containing target worker and guards attempts", () => {
   const sql = buildClaimJobSql("extractor", "worker-1", 60)
   assert.ok(sql.includes("FOR UPDATE SKIP LOCKED"))
   assert.ok(sql.includes("extractor"))
   assert.ok(sql.includes("locked_until"))
   assert.ok(sql.includes("status = 'claimed'"))
+  // Reviewer Finding 3: guard against infinite crash loops
+  assert.ok(sql.includes("attempts < max_attempts"))
+})
+
+test("failJob delays next retry with future locked_until timestamp (Reviewer Finding 2)", async () => {
+  let updatedValues: Record<string, unknown> | null = null
+  const fakeDb = {
+    update: () => ({
+      set: (val: Record<string, unknown>) => ({
+        where: () => {
+          updatedValues = val
+          return Promise.resolve()
+        },
+      }),
+    }),
+  }
+
+  const before = Date.now()
+  const result = await failJob(
+    fakeDb as unknown as DbOrTx,
+    "job-1",
+    "network error",
+    1, // attempt 1 -> 10s backoff
+    3
+  )
+
+  assert.equal(result.status, "pending")
+  assert.equal(result.nextRetryDelaySeconds, 10)
+  assert.ok(updatedValues)
+  const values = updatedValues as Record<string, unknown>
+  assert.equal(values.error_details, "network error")
+  assert.ok(values.locked_until)
+
+  const lockedUntilTime = new Date(values.locked_until as string).getTime()
+  assert.ok(lockedUntilTime >= before + 9000, "locked_until should be at least 9s in future")
+  assert.ok(lockedUntilTime <= before + 12000, "locked_until should be around 10s in future")
 })

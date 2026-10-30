@@ -3,7 +3,9 @@ import { test } from "node:test"
 import {
   calculateServiceHealth,
   parseHeartbeatPayload,
+  recordServiceHeartbeat,
 } from "../src/server/events/services"
+import type { DbOrTx } from "../src/server/events/types"
 
 test("calculateServiceHealth flags fresh heartbeat as online", () => {
   const now = new Date()
@@ -36,4 +38,42 @@ test("parseHeartbeatPayload rejects malformed payload", () => {
   assert.equal(parseHeartbeatPayload(null), null)
   assert.equal(parseHeartbeatPayload({}), null)
   assert.equal(parseHeartbeatPayload({ id: "test" }), null)
+})
+
+test("recordServiceHeartbeat executes atomic onConflictDoUpdate upsert (Reviewer Finding 5)", async () => {
+  let conflictTarget: unknown = null
+  let insertedValues: Record<string, unknown> | null = null
+  let updateSet: Record<string, unknown> | null = null
+
+  const fakeDb = {
+    insert: () => ({
+      values: (val: Record<string, unknown>) => {
+        insertedValues = val
+        return {
+          onConflictDoUpdate: (config: {
+            target: unknown
+            set: Record<string, unknown>
+          }) => {
+            conflictTarget = config.target
+            updateSet = config.set
+            return Promise.resolve()
+          },
+        }
+      },
+    }),
+  }
+
+  await recordServiceHeartbeat(fakeDb as unknown as DbOrTx, {
+    id: "reasoner-worker",
+    displayName: "Oxigraph Reasoner",
+    capabilities: ["blast_radius"],
+  })
+
+  assert.ok(insertedValues)
+  const inserted = insertedValues as Record<string, unknown>
+  assert.equal(inserted.id, "reasoner-worker")
+  assert.ok(conflictTarget, "Should target primary key column")
+  assert.ok(updateSet, "Should configure ON CONFLICT DO UPDATE set fields")
+  const setObj = updateSet as Record<string, unknown>
+  assert.equal(setObj.status, "online")
 })

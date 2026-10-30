@@ -1,4 +1,3 @@
-import { eq } from "drizzle-orm"
 import { systemServices } from "../db/schema"
 import type { DbOrTx } from "./types"
 
@@ -64,45 +63,21 @@ export async function recordServiceHeartbeat(
   db: DbOrTx,
   payload: ServiceHeartbeatPayload
 ): Promise<void> {
+  const now = new Date().toISOString()
   const dbClient = db as unknown as {
-    select: () => {
-      from: (table: unknown) => {
-        where: (condition: unknown) => {
-          limit: (n: number) => Promise<Array<Record<string, unknown>>>
-        }
-      }
-    }
-    update: (table: unknown) => {
-      set: (values: Record<string, unknown>) => {
-        where: (condition: unknown) => Promise<unknown>
-      }
-    }
     insert: (table: unknown) => {
-      values: (data: Record<string, unknown>) => Promise<unknown>
+      values: (val: Record<string, unknown>) => {
+        onConflictDoUpdate: (config: {
+          target: unknown
+          set: Record<string, unknown>
+        }) => Promise<unknown>
+      }
     }
   }
 
-  const existing = await dbClient
-    .select()
-    .from(systemServices)
-    .where(eq(systemServices.id, payload.id))
-    .limit(1)
-
-  const now = new Date().toISOString()
-
-  if (existing.length > 0) {
-    await dbClient
-      .update(systemServices)
-      .set({
-        display_name: payload.displayName,
-        status: "online",
-        capabilities: payload.capabilities,
-        last_heartbeat: now,
-        metadata: payload.metadata ?? null,
-      })
-      .where(eq(systemServices.id, payload.id))
-  } else {
-    await dbClient.insert(systemServices).values({
+  await dbClient
+    .insert(systemServices)
+    .values({
       id: payload.id,
       display_name: payload.displayName,
       status: "online",
@@ -110,7 +85,16 @@ export async function recordServiceHeartbeat(
       last_heartbeat: now,
       metadata: payload.metadata ?? null,
     })
-  }
+    .onConflictDoUpdate({
+      target: systemServices.id,
+      set: {
+        display_name: payload.displayName,
+        status: "online",
+        capabilities: payload.capabilities,
+        last_heartbeat: now,
+        metadata: payload.metadata ?? null,
+      },
+    })
 }
 
 export async function getServiceRegistryStatuses(db: DbOrTx) {

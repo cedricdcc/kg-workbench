@@ -33,8 +33,9 @@ SET
 WHERE id = (
   SELECT id FROM job_queue
   WHERE target_worker = '${safeWorkerType}'
+    AND attempts < max_attempts
     AND (
-      status = 'pending'
+      (status = 'pending' AND (locked_until IS NULL OR locked_until <= NOW()))
       OR (status = 'claimed' AND locked_until IS NOT NULL AND locked_until < NOW())
     )
   ORDER BY priority DESC, created_at ASC
@@ -98,12 +99,15 @@ export async function failJob(
     return { status: "failed" }
   }
 
+  // Delay the next retry attempt using locked_until in the future
+  const retryAt = new Date(Date.now() + backoff * 1000).toISOString()
+
   await dbClient
     .update(jobQueue)
     .set({
       status: "pending",
       error_details: errorMessage,
-      locked_until: null,
+      locked_until: retryAt,
       updated_at: new Date().toISOString(),
     })
     .where(eq(jobQueue.id, jobId))

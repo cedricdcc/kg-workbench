@@ -34,3 +34,4 @@ test("systemServices schema exposes discovery and capability columns", () => {
   assert.ok(systemServices.capabilities)
   assert.ok(systemServices.last_heartbeat)
 })
+

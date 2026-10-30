@@ -429,3 +429,4 @@ Expected: Lint, typecheck, tests, and build all PASS.
 git add src/features/settings/ tests/system-services-dom-contract.test.ts
 git commit -m "feat(settings): add connected services and worker health matrix dashboard" --no-verify
 ```
+
