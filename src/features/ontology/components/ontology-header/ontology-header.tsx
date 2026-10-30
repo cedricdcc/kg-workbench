@@ -220,6 +220,7 @@ export function OntologyHeader({
         onOpenImportFormat={() => setImportFormatOpen(true)}
         onExportJson={() => openExport("json")}
         onExportOwl={() => openExport("owl")}
+        onExportShacl={() => openExport("shacl")}
         onOpenOntologyDetails={() => onOpenOntologyDetails?.()}
         onOpenVocabularies={handleOpenVocabularies}
         onDelete={() => setDeleteOpen(true)}

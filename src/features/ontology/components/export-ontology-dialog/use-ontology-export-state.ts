@@ -4,6 +4,7 @@ import { useState, useTransition } from "react"
 import { toast } from "sonner"
 
 import { buildOntologyOwlExport } from "@/features/ontology/server/actions/ontology-owl-export"
+import { buildOntologyShaclExport } from "@/features/ontology/server/actions/ontology-shacl-export"
 import { buildOntologyExport } from "@/features/ontology/server/actions/ontology-transfer"
 import { normalizeOwlBaseIri } from "@/features/ontology/utils/owl-base-iri"
 import { useOntologyModuleLanguageSelection } from "@/hooks/use-ontology-module-language-selection"
@@ -117,6 +118,40 @@ export function useOntologyExportState({
     })
   }
 
+  function handleShaclExport() {
+    let normalizedBaseIri: string
+    try {
+      normalizedBaseIri = normalizeOwlBaseIri(baseIri)
+    } catch (error) {
+      setBaseIriError(
+        error instanceof Error ? error.message : "Enter a valid Base IRI."
+      )
+      return
+    }
+
+    setBaseIri(normalizedBaseIri)
+    setBaseIriError(null)
+
+    startExportTransition(async () => {
+      try {
+        const result = await buildOntologyShaclExport({
+          ontologyId,
+          baseIri: normalizedBaseIri,
+          exportLanguage: selection.exportLanguage,
+          missingTranslationBehavior: selection.missingTranslationBehavior,
+          moduleIds: Array.from(selection.selectedModuleIds).sort(),
+          classIds: Array.from(selection.selectedClassIds).sort(),
+          relationIds: selection.exportRelationIds.slice().sort(),
+        })
+
+        downloadTextFile(result.fileName, result.content, "text/turtle")
+        closeAndResetDialog()
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Export failed.")
+      }
+    })
+  }
+
   return {
     ...selection,
     baseIri,
@@ -127,6 +162,7 @@ export function useOntologyExportState({
     handleBaseIriChange,
     handleExport,
     handleOwlExport,
+    handleShaclExport,
     resetState,
     setIncludeVisual,
   }

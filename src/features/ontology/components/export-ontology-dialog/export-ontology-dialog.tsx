@@ -47,6 +47,8 @@ export function ExportOntologyDialog({
     onOpenChange,
   })
   const isOwlMode = mode === "owl"
+  const isShaclMode = mode === "shacl"
+  const requiresBaseIri = isOwlMode || isShaclMode
   const isExporting = exportState.isExporting
 
   function handleOpenChange(nextOpen: boolean) {
@@ -66,7 +68,11 @@ export function ExportOntologyDialog({
           <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
             <div className="max-w-2xl space-y-3 text-left">
               <DialogTitle>
-                {isOwlMode ? "Export ontology as OWL" : "Export ontology"}
+                {isShaclMode
+                  ? "Export ontology as SHACL shapes"
+                  : isOwlMode
+                    ? "Export ontology as OWL"
+                    : "Export ontology"}
               </DialogTitle>
               <DialogDescription>
                 Choose which modules to include from {ontologyName} and resolve
@@ -96,11 +102,11 @@ export function ExportOntologyDialog({
           </div>
         </DialogHeader>
 
-        {isOwlMode ? (
+        {requiresBaseIri ? (
           <div className="max-w-xl space-y-1.5">
-            <Label htmlFor="owl-base-iri">Base IRI</Label>
+            <Label htmlFor="base-iri">Base IRI</Label>
             <Input
-              id="owl-base-iri"
+              id="base-iri"
               value={exportState.baseIri}
               onChange={(event) =>
                 exportState.handleBaseIriChange(event.target.value)
@@ -187,7 +193,7 @@ export function ExportOntologyDialog({
             >
               Cancel
             </Button>
-            {!isOwlMode && (
+            {!requiresBaseIri && (
               <label className="flex items-center gap-2 rounded-md border px-3 py-2 font-medium">
                 <input
                   type="checkbox"
@@ -204,17 +210,21 @@ export function ExportOntologyDialog({
             <Button
               type="button"
               onClick={
-                isOwlMode
-                  ? exportState.handleOwlExport
-                  : exportState.handleExport
+                isShaclMode
+                  ? exportState.handleShaclExport
+                  : isOwlMode
+                    ? exportState.handleOwlExport
+                    : exportState.handleExport
               }
               disabled={isExporting || exportState.unresolvedCount > 0}
             >
               {isExporting
                 ? "Exporting..."
-                : isOwlMode
-                  ? "Export OWL"
-                  : "Export JSON"}
+                : isShaclMode
+                  ? "Export SHACL"
+                  : isOwlMode
+                    ? "Export OWL"
+                    : "Export JSON"}
             </Button>
           </div>
         </DialogFooter>

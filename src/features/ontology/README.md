@@ -4,7 +4,7 @@ status: active
 purpose: Create, inspect, document, import, JSON/OWL export, and visualize ontology documents, modules, classes, relations, and attributes.
 scope:
   - ontology document import and selection
-  - ontology document JSON and OWL export with dependency review
+  - ontology document JSON, OWL, and W3C SHACL shapes export with dependency review
   - module create, import, export, rename, duplicate, and delete flows
   - module, class, relation, and attribute metadata authoring
   - class, relation, relation attribute, and attribute CRUD
@@ -35,6 +35,8 @@ server_entry_points:
     purpose: Focused write actions for ontology CRUD, JSON import/export, module transfer, visual layout persistence, atomic class reconciliation, and reference vocabularies sync.
   - path: src/features/ontology/server/blast-radius/
     purpose: Pre-flight blast radius calculation engine, dependency graph traversal, and deterministic risk scoring matrix (0-100 severity).
+  - path: src/features/ontology/server/shacl/
+    purpose: W3C SHACL shapes compilation (NodeShapes, PropertyShapes, cardinalities, datatypes) and in-memory fact validation engine.
   - path: src/features/ontology/server/actions/generate-ontology.ts
     purpose: AI-assisted ontology draft generation from competency questions with local vector grounding, contextual expansion, and transactional persistence.
   - path: src/features/ontology/server/services/ai-relation-reconciliation.ts

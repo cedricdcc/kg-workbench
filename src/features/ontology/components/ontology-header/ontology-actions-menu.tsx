@@ -34,6 +34,7 @@ export interface OntologyActionsMenuProps {
   onOpenImportFormat: () => void
   onExportJson: () => void
   onExportOwl: () => void
+  onExportShacl: () => void
   onOpenOntologyDetails: () => void
   onOpenVocabularies: () => void
   onDelete: () => void
@@ -52,6 +53,7 @@ export function OntologyActionsMenu({
   onOpenImportFormat,
   onExportJson,
   onExportOwl,
+  onExportShacl,
   onOpenOntologyDetails,
   onOpenVocabularies,
   onDelete,
@@ -127,6 +129,13 @@ export function OntologyActionsMenu({
             >
               <Download className="mr-2 h-4 w-4" />
               Export as OWL...
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              disabled={!hasCurrentDocument}
+              onClick={onExportShacl}
+            >
+              <Download className="mr-2 h-4 w-4" />
+              Export as SHACL (.ttl)...
             </DropdownMenuItem>
 
             <DropdownMenuSeparator />

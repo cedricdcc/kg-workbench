@@ -6,7 +6,7 @@ import type {
 } from "@/domain/ontology"
 import type { OntologyClassWithAttributes } from "@/features/ontology/server/queries"
 
-export type ExportOntologyMode = "json" | "owl"
+export type ExportOntologyMode = "json" | "owl" | "shacl"
 export type MissingTranslationBehavior = "fallback" | "strict"
 
 export interface ExportOntologyDialogProps {
