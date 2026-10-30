@@ -1,6 +1,10 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
-import { resolveTargetWorker, publishDomainEvent } from "../src/server/events/outbox"
+import {
+  resolveTargetWorker,
+  publishDomainEvent,
+} from "../src/server/events/outbox"
+import type { DbOrTx } from "../src/server/events/types"
 
 test("resolveTargetWorker routes event types to correct workers", () => {
   assert.equal(resolveTargetWorker("extraction.requested"), "extractor")
@@ -12,24 +16,31 @@ test("resolveTargetWorker routes event types to correct workers", () => {
 })
 
 test("publishDomainEvent calls transaction inserts and returns event and job IDs", async () => {
-  const inserts: { table: string; value: any }[] = []
+  const inserts: { table: string; value: Record<string, unknown> }[] = []
   const fakeTx = {
-    insert: (table: any) => ({
-      values: (val: any) => ({
+    insert: (table: unknown) => ({
+      values: (val: unknown) => ({
         returning: async () => {
-          inserts.push({ table: table[Symbol.for("drizzle:Name")] || "table", value: val })
+          inserts.push({
+            table: (table as Record<symbol, string>)[Symbol.for("drizzle:Name")] || "table",
+            value: val as Record<string, unknown>,
+          })
           return [{ id: "mock-id-" + inserts.length }]
-        }
-      })
-    })
+        },
+      }),
+    }),
   }
 
-  const result = await publishDomainEvent(fakeTx as any, {
-    eventType: "ontology.change_proposed",
-    aggregateType: "ontology",
-    aggregateId: "00000000-0000-0000-0000-000000000001",
-    payload: { action: "delete_class", classId: "123" }
-  }, { priority: 10 })
+  const result = await publishDomainEvent(
+    fakeTx as unknown as DbOrTx,
+    {
+      eventType: "ontology.change_proposed",
+      aggregateType: "ontology",
+      aggregateId: "00000000-0000-0000-0000-000000000001",
+      payload: { action: "delete_class", classId: "123" },
+    },
+    { priority: 10 }
+  )
 
   assert.ok(result.eventId)
   assert.ok(result.jobId)

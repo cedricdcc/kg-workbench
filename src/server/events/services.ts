@@ -1,5 +1,6 @@
 import { eq } from "drizzle-orm"
 import { systemServices } from "../db/schema"
+import type { DbOrTx } from "./types"
 
 export type ServiceHeartbeatPayload = {
   id: string
@@ -50,11 +51,38 @@ export function calculateServiceHealth(
   return "offline"
 }
 
+interface SystemServiceRow {
+  id: string
+  display_name: string
+  status: string
+  capabilities: string[]
+  last_heartbeat: string
+  metadata?: Record<string, unknown> | null
+}
+
 export async function recordServiceHeartbeat(
-  db: any,
+  db: DbOrTx,
   payload: ServiceHeartbeatPayload
 ): Promise<void> {
-  const existing = await db
+  const dbClient = db as unknown as {
+    select: () => {
+      from: (table: unknown) => {
+        where: (condition: unknown) => {
+          limit: (n: number) => Promise<Array<Record<string, unknown>>>
+        }
+      }
+    }
+    update: (table: unknown) => {
+      set: (values: Record<string, unknown>) => {
+        where: (condition: unknown) => Promise<unknown>
+      }
+    }
+    insert: (table: unknown) => {
+      values: (data: Record<string, unknown>) => Promise<unknown>
+    }
+  }
+
+  const existing = await dbClient
     .select()
     .from(systemServices)
     .where(eq(systemServices.id, payload.id))
@@ -63,7 +91,7 @@ export async function recordServiceHeartbeat(
   const now = new Date().toISOString()
 
   if (existing.length > 0) {
-    await db
+    await dbClient
       .update(systemServices)
       .set({
         display_name: payload.displayName,
@@ -74,7 +102,7 @@ export async function recordServiceHeartbeat(
       })
       .where(eq(systemServices.id, payload.id))
   } else {
-    await db.insert(systemServices).values({
+    await dbClient.insert(systemServices).values({
       id: payload.id,
       display_name: payload.displayName,
       status: "online",
@@ -85,9 +113,14 @@ export async function recordServiceHeartbeat(
   }
 }
 
-export async function getServiceRegistryStatuses(db: any) {
-  const services = await db.select().from(systemServices)
-  return services.map((s: any) => ({
+export async function getServiceRegistryStatuses(db: DbOrTx) {
+  const dbClient = db as unknown as {
+    select: () => {
+      from: (table: unknown) => Promise<Array<SystemServiceRow>>
+    }
+  }
+  const services = await dbClient.select().from(systemServices)
+  return services.map((s) => ({
     id: s.id,
     displayName: s.display_name,
     status: calculateServiceHealth(s.last_heartbeat),

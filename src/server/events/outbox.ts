@@ -1,5 +1,6 @@
 import { domainEvents, jobQueue } from "../db/schema"
 import type {
+  DbOrTx,
   DomainEventInput,
   PublishEventOptions,
   PublishedEventResult,
@@ -18,11 +19,17 @@ export function resolveTargetWorker(eventType: string): string {
 }
 
 export async function publishDomainEvent(
-  tx: any,
+  tx: DbOrTx,
   event: DomainEventInput,
   options?: PublishEventOptions
 ): Promise<PublishedEventResult> {
-  const [createdEvent] = await tx
+  const [createdEvent] = await (tx as unknown as {
+    insert: (table: unknown) => {
+      values: (data: unknown) => {
+        returning: (cols: unknown) => Promise<Array<{ id: string }>>
+      }
+    }
+  })
     .insert(domainEvents)
     .values({
       event_type: event.eventType,
@@ -38,7 +45,13 @@ export async function publishDomainEvent(
     options?.targetWorker || resolveTargetWorker(event.eventType)
   const priority = options?.priority ?? 0
 
-  const [createdJob] = await tx
+  const [createdJob] = await (tx as unknown as {
+    insert: (table: unknown) => {
+      values: (data: unknown) => {
+        returning: (cols: unknown) => Promise<Array<{ id: string }>>
+      }
+    }
+  })
     .insert(jobQueue)
     .values({
       event_id: eventId,

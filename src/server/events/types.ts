@@ -1,3 +1,11 @@
+import type { getDb } from "../db"
+
+export type DatabaseInstance = ReturnType<typeof getDb>
+export type TransactionInstance = Parameters<
+  Parameters<DatabaseInstance["transaction"]>[0]
+>[0]
+export type DbOrTx = DatabaseInstance | TransactionInstance
+
 export type DomainEventInput = {
   eventType: string
   aggregateType: string

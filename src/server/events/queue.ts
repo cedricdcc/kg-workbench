@@ -1,5 +1,6 @@
 import { eq } from "drizzle-orm"
 import { jobQueue } from "../db/schema"
+import type { DbOrTx } from "./types"
 
 export function calculateRetryBackoff(attempt: number): number {
   return Math.pow(2, Math.max(1, attempt)) * 5
@@ -45,11 +46,17 @@ RETURNING *;
 }
 
 export async function completeJob(
-  db: any,
+  db: DbOrTx,
   jobId: string,
   result?: Record<string, unknown>
 ): Promise<void> {
-  await db
+  await (db as unknown as {
+    update: (table: unknown) => {
+      set: (values: Record<string, unknown>) => {
+        where: (condition: unknown) => Promise<unknown>
+      }
+    }
+  })
     .update(jobQueue)
     .set({
       status: "completed",
@@ -61,7 +68,7 @@ export async function completeJob(
 }
 
 export async function failJob(
-  db: any,
+  db: DbOrTx,
   jobId: string,
   errorMessage: string,
   currentAttempts: number,
@@ -69,9 +76,16 @@ export async function failJob(
 ): Promise<{ status: "failed" | "pending"; nextRetryDelaySeconds?: number }> {
   const isDeadLetter = shouldMoveToDeadLetter(currentAttempts, maxAttempts)
   const backoff = calculateRetryBackoff(currentAttempts)
+  const dbClient = db as unknown as {
+    update: (table: unknown) => {
+      set: (values: Record<string, unknown>) => {
+        where: (condition: unknown) => Promise<unknown>
+      }
+    }
+  }
 
   if (isDeadLetter) {
-    await db
+    await dbClient
       .update(jobQueue)
       .set({
         status: "failed",
@@ -84,7 +98,7 @@ export async function failJob(
     return { status: "failed" }
   }
 
-  await db
+  await dbClient
     .update(jobQueue)
     .set({
       status: "pending",
@@ -97,16 +111,25 @@ export async function failJob(
   return { status: "pending", nextRetryDelaySeconds: backoff }
 }
 
-export async function fastPathAwaitJob<T = any>(
-  db: any,
+export async function fastPathAwaitJob<T = unknown>(
+  db: DbOrTx,
   jobId: string,
   timeoutMs: number = 2000,
   pollIntervalMs: number = 100
 ): Promise<{ resolved: boolean; status?: string; result?: T; error?: string }> {
   const startTime = Date.now()
+  const dbClient = db as unknown as {
+    select: () => {
+      from: (table: unknown) => {
+        where: (condition: unknown) => {
+          limit: (n: number) => Promise<Array<Record<string, unknown>>>
+        }
+      }
+    }
+  }
 
   while (Date.now() - startTime < timeoutMs) {
-    const [job] = await db
+    const [job] = await dbClient
       .select()
       .from(jobQueue)
       .where(eq(jobQueue.id, jobId))
@@ -120,7 +143,7 @@ export async function fastPathAwaitJob<T = any>(
         return {
           resolved: true,
           status: "failed",
-          error: job.error_details || "Job failed",
+          error: (job.error_details as string) || "Job failed",
         }
       }
     }

@@ -28,7 +28,8 @@ test("decryptSecret throws when ciphertext or tag is tampered with", () => {
     decryptSecret(encrypted.ciphertext, encrypted.iv, tamperedTag)
   })
 
-  const tamperedCiphertext = "0" + encrypted.ciphertext.slice(1)
+  const firstChar = encrypted.ciphertext[0] === "0" ? "f" : "0"
+  const tamperedCiphertext = firstChar + encrypted.ciphertext.slice(1)
   assert.throws(() => {
     decryptSecret(tamperedCiphertext, encrypted.iv, encrypted.tag)
   })
