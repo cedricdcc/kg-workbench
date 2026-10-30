@@ -6,7 +6,11 @@ import { CheckCheck, Loader2, RotateCcw, X } from "lucide-react"
 import type { EntityWithAttributes } from "@/domain/documents"
 import { ClassPicker } from "@/components/shared/class-picker"
 import { Button } from "@/components/ui/button"
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 import { getReviewStatusStyles } from "@/lib/colors"
 import { cn } from "@/lib/utils"
 import { useDocumentsWorkspace } from "../../hooks/documents-workspace-state"
@@ -97,6 +101,9 @@ export function FactTableRow({
     completeness.missingSubjectAttributes.length > 0
       ? "Required subject fields"
       : null,
+    ...completeness.shaclViolations
+      .filter((v) => v.rule === "domain" || v.rule === "range")
+      .map((v) => `SHACL: ${v.message}`),
     completeness.missingObjectAttributes.length > 0
       ? "Required object fields"
       : null,
@@ -134,261 +141,266 @@ export function FactTableRow({
   return (
     <>
       <tr
-        className={cn(
-          rowClassName,
-          primaryAnchor ? "border-b-0" : "border-b"
-        )}
+        className={cn(rowClassName, primaryAnchor ? "border-b-0" : "border-b")}
       >
-          <td className="w-8 px-2 py-1.5 align-middle">
-            <input
-              type="checkbox"
-              checked={selectedIds.has(fact.id)}
-              onChange={(e) => onSelectChange(fact.id, e.target.checked)}
-              className="h-3 w-3"
+        <td className="w-8 px-2 py-1.5 align-middle">
+          <input
+            type="checkbox"
+            checked={selectedIds.has(fact.id)}
+            onChange={(e) => onSelectChange(fact.id, e.target.checked)}
+            className="h-3 w-3"
+          />
+        </td>
+
+        <td className="w-[26%] px-2 py-1.5 align-top">
+          <div className="flex flex-col gap-1">
+            <FactTableEntityNameRow
+              value={fact.subject_text}
+              disabled={mutations.isAnyPending}
+              entityId={fact.subject_entity_id}
+              missingFieldNames={completeness.missingSubjectAttributes.map(
+                (attribute) => attribute.attribute.name
+              )}
+              onFilter={() => {
+                setSubjectEntity(DOCUMENT_FILTER_ALL)
+                setObjectEntity(DOCUMENT_FILTER_ALL)
+                setEntity({
+                  label: fact.subject_text,
+                  text: fact.subject_text,
+                  entityId: fact.subject_entity_id,
+                })
+              }}
+              onEntityClick={(entityId) =>
+                handleInspectorEntityClick(entityId, fact.subject_text)
+              }
+              onSave={(v) => mutations.handleRename("subject_text", v)}
             />
-          </td>
+            <ClassPicker
+              value={fact.subject_class_id ?? ""}
+              onValueChange={(id) =>
+                void mutations.handleRemapEntityClass("subject", id)
+              }
+              allClasses={ontology.filteredSubjectClasses}
+              modules={ontology.modules}
+              currentModuleId={null}
+              placeholder="Unmapped"
+              disabled={mutations.isAnyPending}
+              unavailableClasses={ontology.unavailableSubjectClasses}
+              constraintCopy={ontology.subjectConstraintCopy}
+              onClear={() =>
+                void mutations.handleRemapEntityClass("subject", null)
+              }
+              className={cn(
+                "h-5 rounded px-1.5 text-[10px]",
+                !fact.subject_class_id &&
+                  `border-dashed ${unmappedStyles.borderTextClass}`
+              )}
+            />
+          </div>
+        </td>
 
-          <td className="w-[26%] px-2 py-1.5 align-top">
-            <div className="flex flex-col gap-1">
-              <FactTableEntityNameRow
-                value={fact.subject_text}
-                disabled={mutations.isAnyPending}
-                entityId={fact.subject_entity_id}
-                missingFieldNames={completeness.missingSubjectAttributes.map(
-                  (attribute) => attribute.attribute.name
-                )}
-                onFilter={() => {
-                  setSubjectEntity(DOCUMENT_FILTER_ALL)
-                  setObjectEntity(DOCUMENT_FILTER_ALL)
-                  setEntity({
-                    label: fact.subject_text,
-                    text: fact.subject_text,
-                    entityId: fact.subject_entity_id,
-                  })
-                }}
-                onEntityClick={(entityId) =>
-                  handleInspectorEntityClick(entityId, fact.subject_text)
-                }
-                onSave={(v) => mutations.handleRename("subject_text", v)}
-              />
-              <ClassPicker
-                value={fact.subject_class_id ?? ""}
-                onValueChange={(id) =>
-                  void mutations.handleRemapEntityClass("subject", id)
-                }
-                allClasses={ontology.filteredSubjectClasses}
-                modules={ontology.modules}
-                currentModuleId={null}
-                placeholder="Unmapped"
-                disabled={mutations.isAnyPending}
-                unavailableClasses={ontology.unavailableSubjectClasses}
-                constraintCopy={ontology.subjectConstraintCopy}
-                onClear={() =>
-                  void mutations.handleRemapEntityClass("subject", null)
-                }
-                className={cn(
-                  "h-5 rounded px-1.5 text-[10px]",
-                  !fact.subject_class_id &&
-                    `border-dashed ${unmappedStyles.borderTextClass}`
-                )}
-              />
-            </div>
-          </td>
-
-          <td className="w-[24%] px-2 py-1.5 align-top">
-            <div className="flex flex-col gap-1">
-              <FactRelationField
-                value={fact.relation_text}
-                disabled={mutations.isAnyPending}
-                afterValue={
+        <td className="w-[24%] px-2 py-1.5 align-top">
+          <div className="flex flex-col gap-1">
+            <FactRelationField
+              value={fact.relation_text}
+              disabled={mutations.isAnyPending}
+              afterValue={
+                <div className="flex items-center gap-1">
                   <MissingRequiredNote
                     fieldNames={completeness.missingRelationAttributes.map(
                       (attribute) => attribute.name
                     )}
                   />
-                }
-                onFilter={() =>
-                  setExtractedRelation({
-                    label: fact.relation_text,
-                    text: fact.relation_text,
-                  })
-                }
-                onGoTo={
-                  hasRelationAttributes
-                    ? handleOpenRelationAttributes
-                    : undefined
-                }
-                goToLabel="Open relation attributes in inspector"
-                onSave={(v) => mutations.handleRename("relation_text", v)}
-              />
-              <RelationPicker
-                value={fact.relation_type_id}
-                options={ontology.filteredRelations}
-                unavailableOptions={ontology.unavailableRelations}
-                classes={ontology.classes}
-                modules={ontology.modules}
-                disabled={mutations.isAnyPending}
-                onSelect={(id) => void mutations.handleRemapRelation(id)}
-                constraintCopy={ontology.relationConstraintCopy}
-                className={cn(
-                  !fact.relation_type_id &&
-                    `border-dashed ${unmappedStyles.borderTextClass}`
-                )}
-              />
-            </div>
-          </td>
-
-          <td className="w-[26%] px-2 py-1.5 align-top">
-            <div className="flex flex-col gap-1">
-              <FactTableEntityNameRow
-                value={fact.object_text}
-                disabled={mutations.isAnyPending}
-                entityId={fact.object_entity_id}
-                missingFieldNames={completeness.missingObjectAttributes.map(
-                  (attribute) => attribute.attribute.name
-                )}
-                onFilter={() => {
-                  setSubjectEntity(DOCUMENT_FILTER_ALL)
-                  setObjectEntity(DOCUMENT_FILTER_ALL)
-                  setEntity({
-                    label: fact.object_text,
-                    text: fact.object_text,
-                    entityId: fact.object_entity_id,
-                  })
-                }}
-                onEntityClick={(entityId) =>
-                  handleInspectorEntityClick(entityId, fact.object_text)
-                }
-                onSave={(v) => mutations.handleRename("object_text", v)}
-              />
-              <ClassPicker
-                value={fact.object_class_id ?? ""}
-                onValueChange={(id) =>
-                  void mutations.handleRemapEntityClass("object", id)
-                }
-                allClasses={ontology.filteredObjectClasses}
-                modules={ontology.modules}
-                currentModuleId={null}
-                placeholder="Unmapped"
-                disabled={mutations.isAnyPending}
-                unavailableClasses={ontology.unavailableObjectClasses}
-                constraintCopy={ontology.objectConstraintCopy}
-                onClear={() =>
-                  void mutations.handleRemapEntityClass("object", null)
-                }
-                className={cn(
-                  "h-5 rounded px-1.5 text-[10px]",
-                  !fact.object_class_id &&
-                    `border-dashed ${unmappedStyles.borderTextClass}`
-                )}
-              />
-            </div>
-          </td>
-
-          <td className="w-16 px-2 py-1.5 text-right align-middle text-muted-foreground">
-            {fact.confidence !== null
-              ? `${Math.round(fact.confidence * 100)}%`
-              : "-"}
-          </td>
-
-          <td className="w-20 px-2 py-1.5 text-right align-middle">
-            <PendingEntityClassDialog
-              dialogType={mutations.dialogType}
-              affectedFacts={mutations.affectedFacts}
-              currentClassName={currentClassName}
-              pendingClassName={pendingClassName}
-              onConfirm={mutations.handleConfirmEntityClass}
-              onCancel={mutations.handleCancelEntityClass}
-            />
-            {!(status === "rejected" && structurallyUnmapped) && (
-              <div className="flex items-center justify-end gap-0.5">
-                {(status === "accepted" || status === "rejected") && (
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="h-6 w-6"
-                    title="Reset to pending"
-                    disabled={mutations.isReviewPending}
-                    onClick={() => void mutations.handleReview("pending")}
-                  >
-                    {mutations.isReviewPending ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      <RotateCcw className="h-3.5 w-3.5" />
-                    )}
-                  </Button>
-                )}
-                {(status === "pending" || status === "rejected") && (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <span className="inline-flex">
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-6 w-6 text-green-600 disabled:text-muted-foreground disabled:opacity-35"
-                          title={
-                            completeness.isComplete
-                              ? "Accept"
-                              : "Complete required fields to accept"
-                          }
-                          disabled={
-                            mutations.isReviewPending ||
-                            !completeness.isComplete
-                          }
-                          onClick={() =>
-                            void mutations.handleReview("accepted")
-                          }
-                        >
-                          {mutations.isReviewPending ? (
-                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                          ) : (
-                            <CheckCheck className="h-3.5 w-3.5" />
-                          )}
-                        </Button>
+                  {completeness.shaclViolations
+                    .filter((v) => v.rule === "domain" || v.rule === "range")
+                    .map((v, i) => (
+                      <span
+                        key={i}
+                        className="cursor-help rounded bg-destructive/10 px-1 py-0.5 text-[9px] font-medium text-destructive"
+                        title={v.message}
+                      >
+                        SHACL
                       </span>
-                    </TooltipTrigger>
-                    {isAcceptBlockedByCompleteness ? (
-                      <TooltipContent side="top" align="end">
-                        <div className="space-y-1">
-                          <div>Complete these to accept:</div>
-                          <ul className="list-disc space-y-0.5 pl-4">
-                            {missingAcceptRequirements.map((requirement) => (
-                              <li key={requirement}>{requirement}</li>
-                            ))}
-                          </ul>
-                        </div>
-                      </TooltipContent>
-                    ) : null}
-                  </Tooltip>
-                )}
-                {(status === "pending" ||
-                  status === "accepted" ||
-                  status === "unmapped") && (
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="h-6 w-6 text-red-500"
-                    title="Reject"
-                    disabled={mutations.isReviewPending}
-                    onClick={() => void mutations.handleReview("rejected")}
-                  >
-                    {mutations.isReviewPending ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      <X className="h-3.5 w-3.5" />
-                    )}
-                  </Button>
-                )}
-              </div>
-            )}
-          </td>
-        </tr>
-        {primaryAnchor ? (
-          <FactTableAnchorRow
-            quoteText={primaryAnchor.quote_text}
-            rowClassName={rowClassName}
+                    ))}
+                </div>
+              }
+              onFilter={() =>
+                setExtractedRelation({
+                  label: fact.relation_text,
+                  text: fact.relation_text,
+                })
+              }
+              onGoTo={
+                hasRelationAttributes ? handleOpenRelationAttributes : undefined
+              }
+              goToLabel="Open relation attributes in inspector"
+              onSave={(v) => mutations.handleRename("relation_text", v)}
+            />
+            <RelationPicker
+              value={fact.relation_type_id}
+              options={ontology.filteredRelations}
+              unavailableOptions={ontology.unavailableRelations}
+              classes={ontology.classes}
+              modules={ontology.modules}
+              disabled={mutations.isAnyPending}
+              onSelect={(id) => void mutations.handleRemapRelation(id)}
+              constraintCopy={ontology.relationConstraintCopy}
+              className={cn(
+                !fact.relation_type_id &&
+                  `border-dashed ${unmappedStyles.borderTextClass}`
+              )}
+            />
+          </div>
+        </td>
+
+        <td className="w-[26%] px-2 py-1.5 align-top">
+          <div className="flex flex-col gap-1">
+            <FactTableEntityNameRow
+              value={fact.object_text}
+              disabled={mutations.isAnyPending}
+              entityId={fact.object_entity_id}
+              missingFieldNames={completeness.missingObjectAttributes.map(
+                (attribute) => attribute.attribute.name
+              )}
+              onFilter={() => {
+                setSubjectEntity(DOCUMENT_FILTER_ALL)
+                setObjectEntity(DOCUMENT_FILTER_ALL)
+                setEntity({
+                  label: fact.object_text,
+                  text: fact.object_text,
+                  entityId: fact.object_entity_id,
+                })
+              }}
+              onEntityClick={(entityId) =>
+                handleInspectorEntityClick(entityId, fact.object_text)
+              }
+              onSave={(v) => mutations.handleRename("object_text", v)}
+            />
+            <ClassPicker
+              value={fact.object_class_id ?? ""}
+              onValueChange={(id) =>
+                void mutations.handleRemapEntityClass("object", id)
+              }
+              allClasses={ontology.filteredObjectClasses}
+              modules={ontology.modules}
+              currentModuleId={null}
+              placeholder="Unmapped"
+              disabled={mutations.isAnyPending}
+              unavailableClasses={ontology.unavailableObjectClasses}
+              constraintCopy={ontology.objectConstraintCopy}
+              onClear={() =>
+                void mutations.handleRemapEntityClass("object", null)
+              }
+              className={cn(
+                "h-5 rounded px-1.5 text-[10px]",
+                !fact.object_class_id &&
+                  `border-dashed ${unmappedStyles.borderTextClass}`
+              )}
+            />
+          </div>
+        </td>
+
+        <td className="w-16 px-2 py-1.5 text-right align-middle text-muted-foreground">
+          {fact.confidence !== null
+            ? `${Math.round(fact.confidence * 100)}%`
+            : "-"}
+        </td>
+
+        <td className="w-20 px-2 py-1.5 text-right align-middle">
+          <PendingEntityClassDialog
+            dialogType={mutations.dialogType}
+            affectedFacts={mutations.affectedFacts}
+            currentClassName={currentClassName}
+            pendingClassName={pendingClassName}
+            onConfirm={mutations.handleConfirmEntityClass}
+            onCancel={mutations.handleCancelEntityClass}
           />
-        ) : null}
+          {!(status === "rejected" && structurallyUnmapped) && (
+            <div className="flex items-center justify-end gap-0.5">
+              {(status === "accepted" || status === "rejected") && (
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-6 w-6"
+                  title="Reset to pending"
+                  disabled={mutations.isReviewPending}
+                  onClick={() => void mutations.handleReview("pending")}
+                >
+                  {mutations.isReviewPending ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <RotateCcw className="h-3.5 w-3.5" />
+                  )}
+                </Button>
+              )}
+              {(status === "pending" || status === "rejected") && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="inline-flex">
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-6 w-6 text-green-600 disabled:text-muted-foreground disabled:opacity-35"
+                        title={
+                          completeness.isComplete
+                            ? "Accept"
+                            : "Complete required fields to accept"
+                        }
+                        disabled={
+                          mutations.isReviewPending || !completeness.isComplete
+                        }
+                        onClick={() => void mutations.handleReview("accepted")}
+                      >
+                        {mutations.isReviewPending ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <CheckCheck className="h-3.5 w-3.5" />
+                        )}
+                      </Button>
+                    </span>
+                  </TooltipTrigger>
+                  {isAcceptBlockedByCompleteness ? (
+                    <TooltipContent side="top" align="end">
+                      <div className="space-y-1">
+                        <div>Complete these to accept:</div>
+                        <ul className="list-disc space-y-0.5 pl-4">
+                          {missingAcceptRequirements.map((requirement) => (
+                            <li key={requirement}>{requirement}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    </TooltipContent>
+                  ) : null}
+                </Tooltip>
+              )}
+              {(status === "pending" ||
+                status === "accepted" ||
+                status === "unmapped") && (
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-6 w-6 text-red-500"
+                  title="Reject"
+                  disabled={mutations.isReviewPending}
+                  onClick={() => void mutations.handleReview("rejected")}
+                >
+                  {mutations.isReviewPending ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <X className="h-3.5 w-3.5" />
+                  )}
+                </Button>
+              )}
+            </div>
+          )}
+        </td>
+      </tr>
+      {primaryAnchor ? (
+        <FactTableAnchorRow
+          quoteText={primaryAnchor.quote_text}
+          rowClassName={rowClassName}
+        />
+      ) : null}
     </>
   )
 }

@@ -13,12 +13,24 @@ export interface MissingEntityAttribute {
   attribute: DocumentOntologyAttribute
 }
 
+export interface ShaclViolation {
+  rule: "range" | "domain" | "required_attribute"
+  message: string
+}
+
 export interface FactCompletenessResult {
   missingRelationAttributes: DocumentOntologyRelationAttribute[]
   missingSubjectAttributes: MissingEntityAttribute[]
   missingObjectAttributes: MissingEntityAttribute[]
+  shaclViolations: ShaclViolation[]
   isComplete: boolean
 }
+
+export type FactCompletenessOntology =
+  | (Pick<DocumentOntology, "attributes" | "relationAttributes"> &
+      Partial<Pick<DocumentOntology, "classes" | "relations">>)
+  | null
+  | undefined
 
 export function getEntityMissingRequiredAttributes(
   entity: EntityWithAttributes | null | undefined,
@@ -40,10 +52,7 @@ export function getEntityMissingRequiredAttributes(
 
 export function getFactCompleteness(
   fact: FactWithAnchors,
-  ontology:
-    | Pick<DocumentOntology, "attributes" | "relationAttributes">
-    | null
-    | undefined,
+  ontology: FactCompletenessOntology,
   entitiesById: Map<string, EntityWithAttributes>
 ): FactCompletenessResult {
   if (!ontology) {
@@ -51,6 +60,7 @@ export function getFactCompleteness(
       missingRelationAttributes: [],
       missingSubjectAttributes: [],
       missingObjectAttributes: [],
+      shaclViolations: [],
       isComplete: true,
     }
   }
@@ -92,13 +102,79 @@ export function getFactCompleteness(
     attribute,
   }))
 
+  const shaclViolations: ShaclViolation[] = []
+
+  // Check required attributes
+  for (const missing of missingRelationAttributes) {
+    shaclViolations.push({
+      rule: "required_attribute",
+      message: `Relation attribute "${missing.name}" is required.`,
+    })
+  }
+  for (const missing of missingSubjectAttributes) {
+    shaclViolations.push({
+      rule: "required_attribute",
+      message: `Subject "${missing.entityText}" is missing required attribute "${missing.attribute.name}".`,
+    })
+  }
+  for (const missing of missingObjectAttributes) {
+    shaclViolations.push({
+      rule: "required_attribute",
+      message: `Object "${missing.entityText}" is missing required attribute "${missing.attribute.name}".`,
+    })
+  }
+
+  // Check domain and range class constraints against SHACL shape definitions
+  if (fact.relation_type_id && ontology.relations) {
+    const relation = ontology.relations.find(
+      (r) => r.id === fact.relation_type_id
+    )
+    if (relation) {
+      if (
+        fact.subject_class_id &&
+        relation.domain_class_id &&
+        fact.subject_class_id !== relation.domain_class_id
+      ) {
+        const expectedDomain =
+          ontology.classes?.find((c) => c.id === relation.domain_class_id)
+            ?.name ?? relation.domain_class_id
+        const actualDomain =
+          ontology.classes?.find((c) => c.id === fact.subject_class_id)?.name ??
+          fact.subject_class_id
+        shaclViolations.push({
+          rule: "domain",
+          message: `Domain class "${expectedDomain}" expected for relation "${relation.name}", but subject is assigned to "${actualDomain}".`,
+        })
+      }
+
+      if (
+        fact.object_class_id &&
+        relation.range_class_id &&
+        fact.object_class_id !== relation.range_class_id
+      ) {
+        const expectedRange =
+          ontology.classes?.find((c) => c.id === relation.range_class_id)
+            ?.name ?? relation.range_class_id
+        const actualRange =
+          ontology.classes?.find((c) => c.id === fact.object_class_id)?.name ??
+          fact.object_class_id
+        shaclViolations.push({
+          rule: "range",
+          message: `Range class "${expectedRange}" expected for relation "${relation.name}", but object is assigned to "${actualRange}".`,
+        })
+      }
+    }
+  }
+
   return {
     missingRelationAttributes,
     missingSubjectAttributes,
     missingObjectAttributes,
+    shaclViolations,
     isComplete:
       missingRelationAttributes.length === 0 &&
       missingSubjectAttributes.length === 0 &&
-      missingObjectAttributes.length === 0,
+      missingObjectAttributes.length === 0 &&
+      shaclViolations.length === 0,
   }
 }

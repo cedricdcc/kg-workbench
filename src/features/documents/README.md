@@ -52,7 +52,7 @@ update_this_readme_when:
 
 ## Review Rules
 
-- mapped facts can only be accepted when required relation attributes are filled and the linked subject/object entities are not missing required class attributes
+- mapped facts can only be accepted when conforming to SHACL shape constraints (subject and object matching relation domain/range classes) and all required relation and entity class attributes are satisfied
 - entity cards surface missing required class attributes as editable empty rows before optional attributes
 - the inspector `CQs` tab previews ontology competency questions against the current shared filters and can apply CQ-specific subject/object/relation filters into the workspace after clearing broad class/entity filters
 

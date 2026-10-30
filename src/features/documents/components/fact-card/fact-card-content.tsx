@@ -1,5 +1,6 @@
 "use client"
 
+import { AlertTriangle } from "lucide-react"
 import { ClassPicker } from "@/components/shared/class-picker"
 import type { PickerConstraintCopy } from "@/components/shared/class-picker/types"
 import { GoToIconButton } from "@/components/shared/go-to-icon-button"
@@ -284,6 +285,24 @@ export function FactCardContent({
             &ldquo;{primaryAnchor.quote_text}&rdquo;
           </span>
         </button>
+      )}
+
+      {completeness.shaclViolations.some(
+        (v) => v.rule === "domain" || v.rule === "range"
+      ) && (
+        <div className="flex flex-col gap-1 rounded bg-destructive/10 p-2 text-[11px] text-destructive">
+          <div className="flex items-center gap-1.5 font-medium">
+            <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+            <span>SHACL Shape Violation</span>
+          </div>
+          <ul className="list-disc space-y-0.5 pl-4 text-[10px]">
+            {completeness.shaclViolations
+              .filter((v) => v.rule === "domain" || v.rule === "range")
+              .map((v, i) => (
+                <li key={i}>{v.message}</li>
+              ))}
+          </ul>
+        </div>
       )}
 
       <FactActions

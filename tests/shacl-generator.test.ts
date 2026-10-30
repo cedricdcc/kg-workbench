@@ -88,6 +88,7 @@ test("buildShaclShapes supports closed shapes option", () => {
         attributes: [],
       },
     ],
+    relations: [],
   })
 
   const turtle = buildShaclShapes({
