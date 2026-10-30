@@ -20,6 +20,11 @@ export const routes = {
       services: {
         heartbeat: "/api/system/services/heartbeat",
       },
+      jobs: {
+        claim: "/api/system/jobs/claim",
+        complete: (id: string) => `/api/system/jobs/${id}/complete`,
+        fail: (id: string) => `/api/system/jobs/${id}/fail`,
+      },
     },
   },
 } as const

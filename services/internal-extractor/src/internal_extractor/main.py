@@ -1,5 +1,10 @@
+from contextlib import asynccontextmanager
+import asyncio
+import logging
 from fastapi import BackgroundTasks, FastAPI, HTTPException
 
+from .config import settings
+from .daemon import heartbeat_loop, worker_loop
 from .jobs import create_job, jobs, run_job
 from .models import (
     ExtractionRequest,
@@ -8,7 +13,31 @@ from .models import (
     ExtractionStatusResponse,
 )
 
-app = FastAPI(title="KG Workbench Internal Extractor")
+logger = logging.getLogger("internal_extractor")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    stop_event = asyncio.Event()
+    tasks: list[asyncio.Task] = []
+
+    if settings.enable_heartbeat:
+        tasks.append(asyncio.create_task(heartbeat_loop(stop_event)))
+
+    if settings.enable_worker_polling:
+        tasks.append(asyncio.create_task(worker_loop(stop_event)))
+
+    try:
+        yield
+    finally:
+        stop_event.set()
+        for task in tasks:
+            task.cancel()
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
+
+
+app = FastAPI(title="KG Workbench Internal Extractor", lifespan=lifespan)
 
 
 @app.get("/health")

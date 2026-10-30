@@ -1,5 +1,5 @@
-import { eq } from "drizzle-orm"
-import { jobQueue } from "../db/schema"
+import { eq, sql } from "drizzle-orm"
+import { domainEvents, jobQueue } from "../db/schema"
 import type { DbOrTx } from "./types"
 
 export function calculateRetryBackoff(attempt: number): number {
@@ -46,18 +46,73 @@ RETURNING *;
 `.trim()
 }
 
+export type ClaimedJobResult = {
+  job: typeof jobQueue.$inferSelect
+  eventPayload?: unknown
+}
+
+export async function claimJob(
+  db: DbOrTx,
+  workerType: string,
+  workerId: string,
+  leaseSeconds: number = 60
+): Promise<ClaimedJobResult | null> {
+  const query = buildClaimJobSql(workerType, workerId, leaseSeconds)
+  const res = await (
+    db as unknown as {
+      execute: (query: unknown) => Promise<unknown>
+    }
+  ).execute(sql.raw(query))
+
+  const rows = Array.isArray(res)
+    ? res
+    : ((res as { rows?: unknown[] })?.rows ?? [])
+  const rawJob = (rows[0] as typeof jobQueue.$inferSelect) ?? null
+
+  if (!rawJob) {
+    return null
+  }
+
+  let eventPayload: unknown = null
+  if (rawJob.event_id) {
+    const dbClient = db as unknown as {
+      select: () => {
+        from: (table: unknown) => {
+          where: (condition: unknown) => {
+            limit: (n: number) => Promise<Array<{ payload: unknown }>>
+          }
+        }
+      }
+    }
+    const [event] = await dbClient
+      .select()
+      .from(domainEvents)
+      .where(eq(domainEvents.id, rawJob.event_id))
+      .limit(1)
+
+    eventPayload = event?.payload ?? null
+  }
+
+  return {
+    job: rawJob,
+    eventPayload,
+  }
+}
+
 export async function completeJob(
   db: DbOrTx,
   jobId: string,
   result?: Record<string, unknown>
 ): Promise<void> {
-  await (db as unknown as {
-    update: (table: unknown) => {
-      set: (values: Record<string, unknown>) => {
-        where: (condition: unknown) => Promise<unknown>
+  await (
+    db as unknown as {
+      update: (table: unknown) => {
+        set: (values: Record<string, unknown>) => {
+          where: (condition: unknown) => Promise<unknown>
+        }
       }
     }
-  })
+  )
     .update(jobQueue)
     .set({
       status: "completed",
