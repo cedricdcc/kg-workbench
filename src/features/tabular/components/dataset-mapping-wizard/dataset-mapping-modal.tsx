@@ -29,7 +29,6 @@ export function DatasetMappingModal({
   ontologyId,
   dataset,
   existingClasses,
-  existingRelations,
   onMappingCommitted,
 }: DatasetMappingModalProps) {
   const [currentStep, setCurrentStep] = useState<WizardStep>("entity")
