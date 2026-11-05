@@ -24,6 +24,7 @@ interface ReasonerReportModalProps {
   offlineMessage?: string
   composeCommand?: string
   result?: ReasonerResultPayload | null
+  errorMessage?: string | null
 }
 
 export function ReasonerReportModal({
@@ -34,6 +35,7 @@ export function ReasonerReportModal({
   offlineMessage,
   composeCommand = "bash deploy/scripts/deploy.sh postgres up --profile reasoner",
   result,
+  errorMessage,
 }: ReasonerReportModalProps) {
   const [copied, setCopied] = useState(false)
 
@@ -103,6 +105,16 @@ export function ReasonerReportModal({
                 {copied ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
               </Button>
             </div>
+          </div>
+        )}
+
+        {errorMessage && !isLoading && !isOffline && (
+          <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-4 space-y-2">
+            <div className="flex items-center gap-2 text-sm font-medium text-destructive">
+              <XCircle className="h-4 w-4" />
+              <span>Validation Failed</span>
+            </div>
+            <p className="text-xs text-muted-foreground">{errorMessage}</p>
           </div>
         )}
 

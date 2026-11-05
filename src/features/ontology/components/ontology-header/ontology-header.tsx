@@ -122,6 +122,19 @@ export function OntologyHeader({
     (activeJobId !== null &&
       (!polledJob || polledJob.status === "pending" || polledJob.status === "claimed"))
 
+  const reasonerErrorMessage =
+    polledJob?.status === "failed"
+      ? polledJob.errorDetails || "Reasoner validation failed"
+      : null
+
+  function handleCloseReasonerModal(open: boolean) {
+    setReasonerModalOpen(open)
+    if (!open) {
+      setActiveJobId(null)
+      setReasonerLoading(false)
+    }
+  }
+
   async function handleRunReasoner() {
     if (!currentDocument) return
     setReasonerLoading(true)
@@ -151,6 +164,7 @@ export function OntologyHeader({
       }
       if (resp.status === "pending") {
         setActiveJobId(resp.jobId)
+        setReasonerLoading(false)
       }
     } catch (err) {
       setReasonerLoading(false)
@@ -367,12 +381,13 @@ export function OntologyHeader({
 
       <ReasonerReportModal
         open={reasonerModalOpen}
-        onOpenChange={setReasonerModalOpen}
+        onOpenChange={handleCloseReasonerModal}
         isLoading={isPolledLoading}
         isOffline={reasonerOffline}
         offlineMessage={reasonerOfflineMsg}
         composeCommand={reasonerComposeCmd}
         result={displayedReasonerResult}
+        errorMessage={reasonerErrorMessage}
       />
 
       <ReferenceVocabulariesDialog

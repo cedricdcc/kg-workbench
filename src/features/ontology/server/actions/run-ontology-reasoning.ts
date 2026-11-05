@@ -190,11 +190,11 @@ export async function requestOntologyReasoningAction(
     { priority: 100, targetWorker: "reasoner" }
   )
 
-  // 5. Fast-Path Await (2,000ms window)
+  // 5. Fast-Path Await (3,500ms window)
   const awaitRes = await fastPathAwaitJob<ReasonerResultPayload>(
     db,
     jobId,
-    2000,
+    3500,
     100
   )
 
