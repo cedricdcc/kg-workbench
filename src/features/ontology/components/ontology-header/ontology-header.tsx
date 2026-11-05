@@ -14,6 +14,10 @@ import {
   requestOntologyReasoningAction,
   type ReasonerResultPayload,
 } from "../../server/actions/run-ontology-reasoning"
+import { TabularProfilerModal } from "@/features/tabular/components/tabular-profiler-modal/tabular-profiler-modal"
+import { useTabularJob } from "@/features/tabular/hooks/use-tabular-job"
+import { requestTabularProfilingAction } from "@/features/tabular/server/actions/profile-tabular-dataset"
+import type { TabularProfileResult } from "@/features/tabular/types"
 import type { ExportOntologyMode } from "@/features/ontology/components/export-ontology-dialog/types"
 import { deleteOntologyDocument } from "@/features/ontology/server/actions/ontology-documents"
 import {
@@ -132,6 +136,97 @@ export function OntologyHeader({
     if (!open) {
       setActiveJobId(null)
       setReasonerLoading(false)
+    }
+  }
+
+  const tabularFileRef = useRef<HTMLInputElement | null>(null)
+  const [tabularModalOpen, setTabularModalOpen] = useState(false)
+  const [tabularLoading, setTabularLoading] = useState(false)
+  const [tabularOffline, setTabularOffline] = useState(false)
+  const [tabularOfflineMsg, setTabularOfflineMsg] = useState("")
+  const [tabularComposeCmd, setTabularComposeCmd] = useState("")
+  const [activeTabularJobId, setActiveTabularJobId] = useState<string | null>(null)
+  const [tabularResult, setTabularResult] = useState<TabularProfileResult | null>(null)
+
+  const { data: polledTabularJob } = useTabularJob(activeTabularJobId)
+
+  useEffect(() => {
+    if (polledTabularJob?.status === "failed") {
+      toast.error(polledTabularJob.errorDetails || "Tabular profiling failed")
+    }
+  }, [polledTabularJob?.status, polledTabularJob?.errorDetails])
+
+  const displayedTabularResult =
+    polledTabularJob?.status === "completed" && polledTabularJob.result
+      ? polledTabularJob.result
+      : tabularResult
+
+  const isTabularPolledLoading =
+    tabularLoading ||
+    (activeTabularJobId !== null &&
+      (!polledTabularJob ||
+        polledTabularJob.status === "pending" ||
+        polledTabularJob.status === "claimed"))
+
+  const tabularErrorMessage =
+    polledTabularJob?.status === "failed"
+      ? polledTabularJob.errorDetails || "Tabular profiling failed"
+      : null
+
+  function handleCloseTabularModal(open: boolean) {
+    setTabularModalOpen(open)
+    if (!open) {
+      setActiveTabularJobId(null)
+      setTabularLoading(false)
+    }
+  }
+
+  function handleOpenTabularPicker() {
+    tabularFileRef.current?.click()
+  }
+
+  async function handleTabularFileChange(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setTabularLoading(true)
+    setTabularOffline(false)
+    setTabularResult(null)
+    setActiveTabularJobId(null)
+    setTabularModalOpen(true)
+
+    try {
+      const formData = new FormData()
+      formData.append("file", file)
+      const resp = await requestTabularProfilingAction(formData)
+      if (resp.status === "offline") {
+        setTabularOffline(true)
+        setTabularOfflineMsg(resp.message)
+        setTabularComposeCmd(resp.composeCommand)
+        setTabularLoading(false)
+        return
+      }
+      if (resp.status === "completed") {
+        setTabularResult(resp.result)
+        setTabularLoading(false)
+        return
+      }
+      if (resp.status === "failed") {
+        setTabularLoading(false)
+        toast.error(resp.error || "Tabular profiling failed")
+        return
+      }
+      if (resp.status === "pending") {
+        setActiveTabularJobId(resp.jobId)
+        setTabularLoading(false)
+      }
+    } catch (err) {
+      setTabularLoading(false)
+      toast.error(err instanceof Error ? err.message : "Failed to run tabular profiling")
+    } finally {
+      if (tabularFileRef.current) {
+        tabularFileRef.current.value = ""
+      }
     }
   }
 
@@ -304,6 +399,7 @@ export function OntologyHeader({
         onExportOwl={() => openExport("owl")}
         onExportShacl={() => openExport("shacl")}
         onRunReasoner={handleRunReasoner}
+        onProfileTabular={handleOpenTabularPicker}
         onOpenOntologyDetails={() => onOpenOntologyDetails?.()}
         onOpenVocabularies={handleOpenVocabularies}
         onDelete={() => setDeleteOpen(true)}
@@ -388,6 +484,25 @@ export function OntologyHeader({
         composeCommand={reasonerComposeCmd}
         result={displayedReasonerResult}
         errorMessage={reasonerErrorMessage}
+      />
+
+      <input
+        ref={tabularFileRef}
+        type="file"
+        accept=".csv,.tsv,.parquet,.pq,.xlsx,.xls"
+        className="hidden"
+        onChange={handleTabularFileChange}
+      />
+
+      <TabularProfilerModal
+        open={tabularModalOpen}
+        onOpenChange={handleCloseTabularModal}
+        isLoading={isTabularPolledLoading}
+        isOffline={tabularOffline}
+        offlineMessage={tabularOfflineMsg}
+        composeCommand={tabularComposeCmd}
+        result={displayedTabularResult}
+        errorMessage={tabularErrorMessage}
       />
 
       <ReferenceVocabulariesDialog

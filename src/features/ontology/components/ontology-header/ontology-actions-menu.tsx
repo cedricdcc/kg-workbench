@@ -12,6 +12,7 @@ import {
   Plus,
   Settings2,
   Sparkles,
+  Table2,
   Trash2,
 } from "lucide-react"
 
@@ -37,6 +38,7 @@ export interface OntologyActionsMenuProps {
   onExportOwl: () => void
   onExportShacl: () => void
   onRunReasoner?: () => void
+  onProfileTabular?: () => void
   onOpenOntologyDetails: () => void
   onOpenVocabularies: () => void
   onDelete: () => void
@@ -57,6 +59,7 @@ export function OntologyActionsMenu({
   onExportOwl,
   onExportShacl,
   onRunReasoner,
+  onProfileTabular,
   onOpenOntologyDetails,
   onOpenVocabularies,
   onDelete,
@@ -151,6 +154,12 @@ export function OntologyActionsMenu({
               >
                 <Sparkles className="mr-2 h-4 w-4 text-primary" />
                 Validate with Reasoner...
+              </DropdownMenuItem>
+            )}
+            {onProfileTabular && (
+              <DropdownMenuItem onClick={onProfileTabular}>
+                <Table2 className="mr-2 h-4 w-4 text-primary" />
+                Profile Tabular Dataset...
               </DropdownMenuItem>
             )}
             <DropdownMenuItem
