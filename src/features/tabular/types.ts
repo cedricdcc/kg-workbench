@@ -43,3 +43,4 @@ export type TabularActionResponse =
       message: string
       composeCommand: string
     }
+

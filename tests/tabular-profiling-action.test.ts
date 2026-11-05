@@ -26,3 +26,4 @@ test("requestTabularProfilingPayloadAction returns completed or pending status",
     assert.equal(response.result.columnCount, 2)
   }
 })
+
