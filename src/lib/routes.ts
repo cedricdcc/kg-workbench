@@ -22,6 +22,7 @@ export const routes = {
       },
       jobs: {
         claim: "/api/system/jobs/claim",
+        status: (id: string) => `/api/system/jobs/${id}`,
         complete: (id: string) => `/api/system/jobs/${id}/complete`,
         fail: (id: string) => `/api/system/jobs/${id}/fail`,
       },
