@@ -4,6 +4,7 @@ from typing import Any
 import httpx
 
 from .config import settings
+from .oxigraph_engine import analyze_ontology_consistency
 from .shacl_engine import validate_shacl_turtle
 
 logger = logging.getLogger("reasoner.daemon")
@@ -117,20 +118,41 @@ async def execute_job(client: httpx.AsyncClient, claimed: dict[str, Any]) -> Non
         data_graph = event_payload.get("dataGraph")
         shapes_graph = event_payload.get("shapesGraph")
 
+        violations: list[dict[str, Any]] = []
+        inferred_triples: list[dict[str, Any]] = []
+        conforms = True
+        report_text = ""
+
+        if data_graph:
+            oxigraph_res = analyze_ontology_consistency(data_graph)
+            violations.extend(oxigraph_res.get("violations", []))
+            inferred_triples.extend(oxigraph_res.get("inferredTriples", []))
+            if not oxigraph_res.get("consistent", True):
+                conforms = False
+
         if data_graph and shapes_graph:
             validation_report = validate_shacl_turtle(data_graph, shapes_graph)
-            result = {
-                "jobId": job_id,
-                "status": "completed",
-                "validationReport": validation_report,
-                "processedBy": settings.worker_id,
-            }
-        else:
-            result = {
-                "jobId": job_id,
-                "status": "processed",
-                "processedBy": settings.worker_id,
-            }
+            if not validation_report.get("conforms", True):
+                conforms = False
+            report_text = validation_report.get("reportText", "")
+            if validation_report.get("resultsCount", 0) > 0 and not validation_report.get("conforms", True):
+                violations.append({
+                    "severity": "Violation",
+                    "focusNode": "SHACL Validator",
+                    "message": validation_report.get("reportText", "SHACL shape constraints violated"),
+                    "source": "pySHACL (Shape Validation)",
+                })
+
+        result = {
+            "jobId": job_id,
+            "status": "completed",
+            "conforms": conforms,
+            "violationCount": len(violations),
+            "violations": violations,
+            "inferredTriples": inferred_triples,
+            "reportText": report_text or "Validation and reasoning completed.",
+            "processedBy": settings.worker_id,
+        }
 
         await complete_job(client, job_id, result)
         logger.info("Job %s completed successfully", job_id)
