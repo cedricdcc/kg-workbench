@@ -70,11 +70,7 @@ test("live reasoner worker claims and validates ontology job from job_queue", as
   assert.ok(outcome.result, "Job should contain a result payload")
   assert.equal(outcome.result.conforms, true, "Graph should conform to shapes")
   assert.equal(outcome.result.violationCount, 0, "Violations should be 0")
-  assert.equal(
-    typeof outcome.result.processedBy,
-    "string",
-    "Should include worker identifier"
-  )
+  assert.ok(outcome.result.processedBy, "Should include worker identifier")
   assert.ok(
     outcome.result.processedBy.toLowerCase().includes("reasoner"),
     `Worker id '${outcome.result.processedBy}' should mention reasoner`
