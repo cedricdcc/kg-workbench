@@ -11,6 +11,8 @@ import {
   Loader2,
   Key,
   Layers,
+  Bookmark,
+  Network,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -36,6 +38,8 @@ interface TabularProfilerModalProps {
   composeCommand?: string
   result?: TabularProfileResult | null
   errorMessage?: string | null
+  onSaveToArchive?: (result: TabularProfileResult) => void
+  onMapToKg?: (result: TabularProfileResult) => void
 }
 
 export function TabularProfilerModal({
@@ -47,6 +51,8 @@ export function TabularProfilerModal({
   composeCommand = "bash deploy/scripts/deploy.sh postgres up --profile tabular",
   result,
   errorMessage,
+  onSaveToArchive,
+  onMapToKg,
 }: TabularProfilerModalProps) {
   const [copied, setCopied] = useState(false)
 
@@ -81,46 +87,60 @@ export function TabularProfilerModal({
             {isOffline && (
               <Badge variant="destructive">
                 <span className="flex items-center gap-1">
-                  <AlertTriangle className="h-3.5 w-3.5" /> Tabular Worker Offline
+                  <AlertTriangle className="h-3.5 w-3.5" /> Tabular Worker
+                  Offline
                 </span>
               </Badge>
             )}
           </div>
           <DialogDescription>
-            High-performance DuckDB analytical profiling, inferred types, null ratios, and candidate unique keys.
+            High-performance DuckDB analytical profiling, inferred types, null
+            ratios, and candidate unique keys.
           </DialogDescription>
         </DialogHeader>
 
         {isLoading && (
-          <div className="flex flex-col items-center justify-center py-12 gap-3 text-sm text-muted-foreground">
+          <div className="flex flex-col items-center justify-center gap-3 py-12 text-sm text-muted-foreground">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
             <span>Running DuckDB analytical dataset profiling...</span>
           </div>
         )}
 
         {isOffline && (
-          <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-4 space-y-3">
+          <div className="space-y-3 rounded-lg border border-amber-500/40 bg-amber-500/10 p-4">
             <div className="flex items-center gap-2 text-sm font-medium text-amber-600 dark:text-amber-400">
               <AlertTriangle className="h-4 w-4" />
-              <span>{offlineMessage || "Tabular worker service is offline"}</span>
+              <span>
+                {offlineMessage || "Tabular worker service is offline"}
+              </span>
             </div>
             <p className="text-xs text-muted-foreground">
-              To enable high-performance DuckDB dataset profiling and schema induction, start the tabular worker:
+              To enable high-performance DuckDB dataset profiling and schema
+              induction, start the tabular worker:
             </p>
             <div className="flex items-center justify-between rounded bg-muted/60 px-3 py-2 font-mono text-xs text-foreground">
               <span className="flex items-center gap-2">
                 <Terminal className="h-3.5 w-3.5 text-muted-foreground" />
                 {composeCommand}
               </span>
-              <Button size="icon" variant="ghost" className="h-6 w-6" onClick={handleCopy}>
-                {copied ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-6 w-6"
+                onClick={handleCopy}
+              >
+                {copied ? (
+                  <Check className="h-3.5 w-3.5 text-emerald-500" />
+                ) : (
+                  <Copy className="h-3.5 w-3.5" />
+                )}
               </Button>
             </div>
           </div>
         )}
 
         {errorMessage && !isLoading && !isOffline && (
-          <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-4 space-y-2">
+          <div className="space-y-2 rounded-lg border border-destructive/40 bg-destructive/10 p-4">
             <div className="flex items-center gap-2 text-sm font-medium text-destructive">
               <XCircle className="h-4 w-4" />
               <span>Dataset Profiling Failed</span>
@@ -148,13 +168,17 @@ export function TabularProfilerModal({
             </TabsContent>
 
             <TabsContent value="preview" className="pt-2">
-              <TabularPreviewTab rows={result.previewRows} columns={result.columns} />
+              <TabularPreviewTab
+                rows={result.previewRows}
+                columns={result.columns}
+              />
             </TabsContent>
 
             <TabsContent value="keys" className="pt-2">
               <div className="space-y-3 p-2">
                 <div className="text-xs text-muted-foreground">
-                  Identified candidate unique keys based on non-null uniqueness across all {result.rowCount.toLocaleString()} rows:
+                  Identified candidate unique keys based on non-null uniqueness
+                  across all {result.rowCount.toLocaleString()} rows:
                 </div>
                 {result.candidateKeys.length > 0 ? (
                   <div className="flex flex-wrap gap-2">
@@ -176,15 +200,47 @@ export function TabularProfilerModal({
                 ) : (
                   <div className="flex items-center gap-2 rounded-md border border-border bg-muted/20 p-3 text-xs text-muted-foreground">
                     <Layers className="h-4 w-4" />
-                    <span>No single column satisfies unique non-null constraint. Consider composite key identification or surrogate ID induction.</span>
+                    <span>
+                      No single column satisfies unique non-null constraint.
+                      Consider composite key identification or surrogate ID
+                      induction.
+                    </span>
                   </div>
                 )}
               </div>
             </TabsContent>
+
+            <div className="mt-3 flex items-center justify-between border-t pt-3">
+              <div className="text-[11px] text-muted-foreground">
+                Dataset profiled via DuckDB analytical sidecar
+              </div>
+              <div className="flex items-center gap-2">
+                {onSaveToArchive && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 gap-1.5 text-xs"
+                    onClick={() => onSaveToArchive(result)}
+                  >
+                    <Bookmark className="h-3.5 w-3.5" />
+                    Save to Archive
+                  </Button>
+                )}
+                {onMapToKg && (
+                  <Button
+                    size="sm"
+                    className="h-8 gap-1.5 text-xs"
+                    onClick={() => onMapToKg(result)}
+                  >
+                    <Network className="h-3.5 w-3.5" />
+                    Map to KG
+                  </Button>
+                )}
+              </div>
+            </div>
           </Tabs>
         )}
       </DialogContent>
     </Dialog>
   )
 }
-

@@ -3,7 +3,7 @@ import "server-only"
 import { and, desc, eq } from "drizzle-orm"
 import { getDb } from "@/server/database"
 import { domainEvents, jobQueue } from "@/server/db/schema"
-import type { ReasonerResultPayload } from "@/features/ontology/types"
+import type { ReasonerResultPayload } from "@/features/ontology/server/actions/run-ontology-reasoning"
 
 export interface LatestReasonerRunResult {
   jobId: string

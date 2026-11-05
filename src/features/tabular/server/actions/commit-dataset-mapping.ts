@@ -1,6 +1,6 @@
 "use server"
 
-import { eq, inArray } from "drizzle-orm"
+import { eq } from "drizzle-orm"
 import { getDb } from "@/server/database"
 import {
   datasetSources,

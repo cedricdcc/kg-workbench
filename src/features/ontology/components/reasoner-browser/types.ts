@@ -1,7 +1,4 @@
-import type {
-  ReasonerJobViolation,
-  ReasonerResultPayload,
-} from "@/features/ontology/types"
+import type { ReasonerResultPayload } from "@/features/ontology/server/actions/run-ontology-reasoning"
 
 export interface FormattedSeverityPill {
   label: string
@@ -14,7 +11,7 @@ export function formatReasonerSeverityPill(
   severity: string
 ): FormattedSeverityPill {
   const norm = severity.toLowerCase()
-  if (norm === "critical" || norm === "error") {
+  if (norm === "critical" || norm === "error" || norm === "violation") {
     return {
       label: "CRITICAL",
       bgClass: "bg-red-500/10",

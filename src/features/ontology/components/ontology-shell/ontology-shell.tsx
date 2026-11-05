@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useMemo, useRef, useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { usePathname, useSearchParams } from "next/navigation"
 
@@ -54,6 +54,21 @@ import {
   ReferenceTermDetail,
   type SelectedReferenceTerm,
 } from "../reference-browser/reference-term-detail"
+import { ReasonerBrowser } from "../reasoner-browser/reasoner-browser"
+import { ReasonerReportModal } from "../reasoner-modal/reasoner-report-modal"
+import { DatasetArchiveBrowser } from "@/features/tabular/components/dataset-archive-browser/dataset-archive-browser"
+import { TabularProfilerModal } from "@/features/tabular/components/tabular-profiler-modal/tabular-profiler-modal"
+import { getDatasetSourcesQuery } from "@/features/tabular/server/queries/get-dataset-sources"
+import { deleteDatasetSourceAction } from "@/features/tabular/server/actions/delete-dataset-source"
+import { archiveDatasetSourceAction } from "@/features/tabular/server/actions/archive-dataset-source"
+import { getLatestReasonerRunQuery } from "@/features/tabular/server/queries/get-latest-reasoner-run"
+import { requestOntologyReasoningAction } from "@/features/ontology/server/actions/run-ontology-reasoning"
+import { useReasonerJob } from "@/features/ontology/hooks/use-reasoner-job"
+import { requestTabularProfilingAction } from "@/features/tabular/server/actions/profile-tabular-dataset"
+import type {
+  TabularProfileResult,
+  ArchivedDatasetSource,
+} from "@/features/tabular/types"
 import { ReferenceVocabulariesDialog } from "../reference-vocabularies-dialog/reference-vocabularies-dialog"
 import {
   runOntologyLinter,
@@ -165,6 +180,146 @@ export function OntologyShell({
     enabled: Boolean(currentDocument.id),
   })
 
+  // Reasoner and Dataset Archive State
+  const queryClient = useQueryClient()
+  const [reasonerActiveJobId, setReasonerActiveJobId] = useState<string | null>(
+    null
+  )
+  const [reasonerReportModalOpen, setReasonerReportModalOpen] = useState(false)
+  const [selectedDatasetForMapping, setSelectedDatasetForMapping] =
+    useState<ArchivedDatasetSource | null>(null)
+  const [profilerModalOpen, setProfilerModalOpen] = useState(false)
+  const [profiledDatasetResult, setProfiledDatasetResult] =
+    useState<TabularProfileResult | null>(null)
+  const sidebarFileInputRef = useRef<HTMLInputElement>(null)
+
+  // Keep selectedDatasetForMapping referenced to satisfy linter before Task 6
+  void selectedDatasetForMapping
+
+  const { data: archivedDatasets = [] } = useQuery({
+    queryKey: ["dataset-sources", currentDocument.id],
+    queryFn: () => getDatasetSourcesQuery(currentDocument.id),
+    enabled: Boolean(currentDocument.id),
+  })
+
+  const { data: latestReasonerRun } = useQuery({
+    queryKey: ["latest-reasoner-run", currentDocument.id],
+    queryFn: () => getLatestReasonerRunQuery(currentDocument.id),
+    enabled: Boolean(currentDocument.id),
+  })
+
+  const { data: polledReasonerJob } = useReasonerJob(reasonerActiveJobId)
+  const prevJobStatusRef = useRef<string | undefined>(undefined)
+
+  const isReasonerLoading =
+    reasonerActiveJobId !== null &&
+    (!polledReasonerJob ||
+      polledReasonerJob.status === "pending" ||
+      polledReasonerJob.status === "claimed")
+
+  useEffect(() => {
+    if (prevJobStatusRef.current !== polledReasonerJob?.status) {
+      prevJobStatusRef.current = polledReasonerJob?.status
+      if (polledReasonerJob?.status === "completed") {
+        queryClient.invalidateQueries({
+          queryKey: ["latest-reasoner-run", currentDocument.id],
+        })
+      } else if (polledReasonerJob?.status === "failed") {
+        toast.error(
+          polledReasonerJob.errorDetails || "Reasoner validation failed"
+        )
+      }
+    }
+  }, [
+    polledReasonerJob?.status,
+    polledReasonerJob?.errorDetails,
+    currentDocument.id,
+    queryClient,
+  ])
+
+  async function handleRunReasonerFromSidebar() {
+    try {
+      const resp = await requestOntologyReasoningAction(currentDocument.id)
+      if (resp.status === "completed") {
+        queryClient.invalidateQueries({
+          queryKey: ["latest-reasoner-run", currentDocument.id],
+        })
+        toast.success("Ontology validated successfully")
+      } else if (resp.status === "pending") {
+        setReasonerActiveJobId(resp.jobId)
+      } else {
+        toast.error("Reasoner is currently offline")
+      }
+    } catch {
+      toast.error("Failed to trigger reasoner")
+    }
+  }
+
+  async function handleDeleteDataset(id: string) {
+    const res = await deleteDatasetSourceAction(id)
+    if (res.success) {
+      queryClient.invalidateQueries({
+        queryKey: ["dataset-sources", currentDocument.id],
+      })
+      toast.success("Dataset removed from archive")
+    } else {
+      toast.error("Failed to delete dataset")
+    }
+  }
+
+  async function handleSaveProfileToArchive(res: TabularProfileResult) {
+    try {
+      await archiveDatasetSourceAction({
+        ontologyId: currentDocument.id,
+        sourceName: res.fileName,
+        fileFormat: res.fileType,
+        rowCount: res.rowCount,
+        columnCount: res.columnCount,
+        profileSummary: {
+          rowCount: res.rowCount,
+          columnCount: res.columnCount,
+          candidateKeys: res.candidateKeys,
+          columns: res.columns,
+        },
+        sampleRows: res.previewRows,
+      })
+      queryClient.invalidateQueries({
+        queryKey: ["dataset-sources", currentDocument.id],
+      })
+      toast.success(`Archived "${res.fileName}"`)
+    } catch {
+      toast.error("Failed to archive dataset")
+    }
+  }
+
+  async function handleSidebarFileUpload(
+    e: React.ChangeEvent<HTMLInputElement>
+  ) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    e.target.value = ""
+
+    const loadingToast = toast.loading(`Profiling ${file.name}...`)
+    try {
+      const formData = new FormData()
+      formData.append("file", file)
+      formData.append("ontologyId", currentDocument.id)
+
+      const resp = await requestTabularProfilingAction(formData)
+      toast.dismiss(loadingToast)
+
+      if (resp.status === "completed") {
+        setProfiledDatasetResult(resp.result)
+        setProfilerModalOpen(true)
+      } else {
+        toast.error("Profiling failed or worker is offline")
+      }
+    } catch {
+      toast.dismiss(loadingToast)
+      toast.error("Failed to profile file")
+    }
+  }
+
   const [issuesSheetOpen, setIssuesSheetOpen] = useState(false)
   const [importingPrefix, setImportingPrefix] = useState<string | null>(null)
 
@@ -196,8 +351,6 @@ export function OntologyShell({
     }),
     [defectsReport.counts, analysisData?.redundancyClusters.length]
   )
-
-  const queryClient = useQueryClient()
 
   async function handleSuppressDefect(defectId: string) {
     try {
@@ -602,6 +755,7 @@ export function OntologyShell({
                 classCount={filteredClasses.length}
                 relationCount={filteredRelations.length}
                 referenceCount={referenceVocabularies.length}
+                datasetCount={archivedDatasets.length}
                 classBrowser={
                   <ClassBrowser
                     classes={filteredClasses}
@@ -647,6 +801,50 @@ export function OntologyShell({
                       setSelectedReferenceTerm(term)
                       setIsDetailCollapsed(false)
                     }}
+                  />
+                }
+                reasonerBrowser={
+                  <ReasonerBrowser
+                    ontologyId={currentDocument.id}
+                    latestRun={
+                      polledReasonerJob?.status === "completed" &&
+                      polledReasonerJob.result
+                        ? {
+                            status: "completed",
+                            createdAt: new Date().toISOString(),
+                            result: polledReasonerJob.result,
+                          }
+                        : latestReasonerRun || null
+                    }
+                    isLoading={isReasonerLoading}
+                    onRunReasoner={handleRunReasonerFromSidebar}
+                    onOpenFullReport={() => setReasonerReportModalOpen(true)}
+                    onSelectClass={handleSelectClass}
+                  />
+                }
+                datasetBrowser={
+                  <DatasetArchiveBrowser
+                    ontologyId={currentDocument.id}
+                    datasets={archivedDatasets}
+                    onOpenUpload={() => sidebarFileInputRef.current?.click()}
+                    onInspectProfile={(dataset) => {
+                      setProfiledDatasetResult({
+                        fileName: dataset.sourceName,
+                        fileType: dataset.fileFormat,
+                        rowCount: dataset.rowCount,
+                        columnCount: dataset.columnCount,
+                        estimatedSizeBytes: 0,
+                        columns: dataset.profileSummary?.columns || [],
+                        candidateKeys:
+                          dataset.profileSummary?.candidateKeys || [],
+                        previewRows: dataset.sampleRows || [],
+                      })
+                      setProfilerModalOpen(true)
+                    }}
+                    onOpenMappingWizard={(dataset) => {
+                      setSelectedDatasetForMapping(dataset)
+                    }}
+                    onDeleteDataset={handleDeleteDataset}
                   />
                 }
               />
@@ -737,6 +935,57 @@ export function OntologyShell({
         importingPrefix={importingPrefix}
         onOpenVocabularies={() => setReferenceDialogOpen(true)}
         onSelectClassForRefactor={handleSelectClass}
+      />
+
+      {/* Hidden file input for sidebar dataset uploads */}
+      <input
+        ref={sidebarFileInputRef}
+        type="file"
+        accept=".csv,.tsv,.parquet,.pq,.xlsx,.xls"
+        className="hidden"
+        onChange={handleSidebarFileUpload}
+      />
+
+      <ReasonerReportModal
+        open={reasonerReportModalOpen}
+        onOpenChange={setReasonerReportModalOpen}
+        isLoading={isReasonerLoading}
+        result={
+          polledReasonerJob?.status === "completed" && polledReasonerJob.result
+            ? polledReasonerJob.result
+            : latestReasonerRun?.result || null
+        }
+      />
+
+      <TabularProfilerModal
+        open={profilerModalOpen}
+        onOpenChange={setProfilerModalOpen}
+        result={profiledDatasetResult}
+        onSaveToArchive={handleSaveProfileToArchive}
+        onMapToKg={(res) => {
+          setSelectedDatasetForMapping({
+            id: "",
+            ontologyId: currentDocument.id,
+            groupKey: "shared",
+            sourceName: res.fileName,
+            fileFormat:
+              (res.fileType.toLowerCase() as "csv" | "parquet" | "excel") ||
+              "csv",
+            rowCount: res.rowCount,
+            columnCount: res.columnCount,
+            profileSummary: {
+              rowCount: res.rowCount,
+              columnCount: res.columnCount,
+              candidateKeys: res.candidateKeys,
+              columns: res.columns,
+            },
+            sampleRows: res.previewRows,
+            mappingSpec: null,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          })
+          setProfilerModalOpen(false)
+        }}
       />
     </div>
   )

@@ -13,6 +13,10 @@ import {
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import type {
+  InferredTriple,
+  ReasonerJobViolation,
+} from "@/features/ontology/server/actions/run-ontology-reasoning"
 import { ReasonerViolationItem } from "./reasoner-violation-item"
 import type { ReasonerBrowserProps } from "./types"
 
@@ -26,7 +30,7 @@ export function ReasonerBrowser({
   const [entailmentsOpen, setEntailmentsOpen] = useState(false)
 
   const result = latestRun?.result
-  const isConsistent = result ? result.consistent : null
+  const isConformant = result ? result.conforms : null
   const violations = result?.violations || []
   const inferredTriples = result?.inferredTriples || []
 
@@ -52,7 +56,7 @@ export function ReasonerBrowser({
         </div>
 
         {/* Status Card */}
-        {isConsistent === true && (
+        {isConformant === true && (
           <div className="flex items-center gap-2 rounded-md border border-emerald-500/20 bg-emerald-500/10 p-2 text-xs text-emerald-700 dark:text-emerald-400">
             <CheckCircle2 className="h-4 w-4 shrink-0" />
             <div className="min-w-0 flex-1">
@@ -64,7 +68,7 @@ export function ReasonerBrowser({
           </div>
         )}
 
-        {isConsistent === false && (
+        {isConformant === false && (
           <div className="flex items-center gap-2 rounded-md border border-red-500/20 bg-red-500/10 p-2 text-xs text-red-700 dark:text-red-400">
             <AlertCircle className="h-4 w-4 shrink-0" />
             <div className="min-w-0 flex-1">
@@ -78,7 +82,7 @@ export function ReasonerBrowser({
           </div>
         )}
 
-        {isConsistent === null && (
+        {isConformant === null && (
           <div className="flex items-center gap-2 rounded-md border border-muted bg-muted/30 p-2 text-xs text-muted-foreground">
             <Sparkles className="h-4 w-4 shrink-0 text-muted-foreground/70" />
             <div className="min-w-0 flex-1">
@@ -120,7 +124,7 @@ export function ReasonerBrowser({
                 Contradictions ({violations.length})
               </div>
               <div className="space-y-1.5">
-                {violations.map((v, i) => (
+                {violations.map((v: ReasonerJobViolation, i: number) => (
                   <ReasonerViolationItem
                     key={i}
                     violation={v}
@@ -152,7 +156,7 @@ export function ReasonerBrowser({
 
               {entailmentsOpen && (
                 <div className="max-h-56 divide-y overflow-y-auto bg-background p-1">
-                  {inferredTriples.map((t, idx) => (
+                  {inferredTriples.map((t: InferredTriple, idx: number) => (
                     <div
                       key={idx}
                       className="space-y-0.5 p-1.5 font-mono text-[10px]"
