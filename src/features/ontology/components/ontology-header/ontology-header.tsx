@@ -1,6 +1,6 @@
 "use client"
 
-import { useRef, useState, type ChangeEvent } from "react"
+import { useEffect, useRef, useState, type ChangeEvent } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { toast } from "sonner"
 
@@ -8,6 +8,12 @@ import { CreateOntologyDialog } from "@/features/ontology/components/dialogs/cre
 import { ExportOntologyDialog } from "@/features/ontology/components/export-ontology-dialog/export-ontology-dialog"
 import { ImportFormatDialog } from "@/features/ontology/components/import-format-dialog/import-format-dialog"
 import { ReferenceVocabulariesDialog } from "@/features/ontology/components/reference-vocabularies-dialog/reference-vocabularies-dialog"
+import { ReasonerReportModal } from "../reasoner-modal/reasoner-report-modal"
+import { useReasonerJob } from "../../hooks/use-reasoner-job"
+import {
+  requestOntologyReasoningAction,
+  type ReasonerResultPayload,
+} from "../../server/actions/run-ontology-reasoning"
 import type { ExportOntologyMode } from "@/features/ontology/components/export-ontology-dialog/types"
 import { deleteOntologyDocument } from "@/features/ontology/server/actions/ontology-documents"
 import {
@@ -90,6 +96,68 @@ export function OntologyHeader({
   const [vocabulariesOpen, setVocabulariesOpen] = useState(false)
   const [exportMode, setExportMode] = useState<ExportOntologyMode>("json")
   const [isDeleting, setIsDeleting] = useState(false)
+  const [reasonerModalOpen, setReasonerModalOpen] = useState(false)
+  const [reasonerLoading, setReasonerLoading] = useState(false)
+  const [reasonerOffline, setReasonerOffline] = useState(false)
+  const [reasonerOfflineMsg, setReasonerOfflineMsg] = useState("")
+  const [reasonerComposeCmd, setReasonerComposeCmd] = useState("")
+  const [activeJobId, setActiveJobId] = useState<string | null>(null)
+  const [reasonerResult, setReasonerResult] = useState<ReasonerResultPayload | null>(null)
+
+  const { data: polledJob } = useReasonerJob(activeJobId)
+
+  useEffect(() => {
+    if (polledJob?.status === "failed") {
+      toast.error(polledJob.errorDetails || "Reasoner job failed")
+    }
+  }, [polledJob?.status, polledJob?.errorDetails])
+
+  const displayedReasonerResult =
+    polledJob?.status === "completed" && polledJob.result
+      ? polledJob.result
+      : reasonerResult
+
+  const isPolledLoading =
+    reasonerLoading ||
+    (activeJobId !== null &&
+      (!polledJob || polledJob.status === "pending" || polledJob.status === "claimed"))
+
+  async function handleRunReasoner() {
+    if (!currentDocument) return
+    setReasonerLoading(true)
+    setReasonerOffline(false)
+    setReasonerResult(null)
+    setActiveJobId(null)
+    setReasonerModalOpen(true)
+
+    try {
+      const resp = await requestOntologyReasoningAction(currentDocument.id)
+      if (resp.status === "offline") {
+        setReasonerOffline(true)
+        setReasonerOfflineMsg(resp.message)
+        setReasonerComposeCmd(resp.composeCommand)
+        setReasonerLoading(false)
+        return
+      }
+      if (resp.status === "completed") {
+        setReasonerResult(resp.result)
+        setReasonerLoading(false)
+        return
+      }
+      if (resp.status === "failed") {
+        setReasonerLoading(false)
+        toast.error(resp.error || "Reasoner validation failed")
+        return
+      }
+      if (resp.status === "pending") {
+        setActiveJobId(resp.jobId)
+      }
+    } catch (err) {
+      setReasonerLoading(false)
+      toast.error(err instanceof Error ? err.message : "Failed to run reasoning")
+    }
+  }
+
   const hasCurrentDocument = currentDocument !== null
 
   function handleDocumentChange(docId: string) {
@@ -221,6 +289,7 @@ export function OntologyHeader({
         onExportJson={() => openExport("json")}
         onExportOwl={() => openExport("owl")}
         onExportShacl={() => openExport("shacl")}
+        onRunReasoner={handleRunReasoner}
         onOpenOntologyDetails={() => onOpenOntologyDetails?.()}
         onOpenVocabularies={handleOpenVocabularies}
         onDelete={() => setDeleteOpen(true)}
@@ -295,6 +364,16 @@ export function OntologyHeader({
           documentName={currentDocument.name}
         />
       )}
+
+      <ReasonerReportModal
+        open={reasonerModalOpen}
+        onOpenChange={setReasonerModalOpen}
+        isLoading={isPolledLoading}
+        isOffline={reasonerOffline}
+        offlineMessage={reasonerOfflineMsg}
+        composeCommand={reasonerComposeCmd}
+        result={displayedReasonerResult}
+      />
 
       <ReferenceVocabulariesDialog
         open={vocabulariesOpen}

@@ -78,6 +78,7 @@ update_this_readme_when:
 - `CQ concept coverage`: evaluation metric classifying CQs as `full` (all 3 mapped), `partial` (1 or 2 concepts mapped), or `unmapped` (0 concepts mapped), with percentage reporting
 - `CQ workbench`: dedicated split-screen view (`?view=questions`) featuring coverage metrics bar, question list with search/filters/reordering, and concept mapping inspector
 - `blast radius analysis`: pre-flight risk evaluation quantifying broken CQs, affected extracted facts, orphaned subclasses, and invalidated relations before class or relation deletion
+- `semantic reasoning pipeline`: asynchronous background Oxigraph consistency checking, disjointness conflicts, and transitive entailment closure calculation via the Reasoner sidecar
 
 ## Flow
 

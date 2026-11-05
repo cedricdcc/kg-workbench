@@ -1,10 +1,18 @@
 "use server"
 
+import { eq } from "drizzle-orm"
 import { getDb } from "@/server/db"
+import { ontologyClassDisjointness } from "@/server/db/schema"
 import { getServiceRegistryStatuses } from "@/server/events/services"
 import { publishDomainEvent } from "@/server/events/outbox"
 import { fastPathAwaitJob } from "@/server/events/queue"
-import { buildOntologyExport } from "./ontology-transfer"
+import {
+  getOntologyClasses,
+  getOntologyDocument,
+  getOntologyExamplesByOntology,
+  getOntologyRelations,
+} from "../queries"
+import { normalizeOntologyDataTypeOrDefault } from "@/features/ontology/utils/data-types"
 import { buildShaclShapes } from "../shacl/generator"
 import { serializeOntologyTurtle } from "../shacl/serialize-ontology-turtle"
 
@@ -70,28 +78,98 @@ export async function requestOntologyReasoningAction(
   }
 
   // 2. Fetch full ontology data
-  const jsonExport = await buildOntologyExport({
-    ontologyId,
-    includeVisual: false,
-  })
+  const [classes, relations, ontologyDoc, disjointnessRows, examples] =
+    await Promise.all([
+      getOntologyClasses(ontologyId),
+      getOntologyRelations(ontologyId),
+      getOntologyDocument(ontologyId),
+      db
+        .select()
+        .from(ontologyClassDisjointness)
+        .where(eq(ontologyClassDisjointness.ontology_id, ontologyId)),
+      getOntologyExamplesByOntology(ontologyId),
+    ])
 
-  const ontologyPayload = jsonExport.payload
-  const baseIri = ontologyPayload.baseIri || "http://example.org/onto#"
+  const baseIri = "http://example.org/onto#"
 
   // 3. Serialize to Turtle and SHACL shapes
   const dataGraph = serializeOntologyTurtle({
-    name: ontologyPayload.name,
+    name: ontologyDoc.name,
     baseIri,
-    classes: ontologyPayload.classes,
-    relations: ontologyPayload.relations,
-    attributes: ontologyPayload.attributes,
-    disjointness: ontologyPayload.disjointness,
-    examples: ontologyPayload.examples,
+    classes: classes.map((c) => ({
+      id: c.id,
+      name: c.name,
+      parentClassId: c.parent_class_id,
+      description: c.description,
+    })),
+    relations: relations.map((r) => ({
+      id: r.id,
+      name: r.name,
+      sourceClassId: r.domain_class_id,
+      targetClassId: r.range_class_id,
+    })),
+    attributes: classes.flatMap((c) =>
+      c.attributes.map((a) => ({
+        id: a.id,
+        classId: c.id,
+        name: a.name,
+        dataType: a.data_type,
+        isRequired: a.required ?? undefined,
+      }))
+    ),
+    disjointness: disjointnessRows.map((d) => ({
+      classId: d.class_id,
+      disjointClassId: d.disjoint_class_id,
+    })),
+    examples: examples
+      .filter((e) => Boolean(e.target_class_id))
+      .map((e) => ({
+        id: e.id,
+        classId: e.target_class_id!,
+        value: e.value,
+      })),
   })
 
   const shapesGraph = buildShaclShapes({
     baseIri,
-    ontology: ontologyPayload,
+    ontology: {
+      name: ontologyDoc.name,
+      defaultLanguage: ontologyDoc.default_language ?? "en",
+      languages: [],
+      usecase: ontologyDoc.usecase ?? "",
+      modules: ontologyDoc.modules.map((m) => ({
+        id: m.id,
+        name: m.name,
+        description: m.description ?? "",
+      })),
+      classes: classes.map((c) => ({
+        id: c.id,
+        name: c.name,
+        moduleId: c.module_id,
+        description: c.description ?? "",
+        parentClassId: c.parent_class_id,
+        attributes: c.attributes.map((a) => ({
+          id: a.id,
+          name: a.name,
+          dataType: normalizeOntologyDataTypeOrDefault(a.data_type),
+          required: a.required ?? false,
+          description: a.description ?? "",
+        })),
+      })),
+      relations: relations.map((r) => ({
+        id: r.id,
+        name: r.name,
+        domainClassId: r.domain_class_id,
+        rangeClassId: r.range_class_id,
+        description: r.description ?? "",
+        cardinality: r.cardinality,
+      })),
+      relationAttributes: [],
+      competencyQuestions: [],
+      notes: [],
+      examples: [],
+      localizedTexts: [],
+    },
     closed: false,
   })
 

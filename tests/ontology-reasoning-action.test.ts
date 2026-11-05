@@ -1,9 +1,12 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
-import { serializeOntologyTurtle } from "../src/features/ontology/server/shacl/serialize-ontology-turtle"
+import {
+  serializeOntologyTurtle,
+  type SerializeOntologyInput,
+} from "../src/features/ontology/server/shacl/serialize-ontology-turtle"
 
 test("serializeOntologyTurtle emits classes, subclasses, disjointness and example instances", () => {
-  const mockOntology = {
+  const mockOntology: SerializeOntologyInput = {
     name: "AssetOntology",
     baseIri: "http://example.org/onto#",
     classes: [
@@ -25,7 +28,7 @@ test("serializeOntologyTurtle emits classes, subclasses, disjointness and exampl
     ]
   }
 
-  const ttl = serializeOntologyTurtle(mockOntology as any)
+  const ttl = serializeOntologyTurtle(mockOntology)
   assert.ok(ttl.includes("owl:Class"))
   assert.ok(ttl.includes("rdfs:subClassOf"))
   assert.ok(ttl.includes("owl:disjointWith"))

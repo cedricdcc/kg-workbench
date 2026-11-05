@@ -11,6 +11,7 @@ import {
   Loader2,
   Plus,
   Settings2,
+  Sparkles,
   Trash2,
 } from "lucide-react"
 
@@ -35,6 +36,7 @@ export interface OntologyActionsMenuProps {
   onExportJson: () => void
   onExportOwl: () => void
   onExportShacl: () => void
+  onRunReasoner?: () => void
   onOpenOntologyDetails: () => void
   onOpenVocabularies: () => void
   onDelete: () => void
@@ -54,6 +56,7 @@ export function OntologyActionsMenu({
   onExportJson,
   onExportOwl,
   onExportShacl,
+  onRunReasoner,
   onOpenOntologyDetails,
   onOpenVocabularies,
   onDelete,
@@ -141,6 +144,15 @@ export function OntologyActionsMenu({
             <DropdownMenuSeparator />
 
             {/* Tools & Metadata Group */}
+            {onRunReasoner && (
+              <DropdownMenuItem
+                disabled={!hasCurrentDocument}
+                onClick={onRunReasoner}
+              >
+                <Sparkles className="mr-2 h-4 w-4 text-primary" />
+                Validate with Reasoner...
+              </DropdownMenuItem>
+            )}
             <DropdownMenuItem
               disabled={!hasCurrentDocument}
               onClick={onOpenOntologyDetails}
