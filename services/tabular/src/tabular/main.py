@@ -65,3 +65,4 @@ async def profile_endpoint(
     except Exception as exc:
         logger.exception("Failed to profile tabular data: %s", exc)
         return JSONResponse(status_code=400, content={"error": str(exc)})
+

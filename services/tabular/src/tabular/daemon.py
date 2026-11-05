@@ -166,3 +166,4 @@ async def worker_loop(stop_event: asyncio.Event) -> None:
                 )
             except asyncio.TimeoutError:
                 pass
+

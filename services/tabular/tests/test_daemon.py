@@ -54,3 +54,4 @@ async def test_execute_job_completes_successfully():
     result = complete_call[1]["json"]["result"]
     assert result["rowCount"] == 2
     assert result["columnCount"] == 2
+

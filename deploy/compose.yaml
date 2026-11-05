@@ -61,6 +61,20 @@ services:
     extra_hosts:
       - host.docker.internal:host-gateway
 
+  tabular:
+    container_name: kg-workbench-tabular
+    profiles: ["tabular", "full"]
+    build:
+      context: ../services/tabular
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      WORKBENCH_API_URL: ${WORKBENCH_API_URL:-http://app:3000}
+    ports:
+      - 127.0.0.1:${TABULAR_PORT:-8030}:8000
+    extra_hosts:
+      - host.docker.internal:host-gateway
+
 networks:
   app_web:
     external: true
