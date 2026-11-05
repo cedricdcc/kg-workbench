@@ -1,5 +1,8 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
+import { config } from "dotenv"
+
+config({ path: ".env.local" })
 import {
   addReferenceOntology,
   findNearestStandardTerms,
@@ -62,7 +65,7 @@ test("testRegistryEndpoint probes a registry and returns valid result structure"
 test("saveEndpointSnapshot, getEndpointSnapshots and deleteEndpointSnapshot cycle", async () => {
   process.env.DATABASE_URL =
     process.env.DATABASE_URL ||
-    "postgresql://postgres:cbca93016c7c6612ba0c1bb0d1465c66@127.0.0.1:5433/postgres"
+    "postgresql://postgres:postgres@127.0.0.1:5433/postgres"
   const { saveEndpointSnapshot, getEndpointSnapshots, deleteEndpointSnapshot } =
     await import("../src/features/ontology/server/actions/reference-vocabularies")
 
