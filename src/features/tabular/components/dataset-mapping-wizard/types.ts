@@ -1,0 +1,146 @@
+import type {
+  ArchivedDatasetSource,
+  DatasetColumnMapping,
+  DatasetMappingSpec,
+  TabularColumnProfile,
+} from "@/features/tabular/types"
+
+export type WizardStep = "entity" | "attributes" | "review"
+
+export interface MappingValidationResult {
+  isValid: boolean
+  error?: string
+}
+
+export function validateMappingSpecBeforeCommit(
+  spec: Partial<DatasetMappingSpec>
+): MappingValidationResult {
+  if (!spec.targetClassName || !spec.targetClassName.trim()) {
+    return {
+      isValid: false,
+      error: "Target class name is required.",
+    }
+  }
+
+  if (!spec.primaryKeyColumn || !spec.primaryKeyColumn.trim()) {
+    return {
+      isValid: false,
+      error: "Primary key column is required for entity IRI generation.",
+    }
+  }
+
+  return { isValid: true }
+}
+
+export interface DatasetMappingModalProps {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  ontologyId: string
+  dataset: ArchivedDatasetSource | null
+  existingClasses: Array<{
+    id: string
+    name: string
+    description?: string | null
+    attributes: Array<{ name: string; dataType: string }>
+  }>
+  existingRelations: Array<{
+    id: string
+    name: string
+    domainClassName?: string
+    rangeClassName?: string
+  }>
+  onMappingCommitted: () => void
+}
+
+export interface WizardState {
+  targetClassId?: string
+  targetClassName: string
+  targetModuleId?: string
+  primaryKeyColumn: string
+  columnMappings: DatasetColumnMapping[]
+  synthesizedElements: NonNullable<DatasetMappingSpec["synthesizedElements"]>
+}
+
+export function initializeWizardState(
+  dataset: ArchivedDatasetSource | null
+): WizardState {
+  if (!dataset) {
+    return {
+      targetClassName: "",
+      primaryKeyColumn: "",
+      columnMappings: [],
+      synthesizedElements: { classes: [], attributes: [], relations: [] },
+    }
+  }
+
+  const existingSpec = dataset.mappingSpec
+  if (existingSpec) {
+    return {
+      targetClassId: existingSpec.targetClassId,
+      targetClassName: existingSpec.targetClassName,
+      targetModuleId: existingSpec.targetModuleId,
+      primaryKeyColumn: existingSpec.primaryKeyColumn,
+      columnMappings: [...existingSpec.columnMappings],
+      synthesizedElements: existingSpec.synthesizedElements || {
+        classes: [],
+        attributes: [],
+        relations: [],
+      },
+    }
+  }
+
+  // Auto-seed from profile summary
+  const candidateKey =
+    dataset.profileSummary?.candidateKeys?.[0]?.[0] ||
+    dataset.profileSummary?.columns?.find(
+      (c: TabularColumnProfile) => c.isUniqueCandidate
+    )?.name ||
+    dataset.profileSummary?.columns?.[0]?.name ||
+    ""
+
+  const defaultClassName = dataset.sourceName
+    .replace(/\.[^/.]+$/, "")
+    .replace(/[^a-zA-Z0-9]/g, " ")
+    .split(" ")
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join("")
+
+  const columnMappings: DatasetColumnMapping[] = (
+    dataset.profileSummary?.columns || []
+  ).map((c: TabularColumnProfile) => ({
+    columnName: c.name,
+    inferredType: c.inferredKgType,
+    targetKind: "attribute",
+    targetAttributeName: c.name
+      .replace(/[^a-zA-Z0-9]/g, " ")
+      .split(" ")
+      .filter(Boolean)
+      .map((w, idx) =>
+        idx === 0
+          ? w.toLowerCase()
+          : w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()
+      )
+      .join(""),
+    targetDataType:
+      c.inferredKgType === "number"
+        ? "xsd:decimal"
+        : c.inferredKgType === "boolean"
+          ? "xsd:boolean"
+          : c.inferredKgType === "date"
+            ? "xsd:date"
+            : "xsd:string",
+    isPrimaryKey: c.name === candidateKey,
+  }))
+
+  return {
+    targetClassName: defaultClassName || "Entity",
+    primaryKeyColumn: candidateKey,
+    columnMappings,
+    synthesizedElements: {
+      classes: [],
+      attributes: [],
+      relations: [],
+    },
+  }
+}

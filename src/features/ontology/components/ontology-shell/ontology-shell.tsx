@@ -58,6 +58,7 @@ import { ReasonerBrowser } from "../reasoner-browser/reasoner-browser"
 import { ReasonerReportModal } from "../reasoner-modal/reasoner-report-modal"
 import { DatasetArchiveBrowser } from "@/features/tabular/components/dataset-archive-browser/dataset-archive-browser"
 import { TabularProfilerModal } from "@/features/tabular/components/tabular-profiler-modal/tabular-profiler-modal"
+import { DatasetMappingModal } from "@/features/tabular/components/dataset-mapping-wizard/dataset-mapping-modal"
 import { getDatasetSourcesQuery } from "@/features/tabular/server/queries/get-dataset-sources"
 import { deleteDatasetSourceAction } from "@/features/tabular/server/actions/delete-dataset-source"
 import { archiveDatasetSourceAction } from "@/features/tabular/server/actions/archive-dataset-source"
@@ -192,9 +193,6 @@ export function OntologyShell({
   const [profiledDatasetResult, setProfiledDatasetResult] =
     useState<TabularProfileResult | null>(null)
   const sidebarFileInputRef = useRef<HTMLInputElement>(null)
-
-  // Keep selectedDatasetForMapping referenced to satisfy linter before Task 6
-  void selectedDatasetForMapping
 
   const { data: archivedDatasets = [] } = useQuery({
     queryKey: ["dataset-sources", currentDocument.id],
@@ -985,6 +983,40 @@ export function OntologyShell({
             updatedAt: new Date().toISOString(),
           })
           setProfilerModalOpen(false)
+        }}
+      />
+
+      <DatasetMappingModal
+        open={Boolean(selectedDatasetForMapping)}
+        onOpenChange={(open) => {
+          if (!open) setSelectedDatasetForMapping(null)
+        }}
+        ontologyId={currentDocument.id}
+        dataset={selectedDatasetForMapping}
+        existingClasses={classes.map((c) => ({
+          id: c.id,
+          name: c.name,
+          description: c.description,
+          attributes: c.attributes.map((a) => ({
+            name: a.name,
+            dataType: a.data_type,
+          })),
+        }))}
+        existingRelations={relations.map((r) => {
+          const dom = classes.find((c) => c.id === r.domain_class_id)
+          const ran = classes.find((c) => c.id === r.range_class_id)
+          return {
+            id: r.id,
+            name: r.name,
+            domainClassName: dom?.name,
+            rangeClassName: ran?.name,
+          }
+        })}
+        onMappingCommitted={() => {
+          queryClient.invalidateQueries({
+            queryKey: ["dataset-sources", currentDocument.id],
+          })
+          router.refresh()
         }}
       />
     </div>
