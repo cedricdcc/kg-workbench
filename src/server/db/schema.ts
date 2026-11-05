@@ -521,8 +521,36 @@ export const systemServices = pgTable("system_services", {
   display_name: text("display_name").notNull(),
   status: text("status").notNull().default("offline"),
   capabilities: jsonb("capabilities").notNull(),
-  last_heartbeat: timestamp("last_heartbeat", { withTimezone: true, mode: "string" }).defaultNow(),
+  last_heartbeat: timestamp("last_heartbeat", {
+    withTimezone: true,
+    mode: "string",
+  }).defaultNow(),
   metadata: jsonb("metadata"),
 })
 
-
+export const datasetSources = pgTable(
+  "dataset_sources",
+  {
+    id: generatedId(),
+    ontology_id: uuid("ontology_id")
+      .notNull()
+      .references(() => ontologyDocuments.id, { onDelete: "cascade" }),
+    group_key: text("group_key").notNull().default("shared"),
+    source_name: text("source_name").notNull(),
+    file_format: text("file_format").notNull(),
+    row_count: integer("row_count").notNull(),
+    column_count: integer("column_count").notNull(),
+    profile_summary: jsonb("profile_summary").notNull(),
+    sample_rows: jsonb("sample_rows").notNull(),
+    mapping_spec: jsonb("mapping_spec"),
+    created_at: created_at(),
+    updated_at: timestamp("updated_at", {
+      withTimezone: true,
+      mode: "string",
+    }).defaultNow(),
+  },
+  (table) => [
+    index("dataset_sources_ontology_id_idx").on(table.ontology_id),
+    index("dataset_sources_group_key_idx").on(table.group_key),
+  ]
+)

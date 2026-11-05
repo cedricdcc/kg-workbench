@@ -44,3 +44,50 @@ export type TabularActionResponse =
       composeCommand: string
     }
 
+export interface DatasetColumnMapping {
+  columnName: string
+  inferredType: "string" | "number" | "boolean" | "date"
+  targetKind: "attribute" | "relation" | "ignore"
+  targetAttributeName?: string
+  targetDataType?: string
+  targetRelationName?: string
+  targetClassId?: string
+  isPrimaryKey?: boolean
+}
+
+export interface DatasetMappingSpec {
+  targetClassId?: string
+  targetClassName: string
+  targetModuleId?: string
+  primaryKeyColumn: string
+  columnMappings: DatasetColumnMapping[]
+  synthesizedElements?: {
+    classes?: Array<{ name: string; description?: string; moduleId?: string }>
+    attributes?: Array<{ className: string; name: string; dataType: string }>
+    relations?: Array<{
+      name: string
+      sourceClass: string
+      targetClass: string
+    }>
+  }
+}
+
+export interface ArchivedDatasetSource {
+  id: string
+  ontologyId: string
+  groupKey: string
+  sourceName: string
+  fileFormat: "csv" | "parquet" | "excel"
+  rowCount: number
+  columnCount: number
+  profileSummary: {
+    rowCount: number
+    columnCount: number
+    candidateKeys: string[][]
+    columns: TabularColumnProfile[]
+  }
+  sampleRows: Record<string, unknown>[]
+  mappingSpec: DatasetMappingSpec | null
+  createdAt: string
+  updatedAt: string
+}
