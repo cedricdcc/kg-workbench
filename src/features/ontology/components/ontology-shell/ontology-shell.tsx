@@ -265,12 +265,16 @@ export function OntologyShell({
     }
   }
 
-  async function handleSaveProfileToArchive(res: TabularProfileResult) {
+  async function handleSaveProfileToArchive(
+    res: TabularProfileResult,
+    connectionConfig?: Record<string, unknown> | null,
+    fileFormat?: string
+  ) {
     try {
       await archiveDatasetSourceAction({
         ontologyId: currentDocument.id,
         sourceName: res.fileName,
-        fileFormat: res.fileType,
+        fileFormat: fileFormat || res.fileType,
         rowCount: res.rowCount,
         columnCount: res.columnCount,
         profileSummary: {
@@ -280,6 +284,7 @@ export function OntologyShell({
           columns: res.columns,
         },
         sampleRows: res.previewRows,
+        connectionConfig: connectionConfig || null,
       })
       queryClient.invalidateQueries({
         queryKey: ["dataset-sources", currentDocument.id],
@@ -959,15 +964,22 @@ export function OntologyShell({
         open={profilerModalOpen}
         onOpenChange={setProfilerModalOpen}
         result={profiledDatasetResult}
+        ontologyId={currentDocument.id}
         onSaveToArchive={handleSaveProfileToArchive}
-        onMapToKg={(res) => {
+        onMapToKg={(res, connConfig, format) => {
           setSelectedDatasetForMapping({
             id: "",
             ontologyId: currentDocument.id,
             groupKey: "shared",
             sourceName: res.fileName,
             fileFormat:
-              (res.fileType.toLowerCase() as "csv" | "parquet" | "excel") ||
+              (format as "csv" | "parquet" | "excel" | "postgres" | "mysql") ||
+              (res.fileType.toLowerCase() as
+                | "csv"
+                | "parquet"
+                | "excel"
+                | "postgres"
+                | "mysql") ||
               "csv",
             rowCount: res.rowCount,
             columnCount: res.columnCount,
@@ -979,6 +991,7 @@ export function OntologyShell({
             },
             sampleRows: res.previewRows,
             mappingSpec: null,
+            connectionConfig: connConfig ?? null,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
           })

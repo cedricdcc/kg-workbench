@@ -33,6 +33,22 @@ export function formatDatasetFormatBadge(format: string): FormatBadge {
       borderClass: "border-teal-500/30",
     }
   }
+  if (norm === "postgres" || norm === "postgresql") {
+    return {
+      label: "POSTGRES",
+      bgClass: "bg-indigo-500/10",
+      textClass: "text-indigo-700 dark:text-indigo-400",
+      borderClass: "border-indigo-500/30",
+    }
+  }
+  if (norm === "mysql") {
+    return {
+      label: "MYSQL",
+      bgClass: "bg-amber-500/10",
+      textClass: "text-amber-700 dark:text-amber-400",
+      borderClass: "border-amber-500/30",
+    }
+  }
   return {
     label: format.toUpperCase(),
     bgClass: "bg-slate-500/10",
