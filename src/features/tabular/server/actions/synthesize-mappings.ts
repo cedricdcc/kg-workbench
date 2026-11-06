@@ -12,8 +12,9 @@ import {
 import { getCurrentGroupKeyOrThrow } from "@/server/group-access"
 import {
   buildAiMappingPrompt,
-  parseAiMappingResponse,
+  DatasetMappingSpecSchema,
 } from "@/features/tabular/server/services/ai-mapping-prompt"
+import { getLlmClient } from "@/server/llm"
 import {
   autoDetectPii,
   maskDatasetSamples,
@@ -168,46 +169,23 @@ export async function synthesizeOntologyMappingsAction(
     historicalArchiveSummary,
   })
 
-  // 6. Call Gemini
+  // 6. Synthesize mappings using unified LLM client with candidate fallback
   try {
-    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`
-    const response = await fetch(endpoint, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [
-          {
-            role: "user",
-            parts: [{ text: `${prompt.systemPrompt}\n\n${prompt.userPrompt}` }],
-          },
-        ],
-        generationConfig: {
-          responseMimeType: "application/json",
-          temperature: 0.2,
-        },
-      }),
-    })
-
-    if (!response.ok) {
-      const errText = await response.text()
-      return {
-        success: false,
-        error: `Gemini API returned error (${response.status}): ${errText}`,
+    const result = await getLlmClient().generateStructured<DatasetMappingSpec>(
+      {
+        systemPrompt: prompt.systemPrompt,
+        userPrompt: prompt.userPrompt,
+      },
+      {
+        schema: DatasetMappingSpecSchema,
+        schemaName: "DatasetMappingSpec",
+        provider: "gemini",
+        apiKey: apiKey || undefined,
+        temperature: 0.2,
       }
-    }
+    )
 
-    const data = await response.json()
-    const candidateText = data.candidates?.[0]?.content?.parts?.[0]?.text || ""
-
-    if (!candidateText.trim()) {
-      return {
-        success: false,
-        error: "Gemini returned an empty response. Please try again.",
-      }
-    }
-
-    const rawMappingSpec = parseAiMappingResponse(candidateText)
-    const mappingSpec = sanitizeSynthesizedElements(rawMappingSpec)
+    const mappingSpec = sanitizeSynthesizedElements(result.data)
     return {
       success: true,
       mappingSpec,
