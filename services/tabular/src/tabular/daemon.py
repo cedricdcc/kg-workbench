@@ -1,13 +1,59 @@
 import asyncio
 import base64
+import hashlib
+import json
 import logging
+import os
 from typing import Any
 import httpx
 
 from .config import settings
-from .profiler import profile_tabular_data
+from .profiler import (
+    discover_remote_tables,
+    profile_remote_database_table,
+    profile_tabular_data,
+)
 
 logger = logging.getLogger("tabular.daemon")
+
+
+def _decrypt_aes_gcm(ciphertext_hex: str, iv_hex: str, tag_hex: str) -> str:
+    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
+    seed = (
+        os.environ.get("SETTINGS_ENCRYPTION_SECRET")
+        or os.environ.get("APP_PASSWORD")
+        or "kg-workbench-local-dev-seed"
+    )
+    key = hashlib.sha256(seed.encode("utf-8")).digest()
+    aes = AESGCM(key)
+    iv = bytes.fromhex(iv_hex)
+    ct_with_tag = bytes.fromhex(ciphertext_hex) + bytes.fromhex(tag_hex)
+    decrypted_bytes = aes.decrypt(iv, ct_with_tag, None)
+    return decrypted_bytes.decode("utf-8")
+
+
+def decrypt_credential(password_field: Any) -> str:
+    if not password_field:
+        return ""
+    if isinstance(password_field, str):
+        trimmed = password_field.strip()
+        if trimmed.startswith("{") and trimmed.endswith("}"):
+            try:
+                data = json.loads(trimmed)
+                if isinstance(data, dict) and "ciphertext" in data and "iv" in data and "tag" in data:
+                    return _decrypt_aes_gcm(data["ciphertext"], data["iv"], data["tag"])
+            except Exception:
+                pass
+        return password_field
+    elif isinstance(password_field, dict):
+        if "ciphertext" in password_field and "iv" in password_field and "tag" in password_field:
+            return _decrypt_aes_gcm(
+                password_field["ciphertext"],
+                password_field["iv"],
+                password_field["tag"],
+            )
+    return str(password_field)
 
 
 async def send_heartbeat(client: httpx.AsyncClient) -> bool:
@@ -120,6 +166,99 @@ async def execute_job(client: httpx.AsyncClient, claimed: dict[str, Any]) -> Non
 
     logger.info("Executing claimed tabular job %s (attempt %s)", job_id, current_attempts)
     try:
+        event_type = (
+            event_payload.get("eventType")
+            or event_payload.get("event_type")
+            or claimed.get("eventType")
+            or job.get("eventType")
+            or job.get("event_type")
+        )
+
+        is_db_discover = (
+            event_type == "tabular.db_discover_requested"
+            or (
+                ("dbType" in event_payload or "db_type" in event_payload)
+                and "table" not in event_payload
+                and "tableName" not in event_payload
+                and "fileBufferBase64" not in event_payload
+                and "filePath" not in event_payload
+            )
+        )
+        is_db_profile = (
+            event_type == "tabular.db_profile_requested"
+            or (
+                ("dbType" in event_payload or "db_type" in event_payload)
+                and ("table" in event_payload or "tableName" in event_payload)
+            )
+        )
+
+        if is_db_discover:
+            db_type = event_payload.get("dbType") or event_payload.get("db_type") or "postgres"
+            host = event_payload.get("host", "localhost")
+            default_port = 5432 if str(db_type).lower() in {"postgres", "postgresql"} else 3306
+            port = int(event_payload.get("port") or default_port)
+            database = event_payload.get("database") or event_payload.get("db", "")
+            user = event_payload.get("user") or event_payload.get("username", "")
+            raw_pwd = (
+                event_payload.get("password")
+                or event_payload.get("encryptedPassword")
+                or event_payload.get("encrypted_password")
+                or ""
+            )
+            password = decrypt_credential(raw_pwd)
+            ssl_mode = event_payload.get("sslMode") or event_payload.get("ssl_mode") or "prefer"
+
+            tables = discover_remote_tables(
+                db_type=db_type,
+                host=host,
+                port=port,
+                database=database,
+                user=user,
+                password=password,
+                ssl_mode=ssl_mode,
+            )
+            result = {
+                "tables": tables,
+                "processedBy": settings.worker_id,
+            }
+            await complete_job(client, job_id, result)
+            logger.info("Tabular db_discover job %s completed successfully", job_id)
+            return
+
+        if is_db_profile:
+            db_type = event_payload.get("dbType") or event_payload.get("db_type") or "postgres"
+            host = event_payload.get("host", "localhost")
+            default_port = 5432 if str(db_type).lower() in {"postgres", "postgresql"} else 3306
+            port = int(event_payload.get("port") or default_port)
+            database = event_payload.get("database") or event_payload.get("db", "")
+            user = event_payload.get("user") or event_payload.get("username", "")
+            raw_pwd = (
+                event_payload.get("password")
+                or event_payload.get("encryptedPassword")
+                or event_payload.get("encrypted_password")
+                or ""
+            )
+            password = decrypt_credential(raw_pwd)
+            table = event_payload.get("table") or event_payload.get("tableName") or ""
+            schema = event_payload.get("schema") or "public"
+            ssl_mode = event_payload.get("sslMode") or event_payload.get("ssl_mode") or "prefer"
+
+            profile_res = profile_remote_database_table(
+                db_type=db_type,
+                host=host,
+                port=port,
+                database=database,
+                user=user,
+                password=password,
+                table=table,
+                schema=schema,
+                ssl_mode=ssl_mode,
+            )
+            profile_res["processedBy"] = settings.worker_id
+            await complete_job(client, job_id, profile_res)
+            logger.info("Tabular db_profile job %s completed successfully", job_id)
+            return
+
         file_name = event_payload.get("fileName", "dataset")
         file_type = event_payload.get("fileType", "csv")
         options = event_payload.get("options") or {}

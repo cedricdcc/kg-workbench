@@ -5,12 +5,14 @@ description = "DuckDB tabular ingestion and analytical profiling microservice fo
 license = "MIT"
 requires-python = ">=3.11,<3.14"
 dependencies = [
+  "cryptography>=42.0.0",
   "duckdb>=1.1.0",
   "fastapi>=0.115.0",
   "httpx>=0.27.0",
   "openpyxl>=3.1.5",
   "pyarrow>=17.0.0",
   "pydantic>=2.8.0",
+  "pytz>=2024.1",
   "python-multipart>=0.0.12",
   "uvicorn[standard]>=0.32.0",
 ]
@@ -32,4 +34,5 @@ packages = ["src/tabular"]
 testpaths = ["tests"]
 pythonpath = ["src"]
 asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
 

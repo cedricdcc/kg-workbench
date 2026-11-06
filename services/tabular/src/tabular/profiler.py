@@ -1,7 +1,9 @@
+import decimal
 import io
 import math
 import os
 import tempfile
+import uuid
 from datetime import date, datetime
 from typing import Any
 
@@ -32,7 +34,12 @@ def map_duckdb_type_to_kg(duckdb_type: str) -> str:
         return "number"
     if t in {"BOOLEAN", "BOOL"}:
         return "boolean"
-    if t in {"DATE", "TIMESTAMP", "TIMESTAMPTZ", "TIME", "TIMETZ", "TIMESTAMP_MS", "TIMESTAMP_NS"}:
+    if (
+        t in {"DATE", "TIMESTAMP", "TIMESTAMPTZ", "TIME", "TIMETZ", "TIMESTAMP_MS", "TIMESTAMP_NS"}
+        or "TIMESTAMP" in t
+        or "TIME" in t
+        or "DATE" in t
+    ):
         return "date"
     return "string"
 
@@ -40,6 +47,12 @@ def map_duckdb_type_to_kg(duckdb_type: str) -> str:
 def sanitize_value(val: Any) -> Any:
     if val is None:
         return None
+    if isinstance(val, uuid.UUID):
+        return str(val)
+    if isinstance(val, decimal.Decimal):
+        return float(val)
+    if isinstance(val, (bytes, bytearray)):
+        return val.decode("utf-8", errors="replace")
     if isinstance(val, (datetime, date)):
         return val.isoformat()
     if isinstance(val, float):
@@ -206,7 +219,19 @@ def profile_tabular_data(
                 pass
 
 
-def discover_remote_tables(
+def _escape_libpq(val: Any) -> str:
+    s = str(val)
+    s_esc = s.replace("\\", "\\\\").replace("'", "\\'")
+    return f"'{s_esc}'"
+
+
+def _escape_mysql_val(val: Any) -> str:
+    s = str(val)
+    s_esc = s.replace("\\", "\\\\").replace('"', '\\"')
+    return f'"{s_esc}"'
+
+
+def _build_db_connection(
     db_type: str,
     host: str,
     port: int,
@@ -214,17 +239,11 @@ def discover_remote_tables(
     user: str,
     password: str,
     ssl_mode: str = "prefer",
-) -> list[dict[str, Any]]:
+) -> tuple[str, str, str, str]:
     db_norm = db_type.lower().strip()
     if db_norm in {"postgres", "postgresql"}:
         extension_name = "postgres"
         attach_type = "POSTGRES"
-
-        def _escape_libpq(val: Any) -> str:
-            s = str(val)
-            s_esc = s.replace("\\", "\\\\").replace("'", "\\'")
-            return f"'{s_esc}'"
-
         parts = [
             f"host={_escape_libpq(host)}",
             f"port={_escape_libpq(port)}",
@@ -235,19 +254,41 @@ def discover_remote_tables(
         if ssl_mode:
             parts.append(f"sslmode={_escape_libpq(ssl_mode)}")
         conn_str = " ".join(parts)
+        return db_norm, extension_name, attach_type, conn_str
     elif db_norm == "mysql":
         extension_name = "mysql"
         attach_type = "MYSQL"
         parts = [
-            f"host={host}",
+            f"host={_escape_mysql_val(host)}",
             f"port={port}",
-            f"user={user}",
-            f"password={password}",
-            f"database={database}",
+            f"user={_escape_mysql_val(user)}",
+            f"password={_escape_mysql_val(password)}",
+            f"database={_escape_mysql_val(database)}",
         ]
         conn_str = " ".join(parts)
+        return db_norm, extension_name, attach_type, conn_str
     else:
         raise ValueError(f"Unsupported database type: {db_type}")
+
+
+def discover_remote_tables(
+    db_type: str,
+    host: str,
+    port: int,
+    database: str,
+    user: str,
+    password: str,
+    ssl_mode: str = "prefer",
+) -> list[dict[str, Any]]:
+    db_norm, extension_name, attach_type, conn_str = _build_db_connection(
+        db_type=db_type,
+        host=host,
+        port=port,
+        database=database,
+        user=user,
+        password=password,
+        ssl_mode=ssl_mode,
+    )
 
     con = duckdb.connect(database=":memory:")
     attached = False
@@ -319,4 +360,157 @@ def discover_remote_tables(
             except Exception:
                 pass
         con.close()
+
+
+def profile_remote_database_table(
+    db_type: str,
+    host: str,
+    port: int,
+    database: str,
+    user: str,
+    password: str,
+    table: str,
+    schema: str = "public",
+    ssl_mode: str = "prefer",
+) -> dict[str, Any]:
+    db_norm, extension_name, attach_type, conn_str = _build_db_connection(
+        db_type=db_type,
+        host=host,
+        port=port,
+        database=database,
+        user=user,
+        password=password,
+        ssl_mode=ssl_mode,
+    )
+
+    con = duckdb.connect(database=":memory:")
+    attached = False
+    try:
+        con.execute(f"LOAD {extension_name};")
+        conn_str_sql = conn_str.replace("'", "''")
+        con.execute(f"ATTACH '{conn_str_sql}' AS remote_db (TYPE {attach_type}, READ_ONLY);")
+        attached = True
+
+        clean_table = table.replace('"', '""')
+        clean_schema = schema.replace('"', '""') if schema else None
+
+        if db_norm == "mysql":
+            # In MySQL, schema is typically the database catalog
+            if not clean_schema or clean_schema.lower() == "public":
+                clean_schema = database.replace('"', '""')
+
+        if clean_schema:
+            target_ref = f'"remote_db"."{clean_schema}"."{clean_table}"'
+        else:
+            target_ref = f'"remote_db"."{clean_table}"'
+
+        row_count = con.execute(f"SELECT count(*) FROM {target_ref}").fetchone()[0]
+        schema_info = con.execute(f"DESCRIBE {target_ref}").fetchall()
+        column_count = len(schema_info)
+
+        columns_profile = []
+        candidate_keys: list[list[str]] = []
+
+        for row in schema_info:
+            col_name = str(row[0])
+            duckdb_type = str(row[1])
+            inferred_kg = map_duckdb_type_to_kg(duckdb_type)
+
+            clean_col = col_name.replace('"', '""')
+            escaped_col = f'"{clean_col}"'
+
+            if row_count == 0:
+                null_count = 0
+                null_pct = 0.0
+                distinct_count = 0
+                is_unique = False
+                min_val = None
+                max_val = None
+                samples: list[Any] = []
+            else:
+                stats_sql = f"""
+                    SELECT
+                        count(*) - count({escaped_col}) as null_count,
+                        count(DISTINCT {escaped_col}) as distinct_count,
+                        min({escaped_col}) as min_val,
+                        max({escaped_col}) as max_val
+                    FROM {target_ref}
+                """
+                try:
+                    stats_row = con.execute(stats_sql).fetchone()
+                    null_count = stats_row[0] if stats_row else 0
+                    distinct_count = stats_row[1] if stats_row else 0
+                    min_val = sanitize_value(stats_row[2]) if stats_row else None
+                    max_val = sanitize_value(stats_row[3]) if stats_row else None
+                except Exception:
+                    try:
+                        null_count = con.execute(f"SELECT count(*) - count({escaped_col}) FROM {target_ref}").fetchone()[0]
+                    except Exception:
+                        null_count = 0
+                    distinct_count = 0
+                    min_val = None
+                    max_val = None
+
+                null_pct = round((null_count / row_count * 100), 2)
+                is_unique = (null_count == 0) and (distinct_count == row_count)
+
+                sample_sql = f"""
+                    SELECT DISTINCT {escaped_col}
+                    FROM {target_ref}
+                    WHERE {escaped_col} IS NOT NULL
+                    LIMIT 5
+                """
+                try:
+                    samples = [
+                        sanitize_value(s[0])
+                        for s in con.execute(sample_sql).fetchall()
+                        if s[0] is not None
+                    ]
+                except Exception:
+                    samples = []
+
+            if is_unique:
+                candidate_keys.append([col_name])
+
+            columns_profile.append({
+                "name": col_name,
+                "duckdbType": duckdb_type,
+                "inferredKgType": inferred_kg,
+                "nullCount": null_count,
+                "nullPercentage": null_pct,
+                "distinctCount": distinct_count,
+                "isUniqueCandidate": is_unique,
+                "minValue": min_val,
+                "maxValue": max_val,
+                "sampleValues": samples,
+            })
+
+        preview_rows = []
+        if row_count > 0:
+            preview_cur = con.execute(f"SELECT * FROM {target_ref} LIMIT 20")
+            col_names = [d[0] for d in preview_cur.description]
+            for p_row in preview_cur.fetchall():
+                preview_rows.append({
+                    col_names[i]: sanitize_value(p_row[i])
+                    for i in range(len(col_names))
+                })
+
+        return {
+            "fileName": table,
+            "fileType": db_norm,
+            "rowCount": row_count,
+            "columnCount": column_count,
+            "estimatedSizeBytes": 0,
+            "columns": columns_profile,
+            "candidateKeys": candidate_keys,
+            "previewRows": preview_rows,
+        }
+    finally:
+        if attached:
+            try:
+                con.execute("DETACH remote_db;")
+            except Exception:
+                pass
+        con.close()
+
 
