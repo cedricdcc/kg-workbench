@@ -1,10 +1,11 @@
 import {
   GeneratedOntologyDraftSchema,
-  sanitizeAiJsonResponse,
   type GeneratedOntologyDraft,
 } from "@/features/ontology/schemas/ai-generation"
+import { getLlmClient, getCandidateModels } from "@/server/llm"
+import { getEffectiveApiKey } from "@/server/api-keys"
 
-const GEMINI_RESPONSE_SCHEMA = {
+export const GEMINI_RESPONSE_SCHEMA = {
   type: "OBJECT",
   properties: {
     modules: {
@@ -101,184 +102,46 @@ const GEMINI_RESPONSE_SCHEMA = {
   required: ["modules", "classes", "relations", "cqMappings"],
 }
 
-import { getEffectiveApiKey } from "@/server/api-keys"
-
 export const DEFAULT_GEMINI_FALLBACK_MODELS = [
-  "gemini-2.5-flash",
+  "gemini-3.8-flash",
   "gemini-2.5-pro",
   "gemini-1.5-flash",
   "gemini-1.5-pro",
-  "gemini-3.8-flash",
 ]
 
 export async function requestGeminiDraft(
   prompt: { systemPrompt: string; userPrompt: string },
   options?: { apiKey?: string; model?: string; candidateModels?: string[] }
 ): Promise<GeneratedOntologyDraft> {
-  const apiKey = options?.apiKey?.trim() || (await getEffectiveApiKey("gemini"))
-  if (!apiKey) {
-    throw new Error(
-      "Missing Gemini API key. Please configure a key in Settings or set GEMINI_API_KEY in your environment."
-    )
-  }
-
-  const requestedModel = options?.model?.trim() || "gemini-2.5-flash"
-  const primaryModel =
-    requestedModel === "gemini-2.0-flash" ? "gemini-2.5-flash" : requestedModel
-  const primaryClean = primaryModel.replace(/^models\//, "")
-
-  let candidatePool = options?.candidateModels
-  if (!candidatePool || candidatePool.length === 0) {
-    try {
-      const liveModels = await listGeminiModels(apiKey)
-      if (liveModels.length > 0) {
-        candidatePool = liveModels.map((m) => m.id)
-      }
-    } catch {
-      // Offline, network issue or restricted key, fall back to default list
-    }
-  }
-
-  if (!candidatePool || candidatePool.length === 0) {
-    candidatePool = DEFAULT_GEMINI_FALLBACK_MODELS
-  }
-
-  // Ensure primary model is first, followed by others without duplicates
-  const modelsQueue = [
-    primaryClean,
-    ...candidatePool
-      .map((m) =>
-        (m === "gemini-2.0-flash" ? "gemini-2.5-flash" : m).replace(
-          /^models\//,
-          ""
-        )
-      )
-      .filter((m) => m !== primaryClean),
-  ]
-
-  const requestBody = {
-    systemInstruction: {
-      parts: [{ text: prompt.systemPrompt }],
-    },
-    contents: [
+  const client = getLlmClient()
+  try {
+    const result = await client.generateStructured<GeneratedOntologyDraft>(
       {
-        role: "user",
-        parts: [{ text: prompt.userPrompt }],
+        systemPrompt: prompt.systemPrompt,
+        userPrompt: prompt.userPrompt,
       },
-    ],
-    generationConfig: {
-      responseMimeType: "application/json",
-      responseSchema: GEMINI_RESPONSE_SCHEMA,
-    },
-  }
-
-  let lastError: Error | null = null
-
-  for (let i = 0; i < modelsQueue.length; i++) {
-    const currentModel = modelsQueue[i]!
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${currentModel}:generateContent?key=${apiKey}`
-
-    try {
-      const response = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(requestBody),
-      }).catch((err) => {
-        throw new Error(
-          `Failed to reach Google Gemini API at ${url}: ${err.message}`
-        )
-      })
-
-      if (!response.ok) {
-        const errorText = await response.text().catch(() => "")
-        const isFallbackable =
-          response.status === 503 ||
-          response.status === 429 ||
-          response.status === 404 ||
-          response.status >= 500
-
-        if (isFallbackable && i < modelsQueue.length - 1) {
-          console.warn(
-            `[Gemini] Model "${currentModel}" returned status ${response.status} (${errorText || response.statusText}). Retrying with next fallback model "${modelsQueue[i + 1]}"...`
-          )
-          lastError = new Error(
-            `Gemini API error (${response.status}) on model ${currentModel}: ${errorText || response.statusText}`
-          )
-          continue
-        }
-
-        if (response.status === 429) {
-          throw new Error(
-            "Gemini API rate limit exceeded. Please try again shortly."
-          )
-        }
-        if (response.status === 400 || response.status === 403) {
-          throw new Error(
-            `Gemini API request failed (${response.status}): Please check that your API key is valid.`
-          )
-        }
-        throw new Error(
-          `Gemini API error (${response.status}): ${errorText || response.statusText}`
-        )
+      {
+        provider: "gemini",
+        apiKey: options?.apiKey,
+        model: options?.model,
+        candidateModels: options?.candidateModels,
+        schema: GeneratedOntologyDraftSchema,
+        schemaName: "GeneratedOntologyDraft",
+        jsonSchema: GEMINI_RESPONSE_SCHEMA,
       }
-
-      const data = (await response.json()) as {
-        candidates?: Array<{
-          content?: {
-            parts?: Array<{ text?: string }>
-          }
-        }>
-      }
-
-      const textOutput = data.candidates?.[0]?.content?.parts?.[0]?.text
-      if (!textOutput) {
-        if (i < modelsQueue.length - 1) {
-          console.warn(
-            `[Gemini] Model "${currentModel}" returned empty content. Retrying with next fallback model "${modelsQueue[i + 1]}"...`
-          )
-          lastError = new Error(`Empty content returned from ${currentModel}`)
-          continue
-        }
-        throw new Error("Gemini returned an empty response.")
-      }
-
-      const sanitized = sanitizeAiJsonResponse(textOutput)
-      const parsedJson = JSON.parse(sanitized)
-      return GeneratedOntologyDraftSchema.parse(parsedJson)
-    } catch (err: unknown) {
-      const errMessage = err instanceof Error ? err.message : String(err)
-      lastError = err instanceof Error ? err : new Error(errMessage)
-
-      if (
-        i < modelsQueue.length - 1 &&
-        (errMessage.includes("503") ||
-          errMessage.includes("high demand") ||
-          errMessage.includes("UNAVAILABLE") ||
-          errMessage.includes("429") ||
-          errMessage.includes("rate limit") ||
-          errMessage.includes("Failed to reach"))
-      ) {
-        console.warn(
-          `[Gemini] Model "${currentModel}" failed with error: "${errMessage}". Retrying with next fallback model "${modelsQueue[i + 1]}"...`
-        )
-        continue
-      }
-
-      if (i === modelsQueue.length - 1) {
-        throw new Error(
-          `Gemini generation failed across all attempted models (${modelsQueue.join(", ")}). Last error: ${errMessage}`
-        )
-      }
-      throw err
-    }
-  }
-
-  throw (
-    lastError ||
-    new Error(
-      `Gemini generation failed across all attempted models (${modelsQueue.join(", ")})`
     )
-  )
+    return result.data
+  } catch (err: unknown) {
+    const attemptedModels =
+      options?.candidateModels && options.candidateModels.length > 0
+        ? options.candidateModels
+        : getCandidateModels("gemini", options?.model)
+    const attempted = attemptedModels.join(", ")
+    const message = err instanceof Error ? err.message : String(err)
+    throw new Error(
+      `Gemini generation failed across all attempted models (${attempted}). Last error: ${message}`
+    )
+  }
 }
 
 export type GeminiModelInfo = {

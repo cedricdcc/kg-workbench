@@ -31,6 +31,7 @@ export interface LlmStructuredOptions<T> extends LlmGenerateOptions {
   schema: ZodType<T> | Record<string, unknown>
   schemaName?: string
   schemaDescription?: string
+  jsonSchema?: Record<string, unknown>
 }
 
 export interface LlmExecutionAttempt {

@@ -1,5 +1,5 @@
-import { getEffectiveApiKey } from "@/server/api-keys"
-import { listGeminiModels } from "./ai-ontology-generator/gemini-provider"
+import { z } from "zod"
+import { getLlmClient } from "@/server/llm"
 
 export type ConnectedRelationContext = {
   id: string
@@ -34,7 +34,20 @@ export type SuggestionResult = {
   provenance: AiRelationProvenance
 }
 
-export function parseAiRelationSuggestions(rawText: string): AiRelationSuggestion[] {
+export const AiRelationSuggestionSchema = z.object({
+  relationId: z.string(),
+  suggestedAction: z.enum(["keep", "remap", "delete"]),
+  suggestedName: z.string().optional(),
+  rationale: z.string(),
+})
+
+export const AiRelationSuggestionsListSchema = z.array(
+  AiRelationSuggestionSchema
+)
+
+export function parseAiRelationSuggestions(
+  rawText: string
+): AiRelationSuggestion[] {
   const cleaned = rawText
     .replace(/^```(?:json)?\s*/i, "")
     .replace(/\s*```$/i, "")
@@ -46,7 +59,10 @@ export function parseAiRelationSuggestions(rawText: string): AiRelationSuggestio
   }
 
   return data.map((item: unknown) => {
-    const obj = (item && typeof item === "object" ? item : {}) as Record<string, unknown>
+    const obj = (item && typeof item === "object" ? item : {}) as Record<
+      string,
+      unknown
+    >
     const actionRaw = String(obj.suggestedAction || "")
     const suggestedAction: "keep" | "remap" | "delete" =
       actionRaw === "remap" || actionRaw === "delete" ? actionRaw : "keep"
@@ -60,14 +76,6 @@ export function parseAiRelationSuggestions(rawText: string): AiRelationSuggestio
   })
 }
 
-const DEFAULT_FALLBACK_MODELS = [
-  "gemini-2.5-flash",
-  "gemini-2.5-pro",
-  "gemini-1.5-flash",
-  "gemini-1.5-pro",
-  "gemini-3.8-flash",
-]
-
 export async function suggestRelationRemappings(input: {
   ontologyId: string
   oldClassName: string
@@ -78,7 +86,7 @@ export async function suggestRelationRemappings(input: {
   model?: string
   candidateModels?: string[]
 }): Promise<SuggestionResult> {
-  const chosenModel = input.model?.trim() || "gemini-2.5-flash"
+  const chosenModel = input.model?.trim() || "gemini-3.8-flash"
 
   if (input.relations.length === 0) {
     return {
@@ -89,39 +97,6 @@ export async function suggestRelationRemappings(input: {
       },
     }
   }
-
-  const apiKey = input.apiKey?.trim() || (await getEffectiveApiKey("gemini"))
-  if (!apiKey) {
-    throw new Error(
-      "Missing Gemini API key. Please configure a key in Settings or set GEMINI_API_KEY in your environment."
-    )
-  }
-
-  // Determine candidate models
-  let candidatePool = input.candidateModels
-  if (!candidatePool || candidatePool.length === 0) {
-    try {
-      const liveModels = await listGeminiModels(apiKey)
-      if (liveModels.length > 0) {
-        candidatePool = liveModels.map((m) => m.id)
-      }
-    } catch {
-      // Offline or network error listing models; use built-in fallbacks
-    }
-  }
-
-  if (!candidatePool || candidatePool.length === 0) {
-    candidatePool = DEFAULT_FALLBACK_MODELS
-  }
-
-  // Ensure requested model is tried first
-  const primaryModel = chosenModel.replace(/^models\//, "")
-  const modelsQueue = [
-    primaryModel,
-    ...candidatePool
-      .map((m) => m.replace(/^models\//, ""))
-      .filter((m) => m !== primaryModel),
-  ]
 
   const systemInstruction = `You are a knowledge graph and ontology engineering expert.
 An existing concept "${input.oldClassName}" is being reconciled and adopted to standard reference term "${input.standardTermCurie}"${input.standardTermDescription ? ` (${input.standardTermDescription})` : ""}.
@@ -144,103 +119,35 @@ You must output a JSON array of objects with the exact schema:
   const userPrompt = `Connected relations for "${input.oldClassName}":
 ${JSON.stringify(input.relations, null, 2)}`
 
-  const requestBody = {
-    systemInstruction: {
-      parts: [{ text: systemInstruction }],
+  const client = getLlmClient()
+  const result = await client.generateStructured<AiRelationSuggestion[]>(
+    {
+      systemPrompt: systemInstruction,
+      userPrompt,
     },
-    contents: [
-      {
-        role: "user",
-        parts: [{ text: userPrompt }],
-      },
-    ],
-    generationConfig: {
-      responseMimeType: "application/json",
-    },
-  }
-
-  const attempts: ModelAttemptLog[] = []
-  let lastError: Error | null = null
-
-  for (const currentModel of modelsQueue) {
-    let cleanModel = currentModel
-    if (cleanModel === "gemini-2.0-flash") {
-      cleanModel = "gemini-3.8-flash"
+    {
+      provider: "gemini",
+      apiKey: input.apiKey,
+      model: input.model,
+      candidateModels: input.candidateModels,
+      schema: AiRelationSuggestionsListSchema,
+      schemaName: "AiRelationSuggestionsList",
     }
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${cleanModel}:generateContent?key=${apiKey}`
-
-    try {
-      const response = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(requestBody),
-      })
-
-      if (!response.ok) {
-        const errorText = await response.text().catch(() => "")
-        attempts.push({
-          model: currentModel,
-          status: "failed",
-          statusCode: response.status,
-          error: errorText || response.statusText,
-          timestamp: new Date().toISOString(),
-        })
-        lastError = new Error(
-          `Gemini API error (${response.status}): ${errorText || response.statusText}`
-        )
-        // Fall back to next model
-        continue
-      }
-
-      const result = (await response.json()) as {
-        candidates?: Array<{
-          content?: {
-            parts?: Array<{ text?: string }>
-          }
-        }>
-      }
-
-      const rawText = result.candidates?.[0]?.content?.parts?.[0]?.text
-      if (!rawText) {
-        attempts.push({
-          model: currentModel,
-          status: "failed",
-          error: "Empty content returned",
-          timestamp: new Date().toISOString(),
-        })
-        lastError = new Error("Empty content returned from Gemini")
-        continue
-      }
-
-      const suggestions = parseAiRelationSuggestions(rawText)
-      attempts.push({
-        model: currentModel,
-        status: "succeeded",
-        timestamp: new Date().toISOString(),
-      })
-
-      return {
-        suggestions,
-        provenance: {
-          successfulModel: currentModel,
-          attempts,
-        },
-      }
-    } catch (err: unknown) {
-      const errorMsg = err instanceof Error ? err.message : String(err)
-      attempts.push({
-        model: currentModel,
-        status: "failed",
-        error: errorMsg,
-        timestamp: new Date().toISOString(),
-      })
-      lastError = err instanceof Error ? err : new Error(errorMsg)
-    }
-  }
-
-  throw new Error(
-    `All Gemini models failed (${attempts
-      .map((a) => `${a.model}: ${a.statusCode || a.error}`)
-      .join(", ")}): ${lastError?.message || "Unknown error"}`
   )
+
+  const attempts: ModelAttemptLog[] = result.trace.attempts.map((att) => ({
+    model: att.model,
+    status: att.status === 200 ? "succeeded" : "failed",
+    statusCode: typeof att.status === "number" ? att.status : undefined,
+    error: att.error,
+    timestamp: new Date().toISOString(),
+  }))
+
+  return {
+    suggestions: result.data,
+    provenance: {
+      successfulModel: result.trace.model,
+      attempts,
+    },
+  }
 }

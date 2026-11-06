@@ -52,8 +52,8 @@ export function AiGenerateConfigStep({
   const [isCheckingKey, setIsCheckingKey] = useState(false)
   const [keyVerified, setKeyVerified] = useState(false)
 
-  const [ollamaBaseUrl, setOllamaBaseUrl] = useState("http://localhost:11434")
-  const [ollamaModel, setOllamaModel] = useState("qwen2.5")
+  const [ollamaBaseUrl, setOllamaBaseUrl] = useState("http://localhost:8000/v1")
+  const [ollamaModel, setOllamaModel] = useState("")
 
   async function handleCheckAndFetchModels() {
     setIsCheckingKey(true)
@@ -94,8 +94,8 @@ export function AiGenerateConfigStep({
     } else {
       onGenerate({
         provider: "ollama",
-        baseUrl: ollamaBaseUrl.trim() || "http://localhost:11434",
-        model: ollamaModel.trim() || "qwen2.5",
+        baseUrl: ollamaBaseUrl.trim() || "http://localhost:8000/v1",
+        model: ollamaModel.trim() || undefined,
       })
     }
   }
@@ -127,7 +127,7 @@ export function AiGenerateConfigStep({
             </TabsTrigger>
             <TabsTrigger value="ollama" className="gap-2">
               <Cpu className="h-4 w-4 text-sky-500" />
-              Local Ollama (Offline)
+              Local vLLM (OpenAI API)
             </TabsTrigger>
           </TabsList>
         </Tabs>
@@ -225,14 +225,14 @@ export function AiGenerateConfigStep({
         <div className="space-y-3.5 rounded-md border p-3.5">
           <div className="space-y-1.5">
             <Label htmlFor="ollama-url" className="text-xs font-medium">
-              Ollama Base URL
+              vLLM / Local Endpoint URL
             </Label>
             <Input
               id="ollama-url"
               value={ollamaBaseUrl}
               onChange={(e) => setOllamaBaseUrl(e.target.value)}
               className="text-xs"
-              placeholder="http://localhost:11434"
+              placeholder="http://localhost:8000/v1"
             />
           </div>
 
@@ -245,10 +245,10 @@ export function AiGenerateConfigStep({
               value={ollamaModel}
               onChange={(e) => setOllamaModel(e.target.value)}
               className="text-xs"
-              placeholder="qwen2.5 or llama3"
+              placeholder="Leave blank to auto-detect active model"
             />
             <p className="text-[11px] text-muted-foreground">
-              Ensure Ollama is running locally and the model is pulled.
+              Ensure vLLM or local OpenAI-compatible server is running.
             </p>
           </div>
         </div>

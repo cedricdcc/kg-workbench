@@ -246,9 +246,9 @@ export class LlmClient {
     const isZod =
       typeof (options.schema as { safeParse?: unknown })?.safeParse ===
       "function"
-    const jsonSchema = !isZod
-      ? (options.schema as Record<string, unknown>)
-      : undefined
+    const jsonSchema =
+      options.jsonSchema ??
+      (!isZod ? (options.schema as Record<string, unknown>) : undefined)
 
     const { value, trace } = await this.executeWithFallback<{
       data: T

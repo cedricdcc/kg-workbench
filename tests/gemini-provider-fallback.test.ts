@@ -72,13 +72,13 @@ test("requestGeminiDraft falls back to next model on 503 and succeeds", async ()
       { systemPrompt: "test system", userPrompt: "test user" },
       {
         apiKey: "fake-test-key",
-        model: "gemini-2.5-flash",
-        candidateModels: ["gemini-2.5-flash", "gemini-2.5-pro"],
+        model: "gemini-3.8-flash",
+        candidateModels: ["gemini-3.8-flash", "gemini-2.5-pro"],
       }
     )
 
     assert.equal(callCount, 2, "should have retried with second model")
-    assert.equal(calledModels[0], "gemini-2.5-flash")
+    assert.equal(calledModels[0], "gemini-3.8-flash")
     assert.equal(calledModels[1], "gemini-2.5-pro")
     assert.equal(result.classes[0]?.name, "Device")
   } finally {
@@ -108,11 +108,11 @@ test("requestGeminiDraft throws clear error when all candidate models fail with 
           { systemPrompt: "test system", userPrompt: "test user" },
           {
             apiKey: "fake-test-key",
-            model: "gemini-2.5-flash",
-            candidateModels: ["gemini-2.5-flash", "gemini-2.5-pro"],
+            model: "gemini-3.8-flash",
+            candidateModels: ["gemini-3.8-flash", "gemini-2.5-pro"],
           }
         ),
-      /Gemini generation failed across all attempted models \(gemini-2.5-flash, gemini-2.5-pro\)/
+      /Gemini generation failed across all attempted models \(gemini-3.8-flash, gemini-2.5-pro\)/
     )
   } finally {
     globalThis.fetch = originalFetch

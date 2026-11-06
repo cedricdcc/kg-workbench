@@ -23,16 +23,16 @@ test("parseAiRelationSuggestions parses and validates raw JSON array", () => {
 })
 
 test("parseAiRelationSuggestions strips markdown backticks", () => {
-  const raw = "```json\n[{\"relationId\":\"11111111-1111-1111-1111-111111111111\",\"suggestedAction\":\"delete\",\"rationale\":\"Redundant\"}]\n```"
+  const raw =
+    '```json\n[{"relationId":"11111111-1111-1111-1111-111111111111","suggestedAction":"delete","rationale":"Redundant"}]\n```'
   const parsed = parseAiRelationSuggestions(raw)
   assert.equal(parsed.length, 1)
   assert.equal(parsed[0].suggestedAction, "delete")
 })
 
 test("suggestRelationRemappings falls back to next model on 503 and tracks provenance", async () => {
-  const { suggestRelationRemappings } = await import(
-    "../src/features/ontology/server/services/ai-relation-reconciliation"
-  )
+  const { suggestRelationRemappings } =
+    await import("../src/features/ontology/server/services/ai-relation-reconciliation")
 
   const originalFetch = globalThis.fetch
   let callCount = 0
@@ -100,12 +100,12 @@ test("suggestRelationRemappings falls back to next model on 503 and tracks prove
       ],
       apiKey: "test-fake-key",
       model: "gemini-3.8-flash",
-      candidateModels: ["gemini-3.8-flash", "gemini-2.5-flash"],
+      candidateModels: ["gemini-3.8-flash", "gemini-2.5-pro"],
     })
 
     assert.equal(result.suggestions.length, 1)
     assert.equal(result.suggestions[0].relationId, "rel-1")
-    assert.equal(result.provenance.successfulModel, "gemini-2.5-flash")
+    assert.equal(result.provenance.successfulModel, "gemini-2.5-pro")
     assert.equal(result.provenance.attempts.length, 2)
     assert.equal(result.provenance.attempts[0].status, "failed")
     assert.equal(result.provenance.attempts[0].statusCode, 503)
@@ -114,4 +114,3 @@ test("suggestRelationRemappings falls back to next model on 503 and tracks prove
     globalThis.fetch = originalFetch
   }
 })
-
