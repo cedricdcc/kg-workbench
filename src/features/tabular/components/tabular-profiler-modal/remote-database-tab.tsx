@@ -89,12 +89,30 @@ export function RemoteDatabaseTab({
     }
   }
 
+  const handleUseDockerDb = () => {
+    setDbType("postgres")
+    setHost("db")
+    setPort("5432")
+    setDatabase("postgres")
+    setUser("postgres")
+    setPassword("55a64bfd04c37dbb0af0dfe60c3b60bf")
+    setSslMode("disable")
+    setDiscoveryError(null)
+  }
+
   const handleConnectAndDiscover = async (e?: React.FormEvent) => {
     if (e) e.preventDefault()
     setDiscoveryError(null)
 
     if (!host.trim() || !database.trim() || !user.trim()) {
       setDiscoveryError("Host, Database name, and Username are required.")
+      return
+    }
+
+    if (!password.trim() && host.trim() === "db") {
+      setDiscoveryError(
+        "PostgreSQL in the Docker container ('db') requires a password. Click 'Fill Local Docker DB' above or enter POSTGRES_PASSWORD."
+      )
       return
     }
 
@@ -223,6 +241,22 @@ export function RemoteDatabaseTab({
       {step === 1 ? (
         /* STEP 1: Connection Form */
         <form onSubmit={handleConnectAndDiscover} className="space-y-4">
+          {/* Quick preset for local Docker stack testing */}
+          <div className="flex items-center justify-between rounded-md border border-border/60 bg-muted/30 px-3 py-2 text-xs">
+            <span className="text-muted-foreground">
+              Testing with local Docker stack?
+            </span>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-6 text-[11px]"
+              onClick={handleUseDockerDb}
+            >
+              Fill Local Docker DB
+            </Button>
+          </div>
+
           <div className="grid grid-cols-2 gap-3">
             {/* Database Engine */}
             <div className="space-y-1.5">

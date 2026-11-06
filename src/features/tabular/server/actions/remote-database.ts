@@ -118,6 +118,20 @@ export async function scrubDomainEventPassword(
   }
 }
 
+function normalizeDbError(rawError: string | undefined, user: string): string {
+  if (!rawError) return "Remote database operation failed."
+  if (
+    rawError.includes("no password supplied") ||
+    rawError.includes("fe_sendauth")
+  ) {
+    return `Database requires password authentication, but no password was provided for user '${user}'.`
+  }
+  if (rawError.includes("password authentication failed")) {
+    return `Database password authentication failed for user '${user}'. Please verify credentials.`
+  }
+  return rawError
+}
+
 /**
  * Discovers accessible schemas and tables across a remote PostgreSQL or MySQL database.
  */
@@ -175,7 +189,11 @@ export async function discoverRemoteTablesAction(
       100
     )
 
-    if (awaitRes.resolved && awaitRes.status === "completed" && awaitRes.result) {
+    if (
+      awaitRes.resolved &&
+      awaitRes.status === "completed" &&
+      awaitRes.result
+    ) {
       return {
         success: true,
         tables: awaitRes.result.tables || [],
@@ -185,7 +203,7 @@ export async function discoverRemoteTablesAction(
     if (awaitRes.resolved && awaitRes.status === "failed") {
       return {
         success: false,
-        error: awaitRes.error || "Remote database table discovery failed.",
+        error: normalizeDbError(awaitRes.error, input.user),
       }
     }
 
@@ -269,7 +287,11 @@ export async function profileRemoteTableAction(
       100
     )
 
-    if (awaitRes.resolved && awaitRes.status === "completed" && awaitRes.result) {
+    if (
+      awaitRes.resolved &&
+      awaitRes.status === "completed" &&
+      awaitRes.result
+    ) {
       const connectionConfig: RemoteDbConnectionConfig = {
         dbType: input.dbType,
         host: input.host,
@@ -292,7 +314,7 @@ export async function profileRemoteTableAction(
     if (awaitRes.resolved && awaitRes.status === "failed") {
       return {
         success: false,
-        error: awaitRes.error || "Remote database table profiling failed.",
+        error: normalizeDbError(awaitRes.error, input.user),
       }
     }
 
@@ -355,9 +377,7 @@ export async function resyncDatabaseSourceAction(
     }
 
     const connectionConfig = record.connection_config as
-      | RemoteDbConnectionConfig
-      | null
-      | undefined
+      RemoteDbConnectionConfig | null | undefined
 
     if (!connectionConfig) {
       return {
@@ -380,8 +400,7 @@ export async function resyncDatabaseSourceAction(
     }
 
     const schema = connectionConfig.schema || "public"
-    const table =
-      connectionConfig.table || (record.source_name as string)
+    const table = connectionConfig.table || (record.source_name as string)
 
     const profileOutcome = await profileRemoteTableAction(
       {
