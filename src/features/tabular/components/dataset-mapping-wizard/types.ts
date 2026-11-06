@@ -4,6 +4,10 @@ import type {
   DatasetMappingSpec,
   TabularColumnProfile,
 } from "@/features/tabular/types"
+import {
+  autoDetectPii,
+  type ColumnPrivacyConfig,
+} from "@/features/tabular/server/services/pii-masker"
 
 export type WizardStep = "entity" | "attributes" | "review"
 
@@ -59,6 +63,7 @@ export interface WizardState {
   primaryKeyColumn: string
   columnMappings: DatasetColumnMapping[]
   synthesizedElements: NonNullable<DatasetMappingSpec["synthesizedElements"]>
+  privacyConfigs: ColumnPrivacyConfig[]
 }
 
 export function initializeWizardState(
@@ -70,8 +75,19 @@ export function initializeWizardState(
       primaryKeyColumn: "",
       columnMappings: [],
       synthesizedElements: { classes: [], attributes: [], relations: [] },
+      privacyConfigs: [],
     }
   }
+
+  const rawColumns = dataset.profileSummary?.columns || []
+  const sampleRows = dataset.sampleRows || []
+  const privacyConfigs = autoDetectPii(
+    rawColumns.map((c) => ({
+      name: c.name,
+      sampleValues: c.sampleValues,
+    })),
+    sampleRows
+  )
 
   const existingSpec = dataset.mappingSpec
   if (existingSpec) {
@@ -86,6 +102,7 @@ export function initializeWizardState(
         attributes: [],
         relations: [],
       },
+      privacyConfigs,
     }
   }
 
@@ -142,5 +159,6 @@ export function initializeWizardState(
       attributes: [],
       relations: [],
     },
+    privacyConfigs,
   }
 }

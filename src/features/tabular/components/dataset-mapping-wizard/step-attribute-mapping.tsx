@@ -6,8 +6,10 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { synthesizeOntologyMappingsAction } from "@/features/tabular/server/actions/synthesize-mappings"
+import type { ColumnPrivacyConfig } from "@/features/tabular/server/services/pii-masker"
 import type { ArchivedDatasetSource } from "@/features/tabular/types"
 import { toast } from "sonner"
+import { ColumnPrivacyPopover } from "./column-privacy-popover"
 import type { WizardState } from "./types"
 
 interface StepAttributeMappingProps {
@@ -40,6 +42,7 @@ export function StepAttributeMapping({
           columns: dataset.profileSummary?.columns || [],
         },
         sampleRows: dataset.sampleRows || [],
+        privacyConfigs: wizardState.privacyConfigs,
       })
 
       if (resp.success) {
@@ -75,6 +78,21 @@ export function StepAttributeMapping({
     const updated = [...wizardState.columnMappings]
     updated[index] = { ...updated[index], ...patch }
     onChange({ columnMappings: updated })
+  }
+
+  const handlePrivacyConfigChange = (updated: ColumnPrivacyConfig) => {
+    const current = wizardState.privacyConfigs || []
+    const existingIndex = current.findIndex(
+      (c) => c.columnName === updated.columnName
+    )
+    let next: ColumnPrivacyConfig[]
+    if (existingIndex >= 0) {
+      next = [...current]
+      next[existingIndex] = updated
+    } else {
+      next = [...current, updated]
+    }
+    onChange({ privacyConfigs: next })
   }
 
   return (
@@ -127,6 +145,18 @@ export function StepAttributeMapping({
           <div className="divide-y">
             {wizardState.columnMappings.map((col, idx) => {
               const isPk = col.columnName === wizardState.primaryKeyColumn
+              const privacyConfig = wizardState.privacyConfigs?.find(
+                (c) => c.columnName === col.columnName
+              ) || {
+                columnName: col.columnName,
+                isMasked: false,
+                maskingStrategy: "none" as const,
+              }
+              const sampleValue =
+                dataset.sampleRows?.[0]?.[col.columnName] ??
+                dataset.profileSummary?.columns?.find(
+                  (c) => c.name === col.columnName
+                )?.sampleValues?.[0]
 
               return (
                 <div
@@ -135,12 +165,21 @@ export function StepAttributeMapping({
                     col.targetKind === "ignore" ? "bg-muted/10 opacity-50" : ""
                   }`}
                 >
-                  {/* Column Name */}
-                  <div className="col-span-3 flex items-center gap-1 truncate font-mono font-medium">
-                    {isPk && (
-                      <Key className="h-3 w-3 shrink-0 text-emerald-500" />
-                    )}
-                    <span title={col.columnName}>{col.columnName}</span>
+                  {/* Column Name & Privacy Pill */}
+                  <div className="col-span-3 flex items-center justify-between gap-1 pr-1">
+                    <div className="flex items-center gap-1 truncate font-mono font-medium">
+                      {isPk && (
+                        <Key className="h-3 w-3 shrink-0 text-emerald-500" />
+                      )}
+                      <span title={col.columnName} className="truncate">
+                        {col.columnName}
+                      </span>
+                    </div>
+                    <ColumnPrivacyPopover
+                      config={privacyConfig}
+                      onChange={handlePrivacyConfigChange}
+                      sampleValue={sampleValue}
+                    />
                   </div>
 
                   {/* Inferred Type */}

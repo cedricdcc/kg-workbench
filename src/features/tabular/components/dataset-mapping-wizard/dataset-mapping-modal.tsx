@@ -12,6 +12,8 @@ import {
 } from "@/components/ui/dialog"
 import { commitDatasetMappingAction } from "@/features/tabular/server/actions/commit-dataset-mapping"
 import { toast } from "sonner"
+import { autoDetectPii } from "@/features/tabular/server/services/pii-masker"
+import { PrivacyShieldBadge } from "./privacy-shield-badge"
 import { StepEntitySelection } from "./step-entity-selection"
 import { StepAttributeMapping } from "./step-attribute-mapping"
 import { StepAiSynthesisReview } from "./step-ai-synthesis-review"
@@ -47,6 +49,25 @@ export function DatasetMappingModal({
 
   const handleUpdate = (updates: Partial<WizardState>) => {
     setWizardState((prev) => ({ ...prev, ...updates }))
+  }
+
+  const maskedColumnCount = (wizardState.privacyConfigs || []).filter(
+    (c) => c.isMasked
+  ).length
+
+  const handleResetPrivacy = () => {
+    if (!dataset) return
+    const rawColumns = dataset.profileSummary?.columns || []
+    const sampleRows = dataset.sampleRows || []
+    const resetConfigs = autoDetectPii(
+      rawColumns.map((c) => ({
+        name: c.name,
+        sampleValues: c.sampleValues,
+      })),
+      sampleRows
+    )
+    handleUpdate({ privacyConfigs: resetConfigs })
+    toast.info("Reset column privacy settings to auto-detected defaults")
   }
 
   const handleNext = () => {
@@ -114,9 +135,15 @@ export function DatasetMappingModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-3xl">
         <DialogHeader>
-          <div className="flex items-center gap-2">
-            <Network className="h-5 w-5 text-primary" />
-            <DialogTitle>Map Dataset to Knowledge Graph</DialogTitle>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Network className="h-5 w-5 text-primary" />
+              <DialogTitle>Map Dataset to Knowledge Graph</DialogTitle>
+            </div>
+            <PrivacyShieldBadge
+              count={maskedColumnCount}
+              onReset={handleResetPrivacy}
+            />
           </div>
           <DialogDescription>
             Configure entity alignment and property mappings for{" "}

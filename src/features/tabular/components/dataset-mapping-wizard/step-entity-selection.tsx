@@ -7,6 +7,7 @@ import type {
   ArchivedDatasetSource,
   TabularColumnProfile,
 } from "@/features/tabular/types"
+import { ColumnPrivacyPopover } from "./column-privacy-popover"
 import type { WizardState } from "./types"
 
 interface StepEntitySelectionProps {
@@ -126,10 +127,44 @@ export function StepEntitySelection({
             ))}
           </select>
 
-          <p className="flex items-center gap-1 text-[11px] text-muted-foreground">
-            <Key className="h-3.5 w-3.5 text-muted-foreground" />
-            Values in this column will form the entity IRI fragment.
-          </p>
+          <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+            <p className="flex items-center gap-1">
+              <Key className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+              <span>Values in this column form entity IRI fragments.</span>
+            </p>
+            {(() => {
+              const selectedPkPrivacy = wizardState.privacyConfigs?.find(
+                (c) => c.columnName === wizardState.primaryKeyColumn
+              )
+              if (!selectedPkPrivacy) return null
+              return (
+                <div className="flex items-center gap-1 shrink-0">
+                  <span className="text-[10px]">Privacy:</span>
+                  <ColumnPrivacyPopover
+                    config={selectedPkPrivacy}
+                    onChange={(updated) => {
+                      const current = wizardState.privacyConfigs || []
+                      const idx = current.findIndex(
+                        (c) => c.columnName === updated.columnName
+                      )
+                      const next =
+                        idx >= 0 ? [...current] : [...current, updated]
+                      if (idx >= 0) next[idx] = updated
+                      onChange({ privacyConfigs: next })
+                    }}
+                    sampleValue={
+                      dataset.sampleRows?.[0]?.[
+                        selectedPkPrivacy.columnName
+                      ] ??
+                      dataset.profileSummary?.columns?.find(
+                        (c) => c.name === selectedPkPrivacy.columnName
+                      )?.sampleValues?.[0]
+                    }
+                  />
+                </div>
+              )
+            })()}
+          </div>
         </div>
       </div>
     </div>
