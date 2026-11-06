@@ -9,6 +9,7 @@ import {
   ontologyRelations,
 } from "@/server/db/schema"
 import { getCurrentGroupKeyOrThrow } from "@/server/group-access"
+import { normalizeOntologyDataTypeOrDefault } from "@/features/ontology/utils/data-types"
 import type { DatasetMappingSpec } from "@/features/tabular/types"
 
 export interface CommitDatasetMappingInput {
@@ -133,7 +134,7 @@ export async function commitDatasetMappingAction(
           await tx.insert(ontologyAttributes).values({
             class_id: parentClassId,
             name: attr.name,
-            data_type: attr.dataType || "xsd:string",
+            data_type: normalizeOntologyDataTypeOrDefault(attr.dataType),
           })
           createdAttributesCount++
         }

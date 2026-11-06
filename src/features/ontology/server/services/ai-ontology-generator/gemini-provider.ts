@@ -40,7 +40,7 @@ export const GEMINI_RESPONSE_SCHEMA = {
                     "xsd:integer",
                     "xsd:decimal",
                     "xsd:boolean",
-                    "xsd:date",
+                    "xsd:dateTime",
                   ],
                 },
                 description: { type: "STRING" },

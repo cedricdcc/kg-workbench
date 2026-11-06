@@ -145,7 +145,7 @@ export function initializeWizardState(
         : c.inferredKgType === "boolean"
           ? "xsd:boolean"
           : c.inferredKgType === "date"
-            ? "xsd:date"
+            ? "xsd:dateTime"
             : "xsd:string",
     isPrimaryKey: c.name === candidateKey,
   }))

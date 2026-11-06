@@ -1,13 +1,11 @@
 import { z } from "zod"
 import { sanitizeAiJsonResponse } from "@/features/ontology/schemas/ai-generation"
+import { normalizeOntologyDataTypeOrDefault } from "@/features/ontology/utils/data-types"
 import type {
   DatasetMappingSpec,
   TabularProfileResult,
 } from "@/features/tabular/types"
-import {
-  maskDatasetSamples,
-  type ColumnPrivacyConfig,
-} from "./pii-masker"
+import { maskDatasetSamples, type ColumnPrivacyConfig } from "./pii-masker"
 
 export interface BuildAiMappingPromptInput {
   sourceName: string
@@ -42,7 +40,11 @@ export const DatasetColumnMappingSchema = z.object({
   inferredType: z.enum(["string", "number", "boolean", "date"]),
   targetKind: z.enum(["attribute", "relation", "ignore"]),
   targetAttributeName: z.string().trim().optional(),
-  targetDataType: z.string().trim().optional(),
+  targetDataType: z
+    .string()
+    .trim()
+    .optional()
+    .transform((val) => (val ? normalizeOntologyDataTypeOrDefault(val) : val)),
   targetRelationName: z.string().trim().optional(),
   targetClassId: z.string().trim().optional(),
   isPrimaryKey: z.boolean().optional(),
@@ -71,7 +73,11 @@ export const DatasetMappingSpecSchema = z.object({
           z.object({
             className: z.string().trim().min(1),
             name: z.string().trim().min(1),
-            dataType: z.string().trim().default("xsd:string"),
+            dataType: z
+              .string()
+              .trim()
+              .default("xsd:string")
+              .transform((val) => normalizeOntologyDataTypeOrDefault(val)),
           })
         )
         .optional()
@@ -125,7 +131,7 @@ Rules:
 3. If no existing class fits, synthesize a new, clean PascalCase class name and list it under synthesizedElements.classes.
 4. For each column:
    - Identify candidate primary keys (single or composite uniqueness) to act as primaryKeyColumn for entity IRI generation.
-   - If the column maps to an existing attribute or a scalar property, set targetKind = "attribute", targetAttributeName (camelCase), and targetDataType (e.g. xsd:string, xsd:integer, xsd:decimal, xsd:boolean, xsd:date). If the attribute does not exist yet on the class, list it under synthesizedElements.attributes.
+   - If the column maps to an existing attribute or a scalar property, set targetKind = "attribute", targetAttributeName (camelCase), and targetDataType (e.g. xsd:string, xsd:integer, xsd:decimal, xsd:boolean, xsd:dateTime). If the attribute does not exist yet on the class, list it under synthesizedElements.attributes.
    - If the column references another entity or foreign key, set targetKind = "relation", targetRelationName (camelCase), and targetClassId or range class name. If the relation does not exist, list it under synthesizedElements.relations.
    - If the column is noise/temporary, set targetKind = "ignore".
 5. Align naming conventions with any provided historical dataset archive examples.
@@ -141,7 +147,7 @@ Response format:
       "inferredType": "string|number|boolean|date",
       "targetKind": "attribute|relation|ignore",
       "targetAttributeName": "string (optional)",
-      "targetDataType": "xsd:string|xsd:integer|xsd:decimal|xsd:boolean|xsd:date (optional)",
+      "targetDataType": "xsd:string|xsd:integer|xsd:decimal|xsd:boolean|xsd:dateTime (optional)",
       "targetRelationName": "string (optional)",
       "isPrimaryKey": true|false
     }

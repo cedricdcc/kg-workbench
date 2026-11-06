@@ -1,6 +1,9 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
-import { buildAiMappingPrompt } from "../src/features/tabular/server/services/ai-mapping-prompt"
+import {
+  buildAiMappingPrompt,
+  DatasetMappingSpecSchema,
+} from "../src/features/tabular/server/services/ai-mapping-prompt"
 import { synthesizeOntologyMappingsAction } from "../src/features/tabular/server/actions/synthesize-mappings"
 import type { ColumnPrivacyConfig } from "../src/features/tabular/server/services/pii-masker"
 
@@ -9,7 +12,8 @@ interface MockChain {
   orderBy: () => MockChain
   limit: () => Promise<unknown[]>
   then: <TResult1 = unknown[], TResult2 = never>(
-    onfulfilled?: ((value: unknown[]) => TResult1 | PromiseLike<TResult1>) | null,
+    onfulfilled?:
+      ((value: unknown[]) => TResult1 | PromiseLike<TResult1>) | null,
     onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null
   ) => Promise<TResult1 | TResult2>
   catch: <TResult = never>(
@@ -145,7 +149,10 @@ test("buildAiMappingPrompt masks sensitive sampleRows and sampleValues when priv
   assert.equal(prompt.userPrompt.includes("bob.jones@example.com"), false)
   assert.equal(prompt.userPrompt.includes("123-45-6789"), false)
   assert.equal(prompt.userPrompt.includes("4532-0150-1234-5678"), false)
-  assert.equal(prompt.userPrompt.includes("Confidential medical review notes"), false)
+  assert.equal(
+    prompt.userPrompt.includes("Confidential medical review notes"),
+    false
+  )
 
   // Token placeholders present
   assert.ok(prompt.userPrompt.includes("<EMAIL_1>"))
@@ -176,7 +183,10 @@ test("synthesizeOntologyMappingsAction auto-detects PII, masks prompt, sanitizes
   let capturedPrompt = ""
 
   // @ts-expect-error test mock
-  globalThis.fetch = async (_url: string | URL | Request, init?: RequestInit) => {
+  globalThis.fetch = async (
+    _url: string | URL | Request,
+    init?: RequestInit
+  ) => {
     if (init && typeof init.body === "string") {
       const parsedBody = JSON.parse(init.body)
       capturedPrompt = parsedBody.contents?.[0]?.parts?.[0]?.text || ""
@@ -206,7 +216,8 @@ test("synthesizeOntologyMappingsAction auto-detects PII, masks prompt, sanitizes
         classes: [
           {
             name: "CustomerAccount",
-            description: "Account representing <EMAIL_1> with [REDACTED] credentials.",
+            description:
+              "Account representing <EMAIL_1> with [REDACTED] credentials.",
           },
         ],
         attributes: [
@@ -300,7 +311,8 @@ test("synthesizeOntologyMappingsAction auto-detects PII, masks prompt, sanitizes
     assert.ok(capturedPrompt.includes("ACC-99"))
 
     // Output synthesized elements must be sanitized (token artifacts and [REDACTED] stripped)
-    const classDesc = res.mappingSpec.synthesizedElements?.classes?.[0]?.description
+    const classDesc =
+      res.mappingSpec.synthesizedElements?.classes?.[0]?.description
     assert.equal(classDesc?.includes("<EMAIL_1>"), false)
     assert.equal(classDesc?.includes("[REDACTED]"), false)
     assert.equal(classDesc, "Account representing with credentials.")
@@ -333,7 +345,10 @@ test("synthesizeOntologyMappingsAction respects user privacyConfigs overrides", 
   let capturedPrompt = ""
 
   // @ts-expect-error test mock
-  globalThis.fetch = async (_url: string | URL | Request, init?: RequestInit) => {
+  globalThis.fetch = async (
+    _url: string | URL | Request,
+    init?: RequestInit
+  ) => {
     if (init && typeof init.body === "string") {
       const parsedBody = JSON.parse(init.body)
       capturedPrompt = parsedBody.contents?.[0]?.parts?.[0]?.text || ""
@@ -362,7 +377,9 @@ test("synthesizeOntologyMappingsAction respects user privacyConfigs overrides", 
       ok: true,
       status: 200,
       json: async () => ({
-        candidates: [{ content: { parts: [{ text: JSON.stringify(mockAiResponse) }] } }],
+        candidates: [
+          { content: { parts: [{ text: JSON.stringify(mockAiResponse) }] } },
+        ],
       }),
     }
   }
@@ -431,4 +448,54 @@ test("synthesizeOntologyMappingsAction respects user privacyConfigs overrides", 
       delete process.env.GEMINI_API_KEY
     }
   }
+})
+
+test("DatasetMappingSpecSchema normalizes xsd:date and date aliases to xsd:dateTime", () => {
+  const parsed = DatasetMappingSpecSchema.parse({
+    targetClassName: "Project",
+    primaryKeyColumn: "id",
+    columnMappings: [
+      {
+        columnName: "startDate",
+        inferredType: "date",
+        targetKind: "attribute",
+        targetAttributeName: "startDate",
+        targetDataType: "xsd:date",
+      },
+      {
+        columnName: "rawDate",
+        inferredType: "date",
+        targetKind: "attribute",
+        targetAttributeName: "rawDate",
+        targetDataType: "date",
+      },
+    ],
+    synthesizedElements: {
+      classes: [],
+      attributes: [
+        {
+          className: "Project",
+          name: "startDate",
+          dataType: "xsd:date",
+        },
+        {
+          className: "Project",
+          name: "rawDate",
+          dataType: "date",
+        },
+      ],
+      relations: [],
+    },
+  })
+
+  assert.equal(parsed.columnMappings[0].targetDataType, "xsd:dateTime")
+  assert.equal(parsed.columnMappings[1].targetDataType, "xsd:dateTime")
+  assert.equal(
+    parsed.synthesizedElements.attributes[0].dataType,
+    "xsd:dateTime"
+  )
+  assert.equal(
+    parsed.synthesizedElements.attributes[1].dataType,
+    "xsd:dateTime"
+  )
 })

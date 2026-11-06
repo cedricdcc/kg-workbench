@@ -248,7 +248,7 @@ export function StepAttributeMapping({
                         <option value="xsd:integer">xsd:integer</option>
                         <option value="xsd:decimal">xsd:decimal</option>
                         <option value="xsd:boolean">xsd:boolean</option>
-                        <option value="xsd:date">xsd:date</option>
+                        <option value="xsd:dateTime">xsd:dateTime</option>
                       </select>
                     )}
 
