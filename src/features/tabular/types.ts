@@ -77,7 +77,7 @@ export interface ArchivedDatasetSource {
   ontologyId: string
   groupKey: string
   sourceName: string
-  fileFormat: "csv" | "parquet" | "excel"
+  fileFormat: "csv" | "parquet" | "excel" | "postgres" | "mysql" | string
   rowCount: number
   columnCount: number
   profileSummary: {
@@ -88,6 +88,8 @@ export interface ArchivedDatasetSource {
   }
   sampleRows: Record<string, unknown>[]
   mappingSpec: DatasetMappingSpec | null
+  connectionConfig?: Record<string, unknown> | null
+  lastSyncedAt?: string | null
   createdAt: string
   updatedAt: string
 }

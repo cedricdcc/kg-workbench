@@ -1,0 +1,1 @@
+export { fastPathAwaitJob } from "./queue"

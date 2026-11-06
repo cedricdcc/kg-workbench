@@ -11,6 +11,9 @@ const EVENT_WORKER_ROUTING: Record<string, string> = {
   "ontology.change_proposed": "reasoner",
   "ontology.validation_requested": "reasoner",
   "source.sync_requested": "tabular",
+  "tabular.profile_requested": "tabular",
+  "tabular.db_discover_requested": "tabular",
+  "tabular.db_profile_requested": "tabular",
   "analyst.query_requested": "analyst",
 }
 

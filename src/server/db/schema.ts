@@ -543,6 +543,8 @@ export const datasetSources = pgTable(
     profile_summary: jsonb("profile_summary").notNull(),
     sample_rows: jsonb("sample_rows").notNull(),
     mapping_spec: jsonb("mapping_spec"),
+    connection_config: jsonb("connection_config"),
+    last_synced_at: timestamp("last_synced_at", { withTimezone: true }),
     created_at: created_at(),
     updated_at: timestamp("updated_at", {
       withTimezone: true,

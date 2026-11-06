@@ -16,6 +16,8 @@ test("datasetSources table schema exposes expected columns and indexes", async (
   assert.ok(datasetSources.profile_summary)
   assert.ok(datasetSources.sample_rows)
   assert.ok(datasetSources.mapping_spec)
+  assert.ok(datasetSources.connection_config)
+  assert.ok(datasetSources.last_synced_at)
   assert.ok(datasetSources.created_at)
   assert.ok(datasetSources.updated_at)
 })

@@ -39,6 +39,12 @@ export async function getDatasetSourcesQuery(
       r.profile_summary as ArchivedDatasetSource["profileSummary"],
     sampleRows: r.sample_rows as Record<string, unknown>[],
     mappingSpec: r.mapping_spec as ArchivedDatasetSource["mappingSpec"],
+    connectionConfig: (r.connection_config as Record<string, unknown> | null) ?? null,
+    lastSyncedAt: r.last_synced_at
+      ? typeof r.last_synced_at === "string"
+        ? r.last_synced_at
+        : (r.last_synced_at as Date).toISOString()
+      : null,
     createdAt: r.created_at || new Date().toISOString(),
     updatedAt: r.updated_at || new Date().toISOString(),
   }))

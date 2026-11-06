@@ -14,6 +14,7 @@ export interface ArchiveDatasetSourceInput {
   profileSummary: Record<string, unknown>
   sampleRows: Record<string, unknown>[]
   mappingSpec?: DatasetMappingSpec | null
+  connectionConfig?: Record<string, unknown> | null
 }
 
 export async function archiveDatasetSourceAction(
@@ -41,6 +42,8 @@ export async function archiveDatasetSourceAction(
       profile_summary: input.profileSummary,
       sample_rows: input.sampleRows || [],
       mapping_spec: input.mappingSpec || null,
+      connection_config: input.connectionConfig || null,
+      last_synced_at: input.connectionConfig ? new Date() : null,
     })
     .returning()
 
