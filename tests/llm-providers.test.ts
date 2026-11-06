@@ -157,7 +157,7 @@ test("callGeminiApi throws error with status on HTTP error", async () => {
   )
 })
 
-test("callGeminiApi throws error on network failure", async () => {
+test("callGeminiApi throws error on network failure without leaking api key", async () => {
   globalThis.fetch = (async () => {
     throw new Error("Connection refused")
   }) as typeof fetch
@@ -167,9 +167,36 @@ test("callGeminiApi throws error on network failure", async () => {
       callGeminiApi({
         model: "gemini-3.8-flash",
         prompt: { userPrompt: "test" },
-        apiKey: "key",
+        apiKey: "super-secret-api-key-12345",
       }),
-    /Failed to reach Gemini API.*Connection refused/i
+    (err: unknown) => {
+      const error = err as Error
+      assert.match(
+        error.message,
+        /Failed to reach Gemini API for model gemini-3.8-flash: Connection refused/i
+      )
+      assert.ok(!error.message.includes("super-secret-api-key-12345"))
+      return true
+    }
+  )
+})
+
+test("callGeminiApi throws error on non-json 200 response", async () => {
+  globalThis.fetch = (async () => {
+    return new Response("<html>Bad Gateway</html>", {
+      status: 200,
+      headers: { "Content-Type": "text/html" },
+    })
+  }) as typeof fetch
+
+  await assert.rejects(
+    () =>
+      callGeminiApi({
+        model: "gemini-3.8-flash",
+        prompt: { userPrompt: "test" },
+        apiKey: "test-key",
+      }),
+    /Failed to parse Gemini API response as JSON/i
   )
 })
 

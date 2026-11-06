@@ -60,7 +60,9 @@ export async function callGeminiApi(
     })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err)
-    throw new Error(`Failed to reach Gemini API at ${url}: ${message}`)
+    throw new Error(
+      `Failed to reach Gemini API for model ${options.model}: ${message}`
+    )
   }
 
   if (!response.ok) {
@@ -83,7 +85,7 @@ export async function callGeminiApi(
   }
 
   const durationMs = Math.round(performance.now() - startTime)
-  const data = (await response.json()) as {
+  let data: {
     candidates?: Array<{
       content?: {
         parts?: Array<{
@@ -91,6 +93,13 @@ export async function callGeminiApi(
         }>
       }
     }>
+  }
+  try {
+    data = (await response.json()) as typeof data
+  } catch {
+    throw new Error(
+      `Failed to parse Gemini API response as JSON for model ${options.model}`
+    )
   }
 
   const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? ""

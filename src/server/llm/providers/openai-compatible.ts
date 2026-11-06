@@ -97,12 +97,19 @@ export async function callOpenAiCompatibleApi(
   }
 
   const durationMs = Math.round(performance.now() - startTime)
-  const data = (await response.json()) as {
+  let data: {
     choices?: Array<{
       message?: {
         content?: string
       }
     }>
+  }
+  try {
+    data = (await response.json()) as typeof data
+  } catch {
+    throw new Error(
+      `Failed to parse OpenAI-compatible response as JSON from ${url}`
+    )
   }
 
   const text = data.choices?.[0]?.message?.content ?? ""
