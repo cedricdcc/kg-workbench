@@ -1,5 +1,5 @@
 import type { ZodType } from "zod"
-import { getEffectiveApiKey } from "../api-keys"
+import { getEffectiveApiKey, getEffectiveEndpoint } from "../api-keys"
 import { getCandidateModels } from "./catalog"
 import { callGeminiApi } from "./providers/gemini-provider"
 import {
@@ -70,8 +70,12 @@ export class LlmClient {
     }
 
     // provider === "vllm" || provider === "openai"
+    const resolvedEndpoint = await getEffectiveEndpoint(provider).catch(
+      () => null
+    )
     const baseUrl = (
       options?.baseUrl ||
+      resolvedEndpoint ||
       process.env.VLLM_BASE_URL ||
       "http://localhost:8000/v1"
     ).replace(/\/+$/, "")
