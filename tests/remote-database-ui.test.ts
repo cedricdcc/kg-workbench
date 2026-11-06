@@ -206,7 +206,7 @@ if (isChildTest || !isReactServer) {
 }
 
 // Server environment tests (runs under react-server runner)
-if (!isChildTest) {
+if (isReactServer) {
   test("archiveDatasetSourceAction defense-in-depth encrypts plaintext password and strips raw password", async () => {
     const { archiveDatasetSourceAction } = await import(
       "../src/features/tabular/server/actions/archive-dataset-source"
@@ -338,6 +338,10 @@ test("Remote database UI contract and file integrity", () => {
     shellContent.includes("setProfiledDatasetResult(null)") &&
       shellContent.includes("setProfilerModalOpen(true)"),
     "OntologyShell onOpenUpload must open TabularProfilerModal with reset profile result"
+  )
+  assert.ok(
+    shellContent.includes("onFileUpload={handleSidebarFileUpload}"),
+    "OntologyShell must pass onFileUpload={handleSidebarFileUpload} to TabularProfilerModal"
   )
 
   const readmePath = path.resolve(process.cwd(), "src/features/tabular/README.md")

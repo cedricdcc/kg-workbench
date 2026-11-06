@@ -192,7 +192,7 @@ export function OntologyShell({
   const [profilerModalOpen, setProfilerModalOpen] = useState(false)
   const [profiledDatasetResult, setProfiledDatasetResult] =
     useState<TabularProfileResult | null>(null)
-  const sidebarFileInputRef = useRef<HTMLInputElement>(null)
+  const [isProfilingDataset, setIsProfilingDataset] = useState(false)
 
   const { data: archivedDatasets = [] } = useQuery({
     queryKey: ["dataset-sources", currentDocument.id],
@@ -296,12 +296,15 @@ export function OntologyShell({
   }
 
   async function handleSidebarFileUpload(
-    e: React.ChangeEvent<HTMLInputElement>
+    eOrFile: React.ChangeEvent<HTMLInputElement> | File
   ) {
-    const file = e.target.files?.[0]
+    const file = eOrFile instanceof File ? eOrFile : eOrFile.target.files?.[0]
     if (!file) return
-    e.target.value = ""
+    if (!(eOrFile instanceof File)) {
+      eOrFile.target.value = ""
+    }
 
+    setIsProfilingDataset(true)
     const loadingToast = toast.loading(`Profiling ${file.name}...`)
     try {
       const formData = new FormData()
@@ -320,6 +323,8 @@ export function OntologyShell({
     } catch {
       toast.dismiss(loadingToast)
       toast.error("Failed to profile file")
+    } finally {
+      setIsProfilingDataset(false)
     }
   }
 
@@ -943,15 +948,6 @@ export function OntologyShell({
         onSelectClassForRefactor={handleSelectClass}
       />
 
-      {/* Hidden file input for sidebar dataset uploads */}
-      <input
-        ref={sidebarFileInputRef}
-        type="file"
-        accept=".csv,.tsv,.parquet,.pq,.xlsx,.xls"
-        className="hidden"
-        onChange={handleSidebarFileUpload}
-      />
-
       <ReasonerReportModal
         open={reasonerReportModalOpen}
         onOpenChange={setReasonerReportModalOpen}
@@ -968,6 +964,8 @@ export function OntologyShell({
         onOpenChange={setProfilerModalOpen}
         result={profiledDatasetResult}
         ontologyId={currentDocument.id}
+        isLoading={isProfilingDataset}
+        onFileUpload={handleSidebarFileUpload}
         onSaveToArchive={handleSaveProfileToArchive}
         onMapToKg={(res, connConfig, format) => {
           setSelectedDatasetForMapping({

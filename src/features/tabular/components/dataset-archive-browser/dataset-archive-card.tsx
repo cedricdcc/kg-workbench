@@ -29,10 +29,11 @@ export function DatasetArchiveCard({
   const formatBadge = formatDatasetFormatBadge(dataset.fileFormat)
   const isMapped = Boolean(dataset.mappingSpec?.targetClassName)
 
+  const normalizedFormat = dataset.fileFormat?.toLowerCase()
   const isSqlSource =
-    dataset.fileFormat === "postgres" ||
-    dataset.fileFormat === "mysql" ||
-    dataset.fileFormat === "postgresql"
+    normalizedFormat === "postgres" ||
+    normalizedFormat === "mysql" ||
+    normalizedFormat === "postgresql"
 
   const hasConnectionConfig = Boolean(
     dataset.connectionConfig ||
