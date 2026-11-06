@@ -4,6 +4,10 @@ import type {
   DatasetMappingSpec,
   TabularProfileResult,
 } from "@/features/tabular/types"
+import {
+  maskDatasetSamples,
+  type ColumnPrivacyConfig,
+} from "./pii-masker"
 
 export interface BuildAiMappingPromptInput {
   sourceName: string
@@ -30,6 +34,7 @@ export interface BuildAiMappingPromptInput {
     sourceName: string
     mappedClassName: string
   }>
+  privacyConfigs?: ColumnPrivacyConfig[]
 }
 
 export const DatasetColumnMappingSchema = z.object({
@@ -90,6 +95,27 @@ export function buildAiMappingPrompt(input: BuildAiMappingPromptInput): {
   systemPrompt: string
   userPrompt: string
 } {
+  let effectiveSampleRows = input.sampleRows
+  let effectiveColumns = input.profile.columns
+
+  if (input.privacyConfigs && input.privacyConfigs.length > 0) {
+    const sampleValuesByCol: Record<string, unknown[]> = {}
+    for (const col of input.profile.columns) {
+      sampleValuesByCol[col.name] = col.sampleValues ?? []
+    }
+    const maskingResult = maskDatasetSamples(
+      input.sampleRows,
+      input.privacyConfigs,
+      sampleValuesByCol
+    )
+    effectiveSampleRows = maskingResult.sanitizedSampleRows
+    effectiveColumns = input.profile.columns.map((c) => ({
+      ...c,
+      sampleValues: (maskingResult.sanitizedSampleValues[c.name] ??
+        c.sampleValues) as Array<string | number | boolean>,
+    }))
+  }
+
   const systemPrompt = `You are an expert Knowledge Graph and Semantic Modeling architect.
 Your role is to map tabular dataset columns to ontology classes, attributes (datatype properties), and relations (object properties).
 
@@ -134,7 +160,7 @@ Candidate Unique Keys: ${JSON.stringify(input.profile.candidateKeys)}
 
 Columns Profile:
 ${JSON.stringify(
-  input.profile.columns.map((c) => ({
+  effectiveColumns.map((c) => ({
     name: c.name,
     type: c.duckdbType,
     inferredKgType: c.inferredKgType,
@@ -147,8 +173,8 @@ ${JSON.stringify(
   2
 )}
 
-Sample Rows (First ${Math.min(5, input.sampleRows.length)}):
-${JSON.stringify(input.sampleRows.slice(0, 5), null, 2)}
+Sample Rows (First ${Math.min(5, effectiveSampleRows.length)}):
+${JSON.stringify(effectiveSampleRows.slice(0, 5), null, 2)}
 
 Active Ontology Classes:
 ${JSON.stringify(

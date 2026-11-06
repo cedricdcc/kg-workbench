@@ -14,6 +14,12 @@ import {
   buildAiMappingPrompt,
   parseAiMappingResponse,
 } from "@/features/tabular/server/services/ai-mapping-prompt"
+import {
+  autoDetectPii,
+  maskDatasetSamples,
+  sanitizeSynthesizedElements,
+  type ColumnPrivacyConfig,
+} from "@/features/tabular/server/services/pii-masker"
 import type {
   DatasetMappingSpec,
   TabularColumnProfile,
@@ -29,12 +35,16 @@ export interface SynthesizeMappingsInput {
     columns: TabularColumnProfile[]
   }
   sampleRows: Record<string, unknown>[]
+  privacyConfigs?: ColumnPrivacyConfig[]
 }
 
 export type SynthesizeMappingsResponse =
   | {
       success: true
       mappingSpec: DatasetMappingSpec
+      privacySummary: {
+        maskedColumnCount: number
+      }
     }
   | {
       success: false
@@ -123,17 +133,42 @@ export async function synthesizeOntologyMappingsAction(
     }
   })
 
-  // 4. Build prompt
+  // 4. Resolve privacy configs and mask dataset sample rows / column sample values
+  const privacyConfigs =
+    input.privacyConfigs ??
+    autoDetectPii(input.profile.columns, input.sampleRows)
+
+  const sampleValuesByColumn: Record<string, unknown[]> = {}
+  for (const col of input.profile.columns) {
+    sampleValuesByColumn[col.name] = col.sampleValues ?? []
+  }
+
+  const maskingResult = maskDatasetSamples(
+    input.sampleRows,
+    privacyConfigs,
+    sampleValuesByColumn
+  )
+
+  const sanitizedColumns = input.profile.columns.map((c) => ({
+    ...c,
+    sampleValues: (maskingResult.sanitizedSampleValues[c.name] ??
+      c.sampleValues) as Array<string | number | boolean>,
+  }))
+
+  // 5. Build prompt
   const prompt = buildAiMappingPrompt({
     sourceName: input.sourceName,
-    profile: input.profile,
-    sampleRows: input.sampleRows,
+    profile: {
+      ...input.profile,
+      columns: sanitizedColumns,
+    },
+    sampleRows: maskingResult.sanitizedSampleRows,
     existingClasses,
     existingRelations,
     historicalArchiveSummary,
   })
 
-  // 5. Call Gemini
+  // 6. Call Gemini
   try {
     const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`
     const response = await fetch(endpoint, {
@@ -171,8 +206,15 @@ export async function synthesizeOntologyMappingsAction(
       }
     }
 
-    const mappingSpec = parseAiMappingResponse(candidateText)
-    return { success: true, mappingSpec }
+    const rawMappingSpec = parseAiMappingResponse(candidateText)
+    const mappingSpec = sanitizeSynthesizedElements(rawMappingSpec)
+    return {
+      success: true,
+      mappingSpec,
+      privacySummary: {
+        maskedColumnCount: maskingResult.maskedColumnCount,
+      },
+    }
   } catch (err) {
     return {
       success: false,
