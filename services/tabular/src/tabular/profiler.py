@@ -249,8 +249,9 @@ def _build_db_connection(
             f"port={_escape_libpq(port)}",
             f"dbname={_escape_libpq(database)}",
             f"user={_escape_libpq(user)}",
-            f"password={_escape_libpq(password)}",
         ]
+        if password:
+            parts.append(f"password={_escape_libpq(password)}")
         if ssl_mode:
             parts.append(f"sslmode={_escape_libpq(ssl_mode)}")
         conn_str = " ".join(parts)
@@ -262,9 +263,10 @@ def _build_db_connection(
             f"host={_escape_mysql_val(host)}",
             f"port={port}",
             f"user={_escape_mysql_val(user)}",
-            f"password={_escape_mysql_val(password)}",
-            f"database={_escape_mysql_val(database)}",
         ]
+        if password:
+            parts.append(f"password={_escape_mysql_val(password)}")
+        parts.append(f"database={_escape_mysql_val(database)}")
         conn_str = " ".join(parts)
         return db_norm, extension_name, attach_type, conn_str
     else:

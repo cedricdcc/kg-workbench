@@ -58,7 +58,8 @@ export function RemoteDatabaseTab({
   )
   const [host, setHost] = useState(initialConnection?.host ?? "localhost")
   const [port, setPort] = useState(
-    initialConnection?.port?.toString() ?? (initialConnection?.dbType === "mysql" ? "3306" : "5432")
+    initialConnection?.port?.toString() ??
+      (initialConnection?.dbType === "mysql" ? "3306" : "5432")
   )
   const [database, setDatabase] = useState(initialConnection?.database ?? "")
   const [user, setUser] = useState(initialConnection?.user ?? "")
@@ -105,9 +106,8 @@ export function RemoteDatabaseTab({
 
     setIsDiscovering(true)
     try {
-      const { discoverRemoteTablesAction } = await import(
-        "../../server/actions/remote-database"
-      )
+      const { discoverRemoteTablesAction } =
+        await import("../../server/actions/remote-database")
       const res = await discoverRemoteTablesAction({
         dbType,
         host: host.trim(),
@@ -160,9 +160,8 @@ export function RemoteDatabaseTab({
     const parsedPort = parseInt(port, 10) || (dbType === "mysql" ? 3306 : 5432)
 
     try {
-      const { profileRemoteTableAction } = await import(
-        "../../server/actions/remote-database"
-      )
+      const { profileRemoteTableAction } =
+        await import("../../server/actions/remote-database")
       const res = await profileRemoteTableAction({
         dbType,
         host: host.trim(),
@@ -199,7 +198,9 @@ export function RemoteDatabaseTab({
         <div className="flex items-center gap-2">
           <Database className="h-4 w-4 text-primary" />
           <span className="text-sm font-semibold">
-            {step === 1 ? "Step 1: Database Connection" : "Step 2: Table Selection"}
+            {step === 1
+              ? "Step 1: Database Connection"
+              : "Step 2: Table Selection"}
           </span>
         </div>
         <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -280,7 +281,7 @@ export function RemoteDatabaseTab({
                 placeholder="e.g. localhost or db.example.com"
                 value={host}
                 onChange={(e) => setHost(e.target.value)}
-                className="h-8 text-xs font-mono"
+                className="h-8 font-mono text-xs"
                 required
               />
             </div>
@@ -294,7 +295,7 @@ export function RemoteDatabaseTab({
                 placeholder={dbType === "mysql" ? "3306" : "5432"}
                 value={port}
                 onChange={(e) => setPort(e.target.value)}
-                className="h-8 text-xs font-mono"
+                className="h-8 font-mono text-xs"
                 required
               />
             </div>
@@ -310,7 +311,7 @@ export function RemoteDatabaseTab({
               placeholder="e.g. production_db"
               value={database}
               onChange={(e) => setDatabase(e.target.value)}
-              className="h-8 text-xs font-mono"
+              className="h-8 font-mono text-xs"
               required
             />
           </div>
@@ -326,7 +327,7 @@ export function RemoteDatabaseTab({
                 placeholder="e.g. postgres or root"
                 value={user}
                 onChange={(e) => setUser(e.target.value)}
-                className="h-8 text-xs font-mono"
+                className="h-8 font-mono text-xs"
                 required
               />
             </div>
@@ -337,10 +338,10 @@ export function RemoteDatabaseTab({
               <Input
                 id="db-password"
                 type="password"
-                placeholder="••••••••"
+                placeholder="Enter password..."
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="h-8 text-xs font-mono"
+                className="h-8 font-mono text-xs"
               />
             </div>
           </div>
@@ -433,7 +434,7 @@ export function RemoteDatabaseTab({
                           isSelected ? "bg-primary/10 font-medium" : ""
                         }`}
                       >
-                        <div className="flex items-center gap-2 min-w-0">
+                        <div className="flex min-w-0 items-center gap-2">
                           {isSelected ? (
                             <CheckCircle2 className="h-4 w-4 shrink-0 text-primary" />
                           ) : (
@@ -447,7 +448,7 @@ export function RemoteDatabaseTab({
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-2 shrink-0">
+                        <div className="flex shrink-0 items-center gap-2">
                           <Badge
                             variant="secondary"
                             className="font-mono text-[9px] uppercase"
