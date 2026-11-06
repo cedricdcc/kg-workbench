@@ -25,6 +25,10 @@ services:
       APP_PASSWORD: ${APP_PASSWORD:-}
       APP_ACCESS_GROUPS: ${APP_ACCESS_GROUPS:-}
       NEXT_PUBLIC_USE_MOCKS: ${NEXT_PUBLIC_USE_MOCKS:-true}
+      VLLM_BASE_URL: ${VLLM_BASE_URL:-}
+      VLLM_API_KEY: ${VLLM_API_KEY:-}
+    extra_hosts:
+      - host.docker.internal:host-gateway
     ports:
       - 127.0.0.1:${APP_PORT:-3010}:3000
     networks:
