@@ -30,7 +30,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import type { TabularProfileResult } from "../../types"
-import type { RemoteDbConnectionInput } from "../../server/actions/remote-database"
+import type { RemoteDbConnectionConfig } from "../../server/actions/remote-database"
 import { formatFileSize } from "./formatters"
 import { TabularSchemaTab } from "./schema-tab"
 import { TabularPreviewTab } from "./preview-tab"
@@ -81,19 +81,30 @@ export function TabularProfilerModal({
   const [connectionConfig, setConnectionConfig] = useState<Record<string, unknown> | null>(null)
   const [internalFileFormat, setInternalFileFormat] = useState<string>("csv")
   const [isSaving, setIsSaving] = useState(false)
+  const [isDismissed, setIsDismissed] = useState(false)
+  const [prevResult, setPrevResult] = useState(result)
+
+  // Re-enable showing external result if a new/different result prop is passed
+  if (result !== prevResult) {
+    setPrevResult(result)
+    setIsDismissed(false)
+  }
 
   const fileInputRef = useRef<HTMLInputElement>(null)
   const queryClient = useQueryClient()
 
-  // Derived state: external result takes precedence when present
-  const activeResult = result ?? internalResult
-  const fileFormat = result ? (result.fileType || "csv") : internalFileFormat
+  // Derived active result: if user clicked "Choose Another Source", dismiss external result
+  const effectiveResult = isDismissed ? internalResult : (result ?? internalResult)
+  const activeResult = effectiveResult ?? null
+  const fileFormat =
+    !isDismissed && result ? (result.fileType || "csv") : internalFileFormat
 
   const handleOpenChange = (nextOpen: boolean) => {
     if (!nextOpen) {
       setInternalResult(null)
       setConnectionConfig(null)
       setInternalFileFormat("csv")
+      setIsDismissed(false)
     }
     onOpenChange(nextOpen)
   }
@@ -106,9 +117,10 @@ export function TabularProfilerModal({
 
   const handleProfileComplete = (
     res: TabularProfileResult,
-    config?: RemoteDbConnectionInput & { schema: string; table: string }
+    config?: RemoteDbConnectionConfig
   ) => {
     setInternalResult(res)
+    setIsDismissed(false)
     if (config) {
       setConnectionConfig(config as unknown as Record<string, unknown>)
       setInternalFileFormat(config.dbType)
@@ -327,6 +339,7 @@ export function TabularProfilerModal({
                 onClick={() => {
                   setInternalResult(null)
                   setConnectionConfig(null)
+                  setIsDismissed(true)
                 }}
               >
                 <ArrowLeft className="h-3 w-3" />

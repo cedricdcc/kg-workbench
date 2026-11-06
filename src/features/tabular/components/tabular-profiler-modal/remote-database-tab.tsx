@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/select"
 import { toast } from "sonner"
 import type {
+  RemoteDbConnectionConfig,
   RemoteDbConnectionInput,
   TableDiscoveryItem,
 } from "../../server/actions/remote-database"
@@ -35,7 +36,7 @@ export interface RemoteDatabaseTabProps {
   ontologyId: string
   onProfileComplete: (
     result: TabularProfileResult,
-    connectionConfig?: RemoteDbConnectionInput & { schema: string; table: string }
+    connectionConfig?: RemoteDbConnectionConfig
   ) => void
   initialStep?: 1 | 2
   initialTables?: TableDiscoveryItem[]
@@ -177,18 +178,7 @@ export function RemoteDatabaseTab({
 
       if (res.success) {
         toast.success(`Successfully profiled "${selectedTable.name}"`)
-        onProfileComplete(res.profile, {
-          dbType,
-          host: host.trim(),
-          port: parsedPort,
-          database: database.trim(),
-          user: user.trim(),
-          password,
-          sslMode,
-          ontologyId,
-          schema: selectedTable.schema,
-          table: selectedTable.name,
-        })
+        onProfileComplete(res.profile, res.connectionConfig)
       } else {
         setProfilingError(res.error || "Failed to profile remote table.")
         toast.error(res.error || "Remote profiling failed")

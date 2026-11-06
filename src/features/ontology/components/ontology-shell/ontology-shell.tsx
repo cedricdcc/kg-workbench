@@ -829,7 +829,10 @@ export function OntologyShell({
                   <DatasetArchiveBrowser
                     ontologyId={currentDocument.id}
                     datasets={archivedDatasets}
-                    onOpenUpload={() => sidebarFileInputRef.current?.click()}
+                    onOpenUpload={() => {
+                      setProfiledDatasetResult(null)
+                      setProfilerModalOpen(true)
+                    }}
                     onInspectProfile={(dataset) => {
                       setProfiledDatasetResult({
                         fileName: dataset.sourceName,

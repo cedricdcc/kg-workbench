@@ -205,13 +205,98 @@ if (isChildTest || !isReactServer) {
   })
 }
 
-// Contract and code integration tests (runs in all test environments)
+// Server environment tests (runs under react-server runner)
+if (!isChildTest) {
+  test("archiveDatasetSourceAction defense-in-depth encrypts plaintext password and strips raw password", async () => {
+    const { archiveDatasetSourceAction } = await import(
+      "../src/features/tabular/server/actions/archive-dataset-source"
+    )
+    const { decryptSecret } = await import("../src/server/crypto")
+
+    let capturedRecord: Record<string, unknown> | null = null
+    const mockDb = {
+      insert: () => ({
+        values: (data: Record<string, unknown>) => {
+          capturedRecord = data
+          return {
+            returning: () =>
+              Promise.resolve([
+                {
+                  id: "ds-mock-id",
+                  ...data,
+                },
+              ]),
+          }
+        },
+      }),
+    }
+
+    await archiveDatasetSourceAction(
+      {
+        ontologyId: "ont-def-depth",
+        sourceName: "remote_table",
+        fileFormat: "postgres",
+        rowCount: 100,
+        columnCount: 5,
+        profileSummary: { rowCount: 100, columnCount: 5 },
+        sampleRows: [],
+        connectionConfig: {
+          dbType: "postgres",
+          host: "db.local",
+          port: 5432,
+          database: "crm",
+          user: "analyst",
+          password: "super_secret_plain_password",
+        },
+      },
+      mockDb as unknown as Parameters<typeof archiveDatasetSourceAction>[1]
+    )
+
+    assert.ok(capturedRecord, "Record must be inserted into database")
+    const config = (capturedRecord as Record<string, unknown>)
+      .connection_config as Record<string, unknown>
+
+    assert.equal(
+      "password" in config,
+      false,
+      "Raw plaintext password must NOT exist in archived connection_config"
+    )
+    assert.ok(
+      config.encryptedPassword &&
+        typeof config.encryptedPassword === "object" &&
+        "ciphertext" in config.encryptedPassword,
+      "encryptedPassword must be present in archived connection_config"
+    )
+
+    const enc = config.encryptedPassword as {
+      ciphertext: string
+      iv: string
+      tag: string
+    }
+    const decrypted = decryptSecret(enc.ciphertext, enc.iv, enc.tag)
+    assert.equal(
+      decrypted,
+      "super_secret_plain_password",
+      "Encrypted password must decrypt to original secret"
+    )
+  })
+}
+
 test("Remote database UI contract and file integrity", () => {
   const remoteTabPath = path.resolve(
     process.cwd(),
     "src/features/tabular/components/tabular-profiler-modal/remote-database-tab.tsx"
   )
   assert.ok(fs.existsSync(remoteTabPath), "remote-database-tab.tsx must exist")
+  const remoteTabContent = fs.readFileSync(remoteTabPath, "utf-8")
+  assert.ok(
+    remoteTabContent.includes("onProfileComplete(res.profile, res.connectionConfig)"),
+    "RemoteDatabaseTab must pass res.connectionConfig with encrypted credentials"
+  )
+  assert.ok(
+    !remoteTabContent.includes("onProfileComplete(res.profile, {\n          dbType,\n          host"),
+    "RemoteDatabaseTab must NOT pass unencrypted raw connection input"
+  )
 
   const modalPath = path.resolve(
     process.cwd(),
@@ -227,6 +312,10 @@ test("Remote database UI contract and file integrity", () => {
     modalContent.includes("Upload File") && modalContent.includes("Remote Database"),
     "TabularProfilerModal must contain 'Upload File' and 'Remote Database' source tabs"
   )
+  assert.ok(
+    modalContent.includes("isDismissed") && modalContent.includes("setIsDismissed(true)"),
+    "TabularProfilerModal must support dismissing external result via isDismissed state"
+  )
 
   const cardPath = path.resolve(
     process.cwd(),
@@ -237,6 +326,18 @@ test("Remote database UI contract and file integrity", () => {
   assert.ok(
     cardContent.includes("resyncDatabaseSourceAction"),
     "DatasetArchiveCard must invoke resyncDatabaseSourceAction"
+  )
+
+  const shellPath = path.resolve(
+    process.cwd(),
+    "src/features/ontology/components/ontology-shell/ontology-shell.tsx"
+  )
+  assert.ok(fs.existsSync(shellPath), "ontology-shell.tsx must exist")
+  const shellContent = fs.readFileSync(shellPath, "utf-8")
+  assert.ok(
+    shellContent.includes("setProfiledDatasetResult(null)") &&
+      shellContent.includes("setProfilerModalOpen(true)"),
+    "OntologyShell onOpenUpload must open TabularProfilerModal with reset profile result"
   )
 
   const readmePath = path.resolve(process.cwd(), "src/features/tabular/README.md")
@@ -282,3 +383,4 @@ if (isReactServer && !isChildTest) {
     assert.ok(!output.includes("fail 1"), "Child client DOM tests must have 0 failures")
   })
 }
+

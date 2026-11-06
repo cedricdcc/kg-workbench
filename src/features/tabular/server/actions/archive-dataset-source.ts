@@ -3,6 +3,8 @@
 import { getDb } from "@/server/database"
 import { datasetSources } from "@/server/db/schema"
 import { getCurrentGroupKeyOrThrow } from "@/server/group-access"
+import { encryptSecret } from "@/server/crypto"
+import type { DbOrTx } from "@/server/events/types"
 import type { DatasetMappingSpec } from "@/features/tabular/types"
 
 export interface ArchiveDatasetSourceInput {
@@ -18,7 +20,8 @@ export interface ArchiveDatasetSourceInput {
 }
 
 export async function archiveDatasetSourceAction(
-  input: ArchiveDatasetSourceInput
+  input: ArchiveDatasetSourceInput,
+  dbInstance?: DbOrTx
 ): Promise<{ id: string }> {
   if (!input.ontologyId || !input.ontologyId.trim()) {
     throw new Error("ontologyId is required.")
@@ -28,7 +31,19 @@ export async function archiveDatasetSourceAction(
   }
 
   const groupKey = await getCurrentGroupKeyOrThrow().catch(() => "shared")
-  const db = getDb()
+  const db = dbInstance ?? getDb()
+
+  let sanitizedConnectionConfig = input.connectionConfig ?? null
+  if (sanitizedConnectionConfig && typeof sanitizedConnectionConfig === "object") {
+    const config = { ...sanitizedConnectionConfig }
+    if ("password" in config && typeof config.password === "string") {
+      if (config.password.trim()) {
+        config.encryptedPassword = encryptSecret(config.password)
+      }
+      delete config.password
+    }
+    sanitizedConnectionConfig = config
+  }
 
   const [inserted] = await db
     .insert(datasetSources)
@@ -42,8 +57,8 @@ export async function archiveDatasetSourceAction(
       profile_summary: input.profileSummary,
       sample_rows: input.sampleRows || [],
       mapping_spec: input.mappingSpec || null,
-      connection_config: input.connectionConfig || null,
-      last_synced_at: input.connectionConfig ? new Date() : null,
+      connection_config: sanitizedConnectionConfig,
+      last_synced_at: sanitizedConnectionConfig ? new Date() : null,
     })
     .returning()
 
