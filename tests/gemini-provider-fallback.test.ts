@@ -73,13 +73,13 @@ test("requestGeminiDraft falls back to next model on 503 and succeeds", async ()
       {
         apiKey: "fake-test-key",
         model: "gemini-3.8-flash",
-        candidateModels: ["gemini-3.8-flash", "gemini-2.5-pro"],
+        candidateModels: ["gemini-3.8-flash", "gemini-3.1-pro-preview"],
       }
     )
 
     assert.equal(callCount, 2, "should have retried with second model")
     assert.equal(calledModels[0], "gemini-3.8-flash")
-    assert.equal(calledModels[1], "gemini-2.5-pro")
+    assert.equal(calledModels[1], "gemini-3.1-pro-preview")
     assert.equal(result.classes[0]?.name, "Device")
   } finally {
     globalThis.fetch = originalFetch

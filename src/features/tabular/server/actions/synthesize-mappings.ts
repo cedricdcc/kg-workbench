@@ -182,6 +182,7 @@ export async function synthesizeOntologyMappingsAction(
         provider: "gemini",
         apiKey: apiKey || undefined,
         temperature: 0.2,
+        timeoutMs: 90000,
       }
     )
 

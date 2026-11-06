@@ -5,7 +5,7 @@ import {
   getCandidateModels,
 } from "../src/server/llm/catalog"
 
-test("normalizeModelName normalizes legacy Gemini flash models to gemini-3.8-flash", () => {
+test("normalizeModelName normalizes legacy Gemini flash models to gemini-3.8-flash and 2.5-pro to 3.1-pro-preview", () => {
   assert.equal(
     normalizeModelName("gemini", "gemini-2.5-flash"),
     "gemini-3.8-flash"
@@ -17,6 +17,10 @@ test("normalizeModelName normalizes legacy Gemini flash models to gemini-3.8-fla
   assert.equal(
     normalizeModelName("gemini", "gemini-2.0-flash"),
     "gemini-3.8-flash"
+  )
+  assert.equal(
+    normalizeModelName("gemini", "gemini-2.5-pro"),
+    "gemini-3.1-pro-preview"
   )
   assert.equal(
     normalizeModelName("gemini", "models/gemini-1.5-pro"),
@@ -35,10 +39,9 @@ test("normalizeModelName handles vllm and openai providers", () => {
 })
 
 test("getCandidateModels builds prioritized deduplicated queue", () => {
-  const queue = getCandidateModels("gemini", "gemini-2.5-pro")
-  assert.equal(queue[0], "gemini-2.5-pro")
+  const queue = getCandidateModels("gemini", "gemini-3.1-pro-preview")
+  assert.equal(queue[0], "gemini-3.1-pro-preview")
   assert.ok(queue.includes("gemini-3.8-flash"))
-  assert.ok(queue.includes("gemini-1.5-flash"))
   assert.equal(new Set(queue).size, queue.length)
 })
 
@@ -56,9 +59,7 @@ test("getCandidateModels respects custom candidates and normalizes them", () => 
 test("getCandidateModels defaults when no primaryModel is given", () => {
   const queue = getCandidateModels("gemini")
   assert.equal(queue[0], "gemini-3.8-flash")
-  assert.ok(queue.includes("gemini-2.5-pro"))
-  assert.ok(queue.includes("gemini-1.5-flash"))
-  assert.ok(queue.includes("gemini-1.5-pro"))
+  assert.ok(queue.includes("gemini-3.1-pro-preview"))
 })
 
 test("getCandidateModels handles vllm and openai providers", () => {

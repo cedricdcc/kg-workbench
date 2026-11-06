@@ -1,5 +1,6 @@
 import assert from "node:assert/strict"
 import { test, afterEach } from "node:test"
+import { _clearGeminiModelCache } from "../src/server/llm/providers/gemini-provider"
 import { synthesizeOntologyMappingsAction } from "../src/features/tabular/server/actions/synthesize-mappings"
 import type { TabularColumnProfile } from "../src/features/tabular/types"
 
@@ -46,6 +47,7 @@ const originalGeminiKey = process.env.GEMINI_API_KEY
 afterEach(() => {
   globalThis.fetch = originalFetch
   globalThis.kgWorkbenchDrizzle = originalDrizzle
+  _clearGeminiModelCache()
   if (originalGeminiKey !== undefined) {
     process.env.GEMINI_API_KEY = originalGeminiKey
   } else {
@@ -124,8 +126,8 @@ test("synthesizeOntologyMappingsAction succeeds when primary model returns 404 a
       )
     }
 
-    if (urlStr.includes("models/gemini-2.5-pro")) {
-      attemptedModels.push("gemini-2.5-pro")
+    if (urlStr.includes("models/gemini-3.1-pro-preview")) {
+      attemptedModels.push("gemini-3.1-pro-preview")
       return new Response(
         JSON.stringify({
           candidates: [
@@ -160,7 +162,10 @@ test("synthesizeOntologyMappingsAction succeeds when primary model returns 404 a
 
   assert.equal(result.mappingSpec.targetClassName, "UserProfile")
   assert.equal(result.mappingSpec.primaryKeyColumn, "user_id")
-  assert.deepEqual(attemptedModels, ["gemini-3.8-flash", "gemini-2.5-pro"])
+  assert.deepEqual(attemptedModels, [
+    "gemini-3.8-flash",
+    "gemini-3.1-pro-preview",
+  ])
 })
 
 test("synthesizeOntologyMappingsAction returns sanitized and masked results conforming to DatasetMappingSpec", async () => {

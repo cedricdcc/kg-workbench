@@ -6,6 +6,7 @@ import {
   getLlmClient,
   sanitizeJsonText,
 } from "../src/server/llm/client"
+import { _clearGeminiModelCache } from "../src/server/llm/providers/gemini-provider"
 import { _clearModelCache } from "../src/server/llm/providers/openai-compatible"
 
 interface ErrorWithStatus extends Error {
@@ -23,6 +24,7 @@ afterEach(() => {
   process.env.VLLM_BASE_URL = originalVllmBaseUrl
   process.env.VLLM_API_KEY = originalVllmApiKey
   _clearModelCache()
+  _clearGeminiModelCache()
 })
 
 test("sanitizeJsonText strips markdown fences, language identifiers, and whitespace", () => {
@@ -176,8 +178,8 @@ test("candidate queue fallback on HTTP 404, 503, 429", async () => {
       )
     }
 
-    // Second candidate gemini-2.5-pro returns 200 OK
-    if (urlStr.includes("gemini-2.5-pro")) {
+    // Second candidate gemini-3.1-pro-preview returns 200 OK
+    if (urlStr.includes("gemini-3.1-pro-preview")) {
       return new Response(
         JSON.stringify({
           candidates: [
@@ -200,19 +202,23 @@ test("candidate queue fallback on HTTP 404, 503, 429", async () => {
   )
 
   assert.equal(result.text, "Fallback succeeded")
-  assert.equal(result.trace.model, "gemini-2.5-pro")
+  assert.equal(result.trace.model, "gemini-3.1-pro-preview")
   assert.equal(result.trace.attempts.length, 2)
   assert.equal(result.trace.attempts[0].model, "gemini-3.8-flash")
   assert.equal(result.trace.attempts[0].status, 404)
   assert.match(result.trace.attempts[0].error || "", /404/i)
-  assert.equal(result.trace.attempts[1].model, "gemini-2.5-pro")
+  assert.equal(result.trace.attempts[1].model, "gemini-3.1-pro-preview")
   assert.equal(result.trace.attempts[1].status, 200)
 })
 
 test("schema failure fallback advances to next candidate model", async () => {
   let callCount = 0
 
-  globalThis.fetch = (async () => {
+  globalThis.fetch = (async (url: string | URL | Request) => {
+    const urlStr = url.toString()
+    if (urlStr.includes("/v1beta/models?key=")) {
+      return new Response(JSON.stringify({ models: [] }), { status: 200 })
+    }
     callCount++
     if (callCount === 1) {
       // First model returns JSON that fails schema validation
@@ -256,19 +262,23 @@ test("schema failure fallback advances to next candidate model", async () => {
   )
 
   assert.deepEqual(result.data, { title: "Valid title" })
-  assert.equal(result.trace.model, "gemini-2.5-pro")
+  assert.equal(result.trace.model, "gemini-3.1-pro-preview")
   assert.equal(result.trace.attempts.length, 2)
   assert.equal(result.trace.attempts[0].model, "gemini-3.8-flash")
   assert.equal(result.trace.attempts[0].status, "schema_error")
   assert.ok(result.trace.attempts[0].error)
-  assert.equal(result.trace.attempts[1].model, "gemini-2.5-pro")
+  assert.equal(result.trace.attempts[1].model, "gemini-3.1-pro-preview")
   assert.equal(result.trace.attempts[1].status, 200)
 })
 
 test("invalid JSON parse error causes schema_error and fallback to next candidate", async () => {
   let callCount = 0
 
-  globalThis.fetch = (async () => {
+  globalThis.fetch = (async (url: string | URL | Request) => {
+    const urlStr = url.toString()
+    if (urlStr.includes("/v1beta/models?key=")) {
+      return new Response(JSON.stringify({ models: [] }), { status: 200 })
+    }
     callCount++
     if (callCount === 1) {
       // First model returns malformed JSON
@@ -427,6 +437,72 @@ test("auto-discovery for vLLM queries models and uses the first discovered model
     "meta-llama/Llama-3.1-8B-Instruct"
   )
   assert.equal(result.trace.attempts[0].status, 200)
+})
+
+test("auto-discovery for Gemini queries models and uses discovered live models for candidate queue", async () => {
+  const calledUrls: string[] = []
+
+  globalThis.fetch = (async (url: string | URL | Request) => {
+    const urlStr = url.toString()
+    calledUrls.push(urlStr)
+
+    // Models discovery endpoint
+    if (urlStr.includes("/v1beta/models?key=")) {
+      return new Response(
+        JSON.stringify({
+          models: [
+            {
+              name: "models/gemini-3.8-flash",
+              supportedGenerationMethods: ["generateContent"],
+            },
+            {
+              name: "models/gemini-3.1-pro-preview",
+              supportedGenerationMethods: ["generateContent"],
+            },
+          ],
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+      )
+    }
+
+    // First model fails with 503
+    if (urlStr.includes("gemini-3.8-flash:generateContent")) {
+      return new Response(
+        JSON.stringify({
+          error: { code: 503, message: "Overloaded" },
+        }),
+        { status: 503, headers: { "Content-Type": "application/json" } }
+      )
+    }
+
+    // Second model (from discovered models) succeeds
+    if (urlStr.includes("gemini-3.1-pro-preview:generateContent")) {
+      return new Response(
+        JSON.stringify({
+          candidates: [
+            {
+              content: { parts: [{ text: "Discovered model succeeded" }] },
+            },
+          ],
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+      )
+    }
+
+    return new Response("Unexpected", { status: 500 })
+  }) as typeof fetch
+
+  const client = new LlmClient()
+  const result = await client.generateText(
+    { userPrompt: "Test discovery fallback" },
+    { provider: "gemini", apiKey: "discovered-gemini-key" }
+  )
+
+  assert.equal(result.text, "Discovered model succeeded")
+  assert.equal(result.trace.model, "gemini-3.1-pro-preview")
+  assert.equal(result.trace.attempts.length, 2)
+  assert.equal(result.trace.attempts[0].model, "gemini-3.8-flash")
+  assert.equal(result.trace.attempts[1].model, "gemini-3.1-pro-preview")
 })
 
 test("throws error when all candidate models fail", async () => {

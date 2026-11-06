@@ -1,6 +1,10 @@
 import { test, afterEach } from "node:test"
 import assert from "node:assert/strict"
-import { callGeminiApi } from "../src/server/llm/providers/gemini-provider"
+import {
+  callGeminiApi,
+  discoverGeminiModels,
+  _clearGeminiModelCache,
+} from "../src/server/llm/providers/gemini-provider"
 import {
   callOpenAiCompatibleApi,
   discoverOpenAiModels,
@@ -18,6 +22,7 @@ afterEach(() => {
   globalThis.fetch = originalFetch
   Date.now = originalDateNow
   _clearModelCache()
+  _clearGeminiModelCache()
 })
 
 test("callGeminiApi throws error if apiKey is missing", async () => {
@@ -444,6 +449,71 @@ test("discoverOpenAiModels throws error with status on HTTP error", async () => 
       const errorWithStatus = err as ErrorWithStatus
       assert.equal(errorWithStatus.status, 401)
       assert.match(errorWithStatus.message, /Unauthorized/i)
+      return true
+    }
+  )
+})
+
+test("discoverGeminiModels fetches models from Gemini API and caches for 5 minutes", async () => {
+  let fetchCount = 0
+  let capturedUrl = ""
+
+  globalThis.fetch = (async (url: string | URL | Request) => {
+    fetchCount++
+    capturedUrl = String(url)
+    return new Response(
+      JSON.stringify({
+        models: [
+          {
+            name: "models/gemini-3.8-flash",
+            supportedGenerationMethods: ["generateContent"],
+          },
+          {
+            name: "models/gemini-3.1-pro-preview",
+            supportedGenerationMethods: ["generateContent"],
+          },
+          {
+            name: "models/text-embedding-004",
+            supportedGenerationMethods: ["embedContent"],
+          },
+        ],
+      }),
+      { status: 200, headers: { "Content-Type": "application/json" } }
+    )
+  }) as typeof fetch
+
+  const models1 = await discoverGeminiModels("test-key-12345678")
+  assert.equal(fetchCount, 1)
+  assert.match(
+    capturedUrl,
+    /generativelanguage\.googleapis\.com\/v1beta\/models\?key=test-key-12345678/
+  )
+  assert.deepEqual(models1, ["gemini-3.8-flash", "gemini-3.1-pro-preview"])
+
+  // Second call within 5 minutes uses cache
+  const models2 = await discoverGeminiModels("test-key-12345678")
+  assert.equal(fetchCount, 1)
+  assert.deepEqual(models2, models1)
+})
+
+test("discoverGeminiModels throws error with status on HTTP error", async () => {
+  globalThis.fetch = (async () => {
+    return new Response(
+      JSON.stringify({
+        error: { message: "API key expired" },
+      }),
+      { status: 400, headers: { "Content-Type": "application/json" } }
+    )
+  }) as typeof fetch
+
+  await assert.rejects(
+    async () => {
+      await discoverGeminiModels("invalid-key")
+    },
+    (err: unknown) => {
+      const errorWithStatus = err as ErrorWithStatus
+      assert.equal(errorWithStatus.status, 400)
+      assert.match(errorWithStatus.message, /API key expired/i)
       return true
     }
   )

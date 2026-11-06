@@ -1,7 +1,10 @@
 import type { ZodType } from "zod"
 import { getEffectiveApiKey, getEffectiveEndpoint } from "../api-keys"
 import { getCandidateModels } from "./catalog"
-import { callGeminiApi } from "./providers/gemini-provider"
+import {
+  callGeminiApi,
+  discoverGeminiModels,
+} from "./providers/gemini-provider"
 import {
   callOpenAiCompatibleApi,
   discoverOpenAiModels,
@@ -55,11 +58,33 @@ export class LlmClient {
         process.env.GEMINI_API_KEY ||
         ""
 
-      const candidates = getCandidateModels(
-        "gemini",
-        options?.model,
-        options?.candidateModels
-      )
+      let candidates: string[]
+      if (options?.candidateModels && options.candidateModels.length > 0) {
+        candidates = getCandidateModels(
+          "gemini",
+          options.model,
+          options.candidateModels
+        )
+      } else {
+        let liveModels: string[] = []
+        if (apiKey) {
+          liveModels = await discoverGeminiModels(apiKey).catch(
+            (err: unknown) => {
+              const status = (err as { status?: number })?.status
+              if (status === 401 || status === 403) {
+                throw err
+              }
+              return []
+            }
+          )
+        }
+
+        candidates = getCandidateModels(
+          "gemini",
+          options?.model,
+          liveModels.length > 0 ? liveModels : undefined
+        )
+      }
 
       return {
         provider,
@@ -91,8 +116,6 @@ export class LlmClient {
       candidates = options.model
         ? getCandidateModels(provider, options.model, options.candidateModels)
         : options.candidateModels
-    } else if (options?.model) {
-      candidates = [options.model]
     } else {
       const discovered = await discoverOpenAiModels(baseUrl, apiKey).catch(
         (err: unknown) => {
@@ -103,7 +126,11 @@ export class LlmClient {
           return []
         }
       )
-      candidates = discovered.length > 0 ? [discovered[0]] : ["default"]
+      if (discovered.length > 0) {
+        candidates = getCandidateModels(provider, options?.model, discovered)
+      } else {
+        candidates = options?.model ? [options.model] : ["default"]
+      }
     }
 
     return {

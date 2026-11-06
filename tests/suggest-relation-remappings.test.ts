@@ -100,12 +100,12 @@ test("suggestRelationRemappings falls back to next model on 503 and tracks prove
       ],
       apiKey: "test-fake-key",
       model: "gemini-3.8-flash",
-      candidateModels: ["gemini-3.8-flash", "gemini-2.5-pro"],
+      candidateModels: ["gemini-3.8-flash", "gemini-3.1-pro-preview"],
     })
 
     assert.equal(result.suggestions.length, 1)
     assert.equal(result.suggestions[0].relationId, "rel-1")
-    assert.equal(result.provenance.successfulModel, "gemini-2.5-pro")
+    assert.equal(result.provenance.successfulModel, "gemini-3.1-pro-preview")
     assert.equal(result.provenance.attempts.length, 2)
     assert.equal(result.provenance.attempts[0].status, "failed")
     assert.equal(result.provenance.attempts[0].statusCode, 503)
