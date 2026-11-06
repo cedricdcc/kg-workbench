@@ -24,7 +24,7 @@ export interface MaskingResult {
 }
 
 // Regex patterns for value detection
-const EMAIL_REGEX = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,7}$/
+const EMAIL_REGEX = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,24}$/
 const IPV4_REGEX =
   /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/
 const IPV6_REGEX =
@@ -226,17 +226,17 @@ export function maskDatasetSamples(
 
   function getOrCreateToken(rawVal: unknown, config: ColumnPrivacyConfig): string {
     const strVal = String(rawVal)
-    const cacheKey = `${config.columnName}:${strVal}`
-    const existing = valueToToken.get(cacheKey)
-    if (existing) {
-      return existing
-    }
-
     const prefix = (
       config.detectedCategory ||
       config.columnName.replace(/[^a-zA-Z0-9]/g, "_") ||
       "TOKEN"
     ).toUpperCase()
+
+    const cacheKey = `${prefix}:${strVal}`
+    const existing = valueToToken.get(cacheKey)
+    if (existing) {
+      return existing
+    }
 
     const count = (categoryCounters[prefix] || 0) + 1
     categoryCounters[prefix] = count

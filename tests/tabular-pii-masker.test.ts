@@ -7,10 +7,10 @@ import {
   type ColumnPrivacyConfig,
 } from "../src/features/tabular/server/services/pii-masker"
 
-test("autoDetectPii detects email columns from sample values and column names", () => {
+test("autoDetectPii detects email columns from sample values and column names including long TLDs", () => {
   const configs = autoDetectPii(
-    [{ name: "user_contact", sampleValues: ["test.user@example.com", "admin@company.org"] }],
-    [{ user_contact: "test.user@example.com" }]
+    [{ name: "user_contact", sampleValues: ["test.user@example.technology", "admin@company.international"] }],
+    [{ user_contact: "test.user@example.technology" }]
   )
   assert.equal(configs.length, 1)
   assert.equal(configs[0].columnName, "user_contact")
@@ -148,6 +148,28 @@ test("maskDatasetSamples tokenizes identical values to identical tokens consiste
   const token = result.sanitizedSampleRows[0].email as string
   assert.equal(result.tokenMap[token], "john@example.com")
   assert.equal(result.maskedColumnCount, 2)
+})
+
+test("maskDatasetSamples produces identical tokens for identical values across different columns with same category", () => {
+  const sampleRows = [
+    {
+      primary_email: "shared@domain.com",
+      backup_email: "shared@domain.com",
+    },
+  ]
+  const configs: ColumnPrivacyConfig[] = [
+    { columnName: "primary_email", isMasked: true, detectedCategory: "email", maskingStrategy: "token" },
+    { columnName: "backup_email", isMasked: true, detectedCategory: "email", maskingStrategy: "token" },
+  ]
+
+  const result = maskDatasetSamples(sampleRows, configs)
+
+  assert.equal(
+    result.sanitizedSampleRows[0].primary_email,
+    result.sanitizedSampleRows[0].backup_email,
+    "Cross-column identical emails should receive identical token"
+  )
+  assert.equal(result.sanitizedSampleRows[0].primary_email, "<EMAIL_1>")
 })
 
 test("maskDatasetSamples respects user overrides: unmasking, force-masking, redact strategy", () => {
