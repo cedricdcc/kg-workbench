@@ -204,3 +204,119 @@ def profile_tabular_data(
                 os.remove(temp_path)
             except OSError:
                 pass
+
+
+def discover_remote_tables(
+    db_type: str,
+    host: str,
+    port: int,
+    database: str,
+    user: str,
+    password: str,
+    ssl_mode: str = "prefer",
+) -> list[dict[str, Any]]:
+    db_norm = db_type.lower().strip()
+    if db_norm in {"postgres", "postgresql"}:
+        extension_name = "postgres"
+        attach_type = "POSTGRES"
+
+        def _escape_libpq(val: Any) -> str:
+            s = str(val)
+            s_esc = s.replace("\\", "\\\\").replace("'", "\\'")
+            return f"'{s_esc}'"
+
+        parts = [
+            f"host={_escape_libpq(host)}",
+            f"port={_escape_libpq(port)}",
+            f"dbname={_escape_libpq(database)}",
+            f"user={_escape_libpq(user)}",
+            f"password={_escape_libpq(password)}",
+        ]
+        if ssl_mode:
+            parts.append(f"sslmode={_escape_libpq(ssl_mode)}")
+        conn_str = " ".join(parts)
+    elif db_norm == "mysql":
+        extension_name = "mysql"
+        attach_type = "MYSQL"
+        parts = [
+            f"host={host}",
+            f"port={port}",
+            f"user={user}",
+            f"password={password}",
+            f"database={database}",
+        ]
+        conn_str = " ".join(parts)
+    else:
+        raise ValueError(f"Unsupported database type: {db_type}")
+
+    con = duckdb.connect(database=":memory:")
+    attached = False
+    try:
+        con.execute(f"LOAD {extension_name};")
+        conn_str_sql = conn_str.replace("'", "''")
+        con.execute(f"ATTACH '{conn_str_sql}' AS remote_db (TYPE {attach_type}, READ_ONLY);")
+        attached = True
+
+        # Query estimated rows for postgres if available
+        estimated_rows_map: dict[tuple[str, str], int] = {}
+        if db_norm in {"postgres", "postgresql"}:
+            try:
+                est_rows = con.execute(
+                    """
+                    SELECT n.nspname, c.relname, c.reltuples
+                    FROM remote_db.pg_catalog.pg_class c
+                    JOIN remote_db.pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+                    WHERE c.relkind IN ('r', 'v', 'm', 'p')
+                    """
+                ).fetchall()
+                for s_name, t_name, reltuples in est_rows:
+                    if reltuples is not None and reltuples >= 0:
+                        estimated_rows_map[(str(s_name), str(t_name))] = int(reltuples)
+            except Exception:
+                pass
+
+        # Query information_schema.tables
+        raw_tables = con.execute(
+            """
+            SELECT table_schema, table_name, table_type
+            FROM remote_db.information_schema.tables
+            ORDER BY table_schema, table_name
+            """
+        ).fetchall()
+
+        excluded_schemas = {
+            "information_schema",
+            "pg_catalog",
+            "pg_toast",
+            "mysql",
+            "performance_schema",
+            "sys",
+        }
+
+        tables: list[dict[str, Any]] = []
+        for row in raw_tables:
+            schema_name = str(row[0])
+            table_name = str(row[1])
+            table_type = str(row[2])
+
+            schema_lower = schema_name.lower()
+            if schema_lower in excluded_schemas or schema_lower.startswith("pg_"):
+                continue
+
+            estimated = estimated_rows_map.get((schema_name, table_name))
+            tables.append({
+                "schema": schema_name,
+                "name": table_name,
+                "type": table_type,
+                "estimated_rows": estimated,
+            })
+
+        return tables
+    finally:
+        if attached:
+            try:
+                con.execute("DETACH remote_db;")
+            except Exception:
+                pass
+        con.close()
+
