@@ -14,7 +14,7 @@ export async function saveUserApiKey(
   provider: SupportedProvider,
   apiKey: string
 ): Promise<{ ok: boolean; keyHint?: string; error?: string }> {
-  const validation = validateApiKeyInput(apiKey)
+  const validation = validateApiKeyInput(apiKey, provider)
   if (!validation.valid) {
     return { ok: false, error: validation.error }
   }
@@ -58,8 +58,7 @@ export async function saveUserApiKey(
     console.error("Failed to save user API key:", error)
     return {
       ok: false,
-      error:
-        error instanceof Error ? error.message : "Failed to save API key.",
+      error: error instanceof Error ? error.message : "Failed to save API key.",
     }
   }
 }

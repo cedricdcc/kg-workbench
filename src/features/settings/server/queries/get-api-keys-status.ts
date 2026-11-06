@@ -44,5 +44,18 @@ export async function getUserApiKeysStatus(): Promise<ProviderConfigStatus[]> {
     hasEnvFallback: hasGeminiEnv,
   })
 
+  // Provider 2: Local vLLM (OpenAI-compatible)
+  const vllmRecord = userRecords.find((r) => r.provider === "vllm")
+  const hasVllmEnv = Boolean(process.env.VLLM_BASE_URL?.trim())
+
+  statuses.push({
+    provider: "vllm",
+    displayName: "Local vLLM (OpenAI-compatible)",
+    isConfigured: Boolean(vllmRecord),
+    keyHint: vllmRecord?.key_hint,
+    updatedAt: vllmRecord?.updated_at ?? undefined,
+    hasEnvFallback: hasVllmEnv,
+  })
+
   return statuses
 }

@@ -1,9 +1,5 @@
 export type SupportedProvider =
-  | "gemini"
-  | "bioportal"
-  | "agroportal"
-  | "ecoportal"
-  | string
+  "gemini" | "vllm" | "bioportal" | "agroportal" | "ecoportal" | string
 
 export interface ProviderConfigStatus {
   provider: SupportedProvider
@@ -12,9 +8,14 @@ export interface ProviderConfigStatus {
   keyHint?: string
   updatedAt?: string
   hasEnvFallback: boolean
+  endpoint?: string
+  baseUrl?: string
 }
 
-export function validateApiKeyInput(key: unknown): {
+export function validateApiKeyInput(
+  key: unknown,
+  provider?: SupportedProvider
+): {
   valid: boolean
   error?: string
 } {
@@ -24,7 +25,14 @@ export function validateApiKeyInput(key: unknown): {
 
   const trimmed = key.trim()
   if (!trimmed) {
-    return { valid: false, error: "API key cannot be empty." }
+    return { valid: false, error: "API key or endpoint cannot be empty." }
+  }
+
+  if (provider === "vllm") {
+    if (trimmed.length < 1) {
+      return { valid: false, error: "Endpoint or API key cannot be empty." }
+    }
+    return { valid: true }
   }
 
   if (trimmed.length < 10) {

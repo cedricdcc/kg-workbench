@@ -9,6 +9,7 @@ import {
   KeyRound,
   Loader2,
   Lock,
+  Server,
   Sparkles,
   Trash2,
   XCircle,
@@ -67,7 +68,11 @@ export function ApiKeyCard({ status, onStatusChange }: ApiKeyCardProps) {
 
   const handleSave = async () => {
     if (!keyInput.trim()) {
-      toast.error("Please enter an API key.")
+      toast.error(
+        status.provider === "vllm"
+          ? "Please enter an endpoint URL or API key."
+          : "Please enter an API key."
+      )
       return
     }
 
@@ -75,7 +80,11 @@ export function ApiKeyCard({ status, onStatusChange }: ApiKeyCardProps) {
     try {
       const res = await saveUserApiKey(status.provider, keyInput.trim())
       if (res.ok) {
-        toast.success(`${status.displayName} API key saved and encrypted.`)
+        toast.success(
+          status.provider === "vllm"
+            ? `${status.displayName} configuration saved and encrypted.`
+            : `${status.displayName} API key saved and encrypted.`
+        )
         setKeyInput("")
         setTestResult(null)
         onStatusChange?.({
@@ -122,9 +131,9 @@ export function ApiKeyCard({ status, onStatusChange }: ApiKeyCardProps) {
       return (
         <Badge
           variant="outline"
-          className="border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 font-normal"
+          className="border-emerald-500/30 bg-emerald-500/10 font-normal text-emerald-700 dark:text-emerald-400"
         >
-          <span className="mr-1.5 h-1.5 w-1.5 rounded-full bg-emerald-500 inline-block" />
+          <span className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-emerald-500" />
           Configured ({status.keyHint})
         </Badge>
       )
@@ -134,9 +143,9 @@ export function ApiKeyCard({ status, onStatusChange }: ApiKeyCardProps) {
       return (
         <Badge
           variant="outline"
-          className="border-sky-500/30 bg-sky-500/10 text-sky-700 dark:text-sky-400 font-normal"
+          className="border-sky-500/30 bg-sky-500/10 font-normal text-sky-700 dark:text-sky-400"
         >
-          <span className="mr-1.5 h-1.5 w-1.5 rounded-full bg-sky-500 inline-block" />
+          <span className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-sky-500" />
           Server Default
         </Badge>
       )
@@ -145,33 +154,36 @@ export function ApiKeyCard({ status, onStatusChange }: ApiKeyCardProps) {
     return (
       <Badge
         variant="outline"
-        className="border-muted-foreground/30 text-muted-foreground font-normal"
+        className="border-muted-foreground/30 font-normal text-muted-foreground"
       >
-        <span className="mr-1.5 h-1.5 w-1.5 rounded-full bg-muted-foreground inline-block" />
+        <span className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-muted-foreground" />
         Not Configured
       </Badge>
     )
   }
 
   return (
-    <div className="rounded-lg border border-border bg-card p-5 shadow-xs space-y-4">
+    <div className="space-y-4 rounded-lg border border-border bg-card p-5 shadow-xs">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
           <div className="flex h-9 w-9 items-center justify-center rounded-md border border-border bg-muted/40">
             {status.provider === "gemini" ? (
               <Sparkles className="h-4 w-4 text-primary" />
+            ) : status.provider === "vllm" ? (
+              <Server className="h-4 w-4 text-primary" />
             ) : (
               <KeyRound className="h-4 w-4 text-primary" />
             )}
           </div>
           <div>
-            <h3 className="font-heading font-medium text-sm">
+            <h3 className="font-heading text-sm font-medium">
               {status.displayName}
             </h3>
             <p className="text-xs text-muted-foreground">
-              Powers AI ontology draft generation from CQs and relation
-              reconciliation.
+              {status.provider === "vllm"
+                ? "Powers local OpenAI-compatible LLM inference via vLLM server."
+                : "Powers AI ontology draft generation from CQs and relation reconciliation."}
             </p>
           </div>
         </div>
@@ -182,17 +194,35 @@ export function ApiKeyCard({ status, onStatusChange }: ApiKeyCardProps) {
       <div className="space-y-2 pt-2">
         <div className="flex items-center justify-between">
           <Label htmlFor={`api-key-${status.provider}`} className="text-xs">
-            {status.isConfigured ? "Update API Key" : "API Key"}
+            {status.provider === "vllm"
+              ? status.isConfigured
+                ? "Update Endpoint URL / API Key"
+                : "Endpoint URL / API Key"
+              : status.isConfigured
+                ? "Update API Key"
+                : "API Key"}
           </Label>
-          <a
-            href="https://aistudio.google.com/app/apikey"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1 transition-colors"
-          >
-            Get a free Gemini API key
-            <ExternalLink className="h-3 w-3" />
-          </a>
+          {status.provider === "vllm" ? (
+            <a
+              href="https://docs.vllm.ai/en/latest/serving/openai_compatible_server.html"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
+            >
+              vLLM Documentation
+              <ExternalLink className="h-3 w-3" />
+            </a>
+          ) : (
+            <a
+              href="https://aistudio.google.com/app/apikey"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
+            >
+              Get a free Gemini API key
+              <ExternalLink className="h-3 w-3" />
+            </a>
+          )}
         </div>
         <div className="relative">
           <Input
@@ -201,19 +231,25 @@ export function ApiKeyCard({ status, onStatusChange }: ApiKeyCardProps) {
             value={keyInput}
             onChange={(e) => setKeyInput(e.target.value)}
             placeholder={
-              status.isConfigured
-                ? "Paste new key to update..."
-                : status.hasEnvFallback
-                  ? "Leave blank to use server environment key, or paste custom key"
-                  : "Enter your Gemini API key (e.g. AIzaSy...)"
+              status.provider === "vllm"
+                ? status.isConfigured
+                  ? "Paste new URL or key..."
+                  : status.hasEnvFallback
+                    ? "Using server environment VLLM_BASE_URL, or paste custom endpoint"
+                    : "Enter vLLM endpoint (e.g. http://localhost:8000/v1)"
+                : status.isConfigured
+                  ? "Paste new key to update..."
+                  : status.hasEnvFallback
+                    ? "Leave blank to use server environment key, or paste custom key"
+                    : "Enter your Gemini API key (e.g. AIzaSy...)"
             }
-            className="pr-10 text-xs font-mono"
+            className="pr-10 font-mono text-xs"
             autoComplete="off"
           />
           <button
             type="button"
             onClick={() => setShowPassword((prev) => !prev)}
-            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+            className="absolute top-1/2 right-2.5 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground"
             aria-label={showPassword ? "Hide API key" : "Show API key"}
           >
             {showPassword ? (
@@ -230,21 +266,21 @@ export function ApiKeyCard({ status, onStatusChange }: ApiKeyCardProps) {
         <div
           className={`flex items-start gap-2 rounded-md p-2.5 text-xs ${
             testResult.ok
-              ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20"
-              : "bg-destructive/10 text-destructive border border-destructive/20"
+              ? "border border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+              : "border border-destructive/20 bg-destructive/10 text-destructive"
           }`}
         >
           {testResult.ok ? (
-            <CheckCircle2 className="h-4 w-4 shrink-0 mt-0.5" />
+            <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
           ) : (
-            <XCircle className="h-4 w-4 shrink-0 mt-0.5" />
+            <XCircle className="mt-0.5 h-4 w-4 shrink-0" />
           )}
           <span className="leading-relaxed">{testResult.message}</span>
         </div>
       ) : null}
 
       {/* Security Note & Action Controls */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-border/50">
+      <div className="flex flex-col justify-between gap-3 border-t border-border/50 pt-2 sm:flex-row sm:items-center">
         <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
           <Lock className="h-3.5 w-3.5" />
           <span>Encrypted at rest with AES-256-GCM. Never shared.</span>
@@ -261,11 +297,11 @@ export function ApiKeyCard({ status, onStatusChange }: ApiKeyCardProps) {
               className="text-xs text-destructive hover:bg-destructive/10 hover:text-destructive"
             >
               {isDeleting ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />
+                <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
               ) : (
-                <Trash2 className="h-3.5 w-3.5 mr-1" />
+                <Trash2 className="mr-1 h-3.5 w-3.5" />
               )}
-              Remove Key
+              {status.provider === "vllm" ? "Remove Config" : "Remove Key"}
             </Button>
           ) : null}
 
@@ -274,11 +310,17 @@ export function ApiKeyCard({ status, onStatusChange }: ApiKeyCardProps) {
             variant="outline"
             size="sm"
             onClick={handleTest}
-            disabled={isTesting || (!keyInput && !status.isConfigured && !status.hasEnvFallback)}
+            disabled={
+              isTesting ||
+              (status.provider !== "vllm" &&
+                !keyInput &&
+                !status.isConfigured &&
+                !status.hasEnvFallback)
+            }
             className="text-xs"
           >
             {isTesting ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />
+              <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
             ) : null}
             Test Connection
           </Button>
@@ -291,9 +333,9 @@ export function ApiKeyCard({ status, onStatusChange }: ApiKeyCardProps) {
             className="text-xs"
           >
             {isSaving ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />
+              <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
             ) : null}
-            Save Key
+            {status.provider === "vllm" ? "Save Config" : "Save Key"}
           </Button>
         </div>
       </div>
