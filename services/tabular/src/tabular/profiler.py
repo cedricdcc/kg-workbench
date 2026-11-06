@@ -4,7 +4,7 @@ import math
 import os
 import tempfile
 import uuid
-from datetime import date, datetime
+from datetime import date, datetime, time
 from typing import Any
 
 import duckdb
@@ -53,7 +53,7 @@ def sanitize_value(val: Any) -> Any:
         return float(val)
     if isinstance(val, (bytes, bytearray)):
         return val.decode("utf-8", errors="replace")
-    if isinstance(val, (datetime, date)):
+    if isinstance(val, (datetime, date, time)):
         return val.isoformat()
     if isinstance(val, float):
         if math.isnan(val) or math.isinf(val):

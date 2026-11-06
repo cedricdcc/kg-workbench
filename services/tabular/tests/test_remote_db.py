@@ -1,6 +1,10 @@
 import os
 import pytest
-from tabular.profiler import discover_remote_tables, profile_remote_database_table
+from tabular.profiler import (
+    discover_remote_tables,
+    profile_remote_database_table,
+    sanitize_value,
+)
 
 POSTGRES_HOST = os.environ.get("POSTGRES_HOST", "db")
 POSTGRES_PORT = int(os.environ.get("POSTGRES_PORT", "5432"))
@@ -449,4 +453,13 @@ async def test_daemon_encrypted_credentials():
     result = complete_call[1]["json"]["result"]
     assert result["fileName"] == "ontology_documents"
     assert result["rowCount"] > 0
+
+
+def test_sanitize_value_time():
+    import datetime
+
+    t = datetime.time(14, 30, 0)
+    res = sanitize_value(t)
+    assert res == "14:30:00"
+
 
