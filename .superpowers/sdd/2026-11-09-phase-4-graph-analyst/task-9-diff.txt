@@ -1,0 +1,1608 @@
+diff --git a/src/features/analyst/README.md b/src/features/analyst/README.md
+index 6ba78d9..9659bb0 100644
+--- a/src/features/analyst/README.md
++++ b/src/features/analyst/README.md
+@@ -29,6 +29,12 @@ entry_points:
+     purpose: Dialog displaying reasoning subgraph overview with node/edge counts, entity kind legend, and interactive canvas.
+   - path: src/features/analyst/components/subgraph-preview/subgraph-flow-view.tsx
+     purpose: Interactive React Flow graph canvas computing Dagre rankdir layout, directional handle routing, and styled kind badges.
++  - path: src/features/analyst/components/contradictions-view/contradictions-tab.tsx
++    purpose: Main contradictions tab coordinating drift analysis triggers, search, status filtering, and conflict resolution modal.
++  - path: src/features/analyst/components/contradictions-view/contradiction-card.tsx
++    purpose: Card rendering side-by-side statement evidence comparison, conflict type badges, and resolve action.
++  - path: src/features/analyst/components/contradictions-view/resolve-dialog.tsx
++    purpose: Resolution dialog offering Keep Statement A, Keep Statement B, and Dismiss strategies with custom audit notes.
+ server_entry_points:
+   - path: src/features/analyst/server/actions/create-conversation.ts
+     purpose: Server action to initialize an analyst conversation.
+@@ -38,6 +44,8 @@ server_entry_points:
+     purpose: Server action persisting user queries and enqueuing analyst.query_requested domain events.
+   - path: src/features/analyst/server/actions/resolve-contradiction.ts
+     purpose: Server action updating contradiction status and resolution actions.
++  - path: src/features/analyst/server/actions/run-drift-analysis.ts
++    purpose: Server action publishing analyst.drift_analysis_requested domain events to trigger drift analysis.
+   - path: src/features/analyst/server/queries/get-conversations.ts
+     purpose: Queries conversations scoped to ontology and group key.
+   - path: src/features/analyst/server/queries/get-messages.ts
+diff --git a/src/features/analyst/components/analyst-shell/analyst-shell.tsx b/src/features/analyst/components/analyst-shell/analyst-shell.tsx
+index b80af55..e73faf7 100644
+--- a/src/features/analyst/components/analyst-shell/analyst-shell.tsx
++++ b/src/features/analyst/components/analyst-shell/analyst-shell.tsx
+@@ -30,6 +30,7 @@ import { ChatMessageList } from "../chat-view/chat-message-list"
+ import { ChatInputBar } from "../chat-view/chat-input-bar"
+ import { CitationInspector } from "../citation-drawer/citation-inspector"
+ import { AnalystSubgraphModal } from "../subgraph-preview/analyst-subgraph-modal"
++import { ContradictionsTab } from "../contradictions-view/contradictions-tab"
+ 
+ export interface AnalystShellContextValue {
+   selectedConversationId: string | null
+@@ -362,27 +363,7 @@ export function AnalystShell({
+                 className="flex min-h-0 flex-1 flex-col overflow-auto p-6"
+                 data-testid="analyst-contradictions-view"
+               >
+-                {/* Contradictions Slot (Task 9 will mount ContradictionsTab here) */}
+-                <div className="max-w-4xl space-y-4">
+-                  <div className="space-y-1">
+-                    <div className="flex items-center gap-2">
+-                      <AlertTriangle className="h-4 w-4 text-amber-500" />
+-                      <h2 className="text-sm font-semibold">
+-                        Knowledge Contradictions &amp; Semantic Drift
+-                      </h2>
+-                    </div>
+-                    <p className="text-xs text-muted-foreground">
+-                      Inspect conflicting facts detected across documents,
+-                      extractors, and tabular mappings. Resolve drift by
+-                      selecting the authoritative statement.
+-                    </p>
+-                  </div>
+-
+-                  <div className="rounded-lg border border-dashed p-8 text-center text-xs text-muted-foreground">
+-                    Run drift analysis to verify consistency across accepted
+-                    triples.
+-                  </div>
+-                </div>
++                <ContradictionsTab ontologyId={ontologyId} />
+               </div>
+             )}
+           </main>
+diff --git a/src/features/analyst/components/contradictions-view/contradiction-card.tsx b/src/features/analyst/components/contradictions-view/contradiction-card.tsx
+new file mode 100644
+index 0000000..8b0c235
+--- /dev/null
++++ b/src/features/analyst/components/contradictions-view/contradiction-card.tsx
+@@ -0,0 +1,290 @@
++"use client"
++
++import {
++  AlertCircle,
++  AlertTriangle,
++  CheckCircle,
++  FileText,
++  History,
++  Layers,
++} from "lucide-react"
++
++import { Badge } from "@/components/ui/badge"
++import { Button } from "@/components/ui/button"
++import { cn } from "@/lib/utils"
++import type {
++  ContradictionConflictType,
++  ContradictionStatus,
++  KnowledgeContradiction,
++} from "../../types"
++
++export interface ContradictionCardProps {
++  contradiction: KnowledgeContradiction
++  onResolveClick: (contradiction: KnowledgeContradiction) => void
++  className?: string
++}
++
++function extractFactValue(fact: Record<string, unknown> | undefined): string {
++  if (!fact) return "—"
++  if (typeof fact.value === "string" && fact.value) return fact.value
++  if (typeof fact.object_text === "string" && fact.object_text)
++    return fact.object_text
++  if (typeof fact.val === "string" && fact.val) return fact.val
++  if (typeof fact.text === "string" && fact.text) return fact.text
++  return Object.keys(fact).length > 0 ? JSON.stringify(fact) : "—"
++}
++
++function extractFactSource(fact: Record<string, unknown> | undefined): string {
++  if (!fact) return "Unknown source"
++  if (typeof fact.documentTitle === "string" && fact.documentTitle)
++    return fact.documentTitle
++  if (typeof fact.sourceName === "string" && fact.sourceName)
++    return fact.sourceName
++  if (typeof fact.sourceTitle === "string" && fact.sourceTitle)
++    return fact.sourceTitle
++  if (typeof fact.document_name === "string" && fact.document_name)
++    return fact.document_name
++  if (typeof fact.source === "string" && fact.source) return fact.source
++  if (typeof fact.extractor === "string" && fact.extractor)
++    return fact.extractor
++  return "Unknown source"
++}
++
++function extractFactQuote(
++  fact: Record<string, unknown> | undefined
++): string | null {
++  if (!fact) return null
++  if (typeof fact.quoteText === "string" && fact.quoteText)
++    return fact.quoteText
++  if (typeof fact.quote_text === "string" && fact.quote_text)
++    return fact.quote_text
++  if (typeof fact.quote === "string" && fact.quote) return fact.quote
++  if (typeof fact.anchor === "string" && fact.anchor) return fact.anchor
++  return null
++}
++
++function getConflictTypeBadge(conflictType: ContradictionConflictType) {
++  switch (conflictType) {
++    case "value_mismatch":
++      return {
++        label: "Value Mismatch",
++        className:
++          "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400",
++        icon: AlertTriangle,
++      }
++    case "temporal_drift":
++      return {
++        label: "Temporal Drift",
++        className:
++          "border-blue-500/30 bg-blue-500/10 text-blue-700 dark:text-blue-400",
++        icon: History,
++      }
++    case "negation":
++      return {
++        label: "Negation / Direct Contradiction",
++        className:
++          "border-rose-500/30 bg-rose-500/10 text-rose-700 dark:text-rose-400",
++        icon: AlertCircle,
++      }
++    default:
++      return {
++        label: conflictType,
++        className: "border-border bg-muted text-muted-foreground",
++        icon: AlertCircle,
++      }
++  }
++}
++
++function getStatusBadge(status: ContradictionStatus) {
++  switch (status) {
++    case "open":
++      return {
++        label: "Open",
++        className:
++          "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400",
++      }
++    case "resolved":
++      return {
++        label: "Resolved",
++        className:
++          "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
++      }
++    case "dismissed":
++      return {
++        label: "Dismissed",
++        className: "border-border bg-muted text-muted-foreground",
++      }
++    default:
++      return {
++        label: status,
++        className: "border-border bg-muted text-muted-foreground",
++      }
++  }
++}
++
++export function ContradictionCard({
++  contradiction,
++  onResolveClick,
++  className,
++}: ContradictionCardProps) {
++  const conflictTypeBadge = getConflictTypeBadge(contradiction.conflictType)
++  const statusBadge = getStatusBadge(contradiction.status)
++  const isResolvedOrDismissed = contradiction.status !== "open"
++
++  const factAValue = extractFactValue(contradiction.factA)
++  const factASource = extractFactSource(contradiction.factA)
++  const factAQuote = extractFactQuote(contradiction.factA)
++
++  const factBValue = extractFactValue(contradiction.factB)
++  const factBSource = extractFactSource(contradiction.factB)
++  const factBQuote = extractFactQuote(contradiction.factB)
++
++  const ConflictIcon = conflictTypeBadge.icon
++
++  return (
++    <div
++      className={cn(
++        "flex flex-col gap-3 rounded-lg border bg-card p-4 text-card-foreground shadow-xs transition-shadow hover:shadow-sm",
++        isResolvedOrDismissed && "opacity-85",
++        className
++      )}
++      data-testid="contradiction-card"
++      data-contradiction-id={contradiction.id}
++    >
++      {/* Header Bar */}
++      <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-3">
++        <div className="flex flex-wrap items-center gap-2">
++          <div className="flex items-center gap-1.5 text-xs font-medium text-foreground">
++            <span className="text-sm font-semibold">
++              {contradiction.entityLabel}
++            </span>
++            <span className="text-muted-foreground">→</span>
++            <Badge
++              variant="outline"
++              className="font-mono text-[11px] tracking-tight"
++            >
++              {contradiction.relationName}
++            </Badge>
++          </div>
++
++          {/* Conflict Type Badge */}
++          <span
++            className={cn(
++              "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium",
++              conflictTypeBadge.className
++            )}
++            data-testid="conflict-type-badge"
++          >
++            <ConflictIcon className="h-3 w-3" />
++            <span>{conflictTypeBadge.label}</span>
++          </span>
++        </div>
++
++        {/* Status Badge */}
++        <div className="flex items-center gap-2">
++          <span
++            className={cn(
++              "inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium capitalize",
++              statusBadge.className
++            )}
++            data-testid="contradiction-status-badge"
++          >
++            {statusBadge.label}
++          </span>
++        </div>
++      </div>
++
++      {/* Side-by-Side Statements Grid */}
++      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
++        {/* Statement A */}
++        <div className="flex flex-col gap-1.5 rounded-md border bg-muted/20 p-3">
++          <div className="flex items-center justify-between text-[11px]">
++            <span className="font-semibold text-foreground/80">
++              Statement A
++            </span>
++            <div
++              className="flex max-w-[200px] items-center gap-1 truncate text-muted-foreground"
++              title={factASource}
++            >
++              <FileText className="h-3 w-3 shrink-0" />
++              <span className="truncate">{factASource}</span>
++            </div>
++          </div>
++
++          <div className="mt-0.5 text-xs font-medium text-foreground">
++            {factAValue}
++          </div>
++
++          {factAQuote && (
++            <blockquote className="mt-1 border-l-2 border-primary/40 pl-2 text-[11px] leading-relaxed text-muted-foreground italic">
++              &quot;{factAQuote}&quot;
++            </blockquote>
++          )}
++        </div>
++
++        {/* Statement B */}
++        <div className="flex flex-col gap-1.5 rounded-md border bg-muted/20 p-3">
++          <div className="flex items-center justify-between text-[11px]">
++            <span className="font-semibold text-foreground/80">
++              Statement B
++            </span>
++            <div
++              className="flex max-w-[200px] items-center gap-1 truncate text-muted-foreground"
++              title={factBSource}
++            >
++              <FileText className="h-3 w-3 shrink-0" />
++              <span className="truncate">{factBSource}</span>
++            </div>
++          </div>
++
++          <div className="mt-0.5 text-xs font-medium text-foreground">
++            {factBValue}
++          </div>
++
++          {factBQuote && (
++            <blockquote className="mt-1 border-l-2 border-primary/40 pl-2 text-[11px] leading-relaxed text-muted-foreground italic">
++              &quot;{factBQuote}&quot;
++            </blockquote>
++          )}
++        </div>
++      </div>
++
++      {/* Explanation Box */}
++      <div className="flex items-start gap-2 rounded-md bg-muted/40 p-2.5 text-xs text-muted-foreground">
++        <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-500" />
++        <p className="flex-1 leading-relaxed">{contradiction.explanation}</p>
++      </div>
++
++      {/* Resolution Notes (if present) */}
++      {contradiction.resolutionAction && (
++        <div className="rounded-md border border-emerald-500/20 bg-emerald-500/5 px-3 py-1.5 text-[11px] text-emerald-800 dark:text-emerald-300">
++          <span className="font-medium">Resolution: </span>
++          {contradiction.resolutionAction}
++        </div>
++      )}
++
++      {/* Footer / Action */}
++      <div className="flex items-center justify-end border-t pt-2.5">
++        <Button
++          size="sm"
++          variant={isResolvedOrDismissed ? "outline" : "default"}
++          onClick={() => onResolveClick(contradiction)}
++          data-testid="resolve-conflict-button"
++          className="gap-1.5 text-xs"
++        >
++          {isResolvedOrDismissed ? (
++            <>
++              <Layers className="h-3.5 w-3.5" />
++              <span>Resolution Details</span>
++            </>
++          ) : (
++            <>
++              <CheckCircle className="h-3.5 w-3.5" />
++              <span>Resolve Conflict</span>
++            </>
++          )}
++        </Button>
++      </div>
++    </div>
++  )
++}
+diff --git a/src/features/analyst/components/contradictions-view/contradictions-tab.tsx b/src/features/analyst/components/contradictions-view/contradictions-tab.tsx
+new file mode 100644
+index 0000000..31fdb39
+--- /dev/null
++++ b/src/features/analyst/components/contradictions-view/contradictions-tab.tsx
+@@ -0,0 +1,309 @@
++"use client"
++
++import { useMemo, useState } from "react"
++import { useQuery } from "@tanstack/react-query"
++import {
++  AlertTriangle,
++  Filter,
++  Loader2,
++  Search,
++  ShieldCheck,
++  Sparkles,
++} from "lucide-react"
++import { toast } from "sonner"
++
++import { Badge } from "@/components/ui/badge"
++import { Button } from "@/components/ui/button"
++import { Input } from "@/components/ui/input"
++import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
++import { cn } from "@/lib/utils"
++import type { KnowledgeContradiction } from "../../types"
++import { getContradictionsQuery } from "../../server/queries/get-contradictions"
++import { runDriftAnalysisAction } from "../../server/actions/run-drift-analysis"
++import { ContradictionCard } from "./contradiction-card"
++import { ResolveDialog } from "./resolve-dialog"
++
++export interface ContradictionsTabProps {
++  ontologyId: string
++  contradictions?: KnowledgeContradiction[]
++  isLoading?: boolean
++  onRefresh?: () => void
++  className?: string
++}
++
++type StatusFilter = "all" | "open" | "resolved" | "dismissed"
++
++export function ContradictionsTab({
++  ontologyId,
++  contradictions: contradictionsProp,
++  isLoading: isLoadingProp,
++  onRefresh,
++  className,
++}: ContradictionsTabProps) {
++  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all")
++  const [searchQuery, setSearchQuery] = useState("")
++  const [isAnalyzing, setIsAnalyzing] = useState(false)
++  const [selectedContradiction, setSelectedContradiction] =
++    useState<KnowledgeContradiction | null>(null)
++  const [isResolveDialogOpen, setIsResolveDialogOpen] = useState(false)
++
++  // Query when props not explicitly supplied
++  const {
++    data: fetchedContradictions = [],
++    isLoading: isQueryLoading,
++    refetch,
++  } = useQuery({
++    queryKey: ["knowledge-contradictions", ontologyId],
++    queryFn: async () => {
++      if (!ontologyId) return []
++      return await getContradictionsQuery(ontologyId)
++    },
++    enabled: Boolean(ontologyId) && contradictionsProp === undefined,
++  })
++
++  const allContradictions = contradictionsProp ?? fetchedContradictions
++  const isLoading = isLoadingProp ?? isQueryLoading
++
++  const handleRefresh = async () => {
++    if (onRefresh) {
++      onRefresh()
++    } else {
++      await refetch()
++    }
++  }
++
++  const openCount = useMemo(
++    () => allContradictions.filter((c) => c.status === "open").length,
++    [allContradictions]
++  )
++
++  const resolvedCount = useMemo(
++    () => allContradictions.filter((c) => c.status === "resolved").length,
++    [allContradictions]
++  )
++
++  const dismissedCount = useMemo(
++    () => allContradictions.filter((c) => c.status === "dismissed").length,
++    [allContradictions]
++  )
++
++  const filteredContradictions = useMemo(() => {
++    return allContradictions.filter((c) => {
++      if (statusFilter !== "all" && c.status !== statusFilter) {
++        return false
++      }
++      if (searchQuery.trim()) {
++        const q = searchQuery.toLowerCase().trim()
++        const matchEntity = c.entityLabel?.toLowerCase().includes(q)
++        const matchRelation = c.relationName?.toLowerCase().includes(q)
++        const matchExplanation = c.explanation?.toLowerCase().includes(q)
++        if (!matchEntity && !matchRelation && !matchExplanation) {
++          return false
++        }
++      }
++      return true
++    })
++  }, [allContradictions, statusFilter, searchQuery])
++
++  async function handleRunDriftAnalysis() {
++    if (!ontologyId || isAnalyzing) return
++    setIsAnalyzing(true)
++    try {
++      await runDriftAnalysisAction(ontologyId)
++      toast.success("Drift analysis triggered successfully")
++      await handleRefresh()
++    } catch (err) {
++      toast.error(
++        err instanceof Error ? err.message : "Failed to run drift analysis"
++      )
++    } finally {
++      setIsAnalyzing(false)
++    }
++  }
++
++  function handleOpenResolveDialog(contradiction: KnowledgeContradiction) {
++    setSelectedContradiction(contradiction)
++    setIsResolveDialogOpen(true)
++  }
++
++  function handleContradictionResolved() {
++    void handleRefresh()
++  }
++
++  return (
++    <div
++      className={cn("flex w-full max-w-4xl flex-col gap-4", className)}
++      data-testid="contradictions-tab"
++    >
++      {/* Top Header / Action Bar */}
++      <div className="flex flex-col gap-3 border-b pb-3 sm:flex-row sm:items-center sm:justify-between">
++        <div className="flex flex-col gap-1">
++          <div className="flex items-center gap-2">
++            <AlertTriangle className="h-4 w-4 text-amber-500" />
++            <h2 className="text-sm font-semibold tracking-tight">
++              Knowledge Contradictions &amp; Semantic Drift
++            </h2>
++            <Badge
++              variant="outline"
++              className={cn(
++                "text-[11px] font-normal transition-colors",
++                openCount > 0
++                  ? "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400"
++                  : "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
++              )}
++              data-testid="contradictions-count-badge"
++            >
++              {openCount} {openCount === 1 ? "open conflict" : "open conflicts"}
++            </Badge>
++          </div>
++          <p className="text-xs text-muted-foreground">
++            Surface conflicting assertions across documents, extractors, and
++            tabular sources, then resolve discrepancies.
++          </p>
++        </div>
++
++        {/* Trigger Drift Analysis */}
++        <div className="flex items-center gap-2">
++          <Button
++            size="sm"
++            onClick={handleRunDriftAnalysis}
++            disabled={isAnalyzing || !ontologyId}
++            className="gap-1.5 text-xs shadow-xs"
++            data-testid="run-drift-analysis-button"
++          >
++            {isAnalyzing ? (
++              <>
++                <Loader2 className="h-3.5 w-3.5 animate-spin" />
++                <span>Analyzing Drift...</span>
++              </>
++            ) : (
++              <>
++                <Sparkles className="h-3.5 w-3.5 text-amber-300" />
++                <span>Run Drift Analysis</span>
++              </>
++            )}
++          </Button>
++        </div>
++      </div>
++
++      {/* Filter and Search Bar */}
++      <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
++        {/* Status Filter Tabs */}
++        <Tabs
++          value={statusFilter}
++          onValueChange={(v) => setStatusFilter(v as StatusFilter)}
++          className="w-full sm:w-auto"
++        >
++          <TabsList className="h-8">
++            <TabsTrigger value="all" className="gap-1.5 px-2.5 text-xs">
++              <span>All</span>
++              <span className="py-0.2 rounded-full bg-muted-foreground/15 px-1.5 text-[10px]">
++                {allContradictions.length}
++              </span>
++            </TabsTrigger>
++            <TabsTrigger value="open" className="gap-1.5 px-2.5 text-xs">
++              <span>Open</span>
++              <span className="py-0.2 rounded-full bg-amber-500/15 px-1.5 text-[10px] text-amber-700 dark:text-amber-400">
++                {openCount}
++              </span>
++            </TabsTrigger>
++            <TabsTrigger value="resolved" className="gap-1.5 px-2.5 text-xs">
++              <span>Resolved</span>
++              <span className="py-0.2 rounded-full bg-emerald-500/15 px-1.5 text-[10px] text-emerald-700 dark:text-emerald-400">
++                {resolvedCount}
++              </span>
++            </TabsTrigger>
++            <TabsTrigger value="dismissed" className="gap-1.5 px-2.5 text-xs">
++              <span>Dismissed</span>
++              <span className="py-0.2 rounded-full bg-muted-foreground/15 px-1.5 text-[10px]">
++                {dismissedCount}
++              </span>
++            </TabsTrigger>
++          </TabsList>
++        </Tabs>
++
++        {/* Search Input */}
++        <div className="relative w-full sm:w-72">
++          <Search className="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
++          <Input
++            value={searchQuery}
++            onChange={(e) => setSearchQuery(e.target.value)}
++            placeholder="Search entity, relation, explanation..."
++            className="h-8 pl-8 text-xs"
++            data-testid="contradictions-search-input"
++          />
++        </div>
++      </div>
++
++      {/* Main Content Area */}
++      {isLoading ? (
++        <div
++          className="flex h-48 w-full items-center justify-center gap-2 rounded-lg border border-dashed text-xs text-muted-foreground"
++          data-testid="contradictions-loading"
++        >
++          <Loader2 className="h-4 w-4 animate-spin text-primary" />
++          <span>Scanning knowledge graph for contradictions...</span>
++        </div>
++      ) : allContradictions.length === 0 ? (
++        /* Empty State: 0 total contradictions */
++        <div
++          className="flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed p-10 text-center"
++          data-testid="contradictions-empty-state"
++        >
++          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
++            <ShieldCheck className="h-6 w-6" />
++          </div>
++          <h3 className="text-sm font-semibold text-foreground">
++            Knowledge Graph is coherent: no conflicting assertions detected.
++          </h3>
++          <p className="max-w-md text-xs text-muted-foreground">
++            All extracted facts, entity relations, and mapped tabular rows are
++            harmonious. Click &quot;Run Drift Analysis&quot; anytime to scan for
++            newly introduced inconsistencies.
++          </p>
++        </div>
++      ) : filteredContradictions.length === 0 ? (
++        /* Empty State: filters returned 0 */
++        <div
++          className="flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed p-8 text-center text-xs text-muted-foreground"
++          data-testid="contradictions-filtered-empty"
++        >
++          <Filter className="h-5 w-5 text-muted-foreground/60" />
++          <p>No conflicting assertions match your current filters.</p>
++          {(statusFilter !== "all" || searchQuery.trim()) && (
++            <Button
++              variant="outline"
++              size="sm"
++              onClick={() => {
++                setStatusFilter("all")
++                setSearchQuery("")
++              }}
++              className="mt-1 text-xs"
++            >
++              Reset Filters
++            </Button>
++          )}
++        </div>
++      ) : (
++        /* List of Contradiction Cards */
++        <div className="flex flex-col gap-3" data-testid="contradictions-list">
++          {filteredContradictions.map((contra) => (
++            <ContradictionCard
++              key={contra.id}
++              contradiction={contra}
++              onResolveClick={handleOpenResolveDialog}
++            />
++          ))}
++        </div>
++      )}
++
++      {/* Resolution Dialog Modal */}
++      <ResolveDialog
++        contradiction={selectedContradiction}
++        open={isResolveDialogOpen}
++        onOpenChange={setIsResolveDialogOpen}
++        onResolved={handleContradictionResolved}
++      />
++    </div>
++  )
++}
+diff --git a/src/features/analyst/components/contradictions-view/resolve-dialog.tsx b/src/features/analyst/components/contradictions-view/resolve-dialog.tsx
+new file mode 100644
+index 0000000..681ed78
+--- /dev/null
++++ b/src/features/analyst/components/contradictions-view/resolve-dialog.tsx
+@@ -0,0 +1,311 @@
++"use client"
++
++import { useState } from "react"
++import { AlertCircle, CheckCircle, Loader2 } from "lucide-react"
++import { toast } from "sonner"
++
++import { Button } from "@/components/ui/button"
++import {
++  Dialog,
++  DialogContent,
++  DialogDescription,
++  DialogHeader,
++  DialogTitle,
++} from "@/components/ui/dialog"
++import { Label } from "@/components/ui/label"
++import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
++import { Textarea } from "@/components/ui/textarea"
++import { cn } from "@/lib/utils"
++import type { KnowledgeContradiction } from "../../types"
++import { resolveContradictionAction } from "../../server/actions/resolve-contradiction"
++
++export interface ResolveDialogProps {
++  contradiction: KnowledgeContradiction | null
++  open: boolean
++  onOpenChange: (open: boolean) => void
++  onResolved?: (updated: KnowledgeContradiction) => void
++  inline?: boolean // For DOM testing
++  className?: string
++}
++
++export type ResolutionStrategy = "keep_a" | "keep_b" | "dismiss"
++
++function extractFactValue(fact: Record<string, unknown> | undefined): string {
++  if (!fact) return ""
++  if (typeof fact.value === "string") return fact.value
++  if (typeof fact.object_text === "string") return fact.object_text
++  if (typeof fact.val === "string") return fact.val
++  if (typeof fact.text === "string") return fact.text
++  return Object.keys(fact).length > 0 ? JSON.stringify(fact) : ""
++}
++
++interface ResolveDialogFormProps {
++  contradiction: KnowledgeContradiction
++  onOpenChange: (open: boolean) => void
++  onResolved?: (updated: KnowledgeContradiction) => void
++}
++
++function ResolveDialogForm({
++  contradiction,
++  onOpenChange,
++  onResolved,
++}: ResolveDialogFormProps) {
++  const [strategy, setStrategy] = useState<ResolutionStrategy>("keep_a")
++  const [customNotes, setCustomNotes] = useState("")
++  const [isSubmitting, setIsSubmitting] = useState(false)
++
++  const factAValue = extractFactValue(contradiction.factA)
++  const factBValue = extractFactValue(contradiction.factB)
++
++  async function handleConfirm() {
++    setIsSubmitting(true)
++    try {
++      const isDismiss = strategy === "dismiss"
++      const status: "resolved" | "dismissed" = isDismiss
++        ? "dismissed"
++        : "resolved"
++
++      const strategyBaseNote =
++        strategy === "keep_a"
++          ? "Keep Statement A (Mark B as invalid)"
++          : strategy === "keep_b"
++            ? "Keep Statement B (Mark A as invalid)"
++            : "Dismiss as Compatible (Both valid in context)"
++
++      const actionNotes = customNotes.trim()
++        ? `${strategyBaseNote}: ${customNotes.trim()}`
++        : strategyBaseNote
++
++      const updated = await resolveContradictionAction({
++        contradictionId: contradiction.id,
++        status,
++        actionNotes,
++      })
++
++      toast.success("Contradiction resolved successfully")
++      onResolved?.(updated)
++      onOpenChange(false)
++    } catch (err) {
++      toast.error(
++        err instanceof Error ? err.message : "Failed to resolve contradiction"
++      )
++    } finally {
++      setIsSubmitting(false)
++    }
++  }
++
++  return (
++    <div className="flex flex-col gap-4 text-left">
++      <div className="flex flex-col gap-1.5">
++        <div className="flex items-center gap-2 text-foreground">
++          <AlertCircle className="h-4 w-4 text-amber-500" />
++          <h2 className="text-sm font-semibold tracking-tight">
++            Resolve Contradiction
++          </h2>
++        </div>
++        <p className="text-xs text-muted-foreground">
++          Choose an authoritative resolution strategy for{" "}
++          <span className="font-semibold text-foreground">
++            {contradiction.entityLabel}
++          </span>{" "}
++          (&quot;{contradiction.relationName}&quot;).
++        </p>
++      </div>
++
++      {/* Strategies Radio Group */}
++      <div className="flex flex-col gap-2">
++        <Label className="text-xs font-medium">Resolution Strategy</Label>
++        <RadioGroup
++          value={strategy}
++          onValueChange={(val) => setStrategy(val as ResolutionStrategy)}
++          className="gap-2"
++        >
++          {/* Strategy: keep_a */}
++          <label
++            htmlFor="strat-keep-a"
++            className={cn(
++              "flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors",
++              strategy === "keep_a"
++                ? "border-primary bg-primary/5"
++                : "border-border hover:bg-muted/30"
++            )}
++          >
++            <RadioGroupItem
++              value="keep_a"
++              id="strat-keep-a"
++              className="mt-0.5"
++            />
++            <div className="flex flex-col gap-0.5">
++              <span className="text-xs font-medium text-foreground">
++                Keep Statement A (Mark B as invalid)
++              </span>
++              {factAValue && (
++                <span className="text-[11px] text-muted-foreground">
++                  Statement A value: &quot;{factAValue}&quot;
++                </span>
++              )}
++            </div>
++          </label>
++
++          {/* Strategy: keep_b */}
++          <label
++            htmlFor="strat-keep-b"
++            className={cn(
++              "flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors",
++              strategy === "keep_b"
++                ? "border-primary bg-primary/5"
++                : "border-border hover:bg-muted/30"
++            )}
++          >
++            <RadioGroupItem
++              value="keep_b"
++              id="strat-keep-b"
++              className="mt-0.5"
++            />
++            <div className="flex flex-col gap-0.5">
++              <span className="text-xs font-medium text-foreground">
++                Keep Statement B (Mark A as invalid)
++              </span>
++              {factBValue && (
++                <span className="text-[11px] text-muted-foreground">
++                  Statement B value: &quot;{factBValue}&quot;
++                </span>
++              )}
++            </div>
++          </label>
++
++          {/* Strategy: dismiss */}
++          <label
++            htmlFor="strat-dismiss"
++            className={cn(
++              "flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors",
++              strategy === "dismiss"
++                ? "border-primary bg-primary/5"
++                : "border-border hover:bg-muted/30"
++            )}
++          >
++            <RadioGroupItem
++              value="dismiss"
++              id="strat-dismiss"
++              className="mt-0.5"
++            />
++            <div className="flex flex-col gap-0.5">
++              <span className="text-xs font-medium text-foreground">
++                Dismiss as Compatible (Both valid in context)
++              </span>
++              <span className="text-[11px] text-muted-foreground">
++                Retain both assertions without flagging semantic drift.
++              </span>
++            </div>
++          </label>
++        </RadioGroup>
++      </div>
++
++      {/* Resolution Notes Textarea */}
++      <div className="flex flex-col gap-1.5">
++        <Label htmlFor="resolve-notes" className="text-xs font-medium">
++          Resolution Notes (Optional)
++        </Label>
++        <Textarea
++          id="resolve-notes"
++          value={customNotes}
++          onChange={(e) => setCustomNotes(e.target.value)}
++          placeholder="Add rationale, source verification notes, or audit commentary..."
++          className="min-h-[70px] resize-none text-xs"
++        />
++      </div>
++
++      {/* Action Buttons */}
++      <div className="flex items-center justify-end gap-2 border-t pt-3">
++        <Button
++          type="button"
++          variant="outline"
++          size="sm"
++          onClick={() => onOpenChange(false)}
++          disabled={isSubmitting}
++        >
++          Cancel
++        </Button>
++        <Button
++          type="button"
++          size="sm"
++          onClick={handleConfirm}
++          disabled={isSubmitting}
++          className="gap-1.5"
++          data-testid="confirm-resolve-button"
++        >
++          {isSubmitting ? (
++            <>
++              <Loader2 className="h-3.5 w-3.5 animate-spin" />
++              <span>Resolving...</span>
++            </>
++          ) : (
++            <>
++              <CheckCircle className="h-3.5 w-3.5" />
++              <span>Confirm Resolution</span>
++            </>
++          )}
++        </Button>
++      </div>
++    </div>
++  )
++}
++
++export function ResolveDialog({
++  contradiction,
++  open,
++  onOpenChange,
++  onResolved,
++  inline = false,
++  className,
++}: ResolveDialogProps) {
++  if (!contradiction) {
++    if (inline) return null
++    return (
++      <Dialog open={open} onOpenChange={onOpenChange}>
++        <DialogContent className={className} />
++      </Dialog>
++    )
++  }
++
++  if (inline) {
++    return (
++      <div
++        className={cn(
++          "flex w-full max-w-lg flex-col gap-4 rounded-lg border bg-card p-6 text-card-foreground shadow-sm",
++          className
++        )}
++        data-testid="resolve-contradiction-dialog"
++      >
++        <ResolveDialogForm
++          key={contradiction.id}
++          contradiction={contradiction}
++          onOpenChange={onOpenChange}
++          onResolved={onResolved}
++        />
++      </div>
++    )
++  }
++
++  return (
++    <Dialog open={open} onOpenChange={onOpenChange}>
++      <DialogContent
++        className={cn("sm:max-w-lg", className)}
++        data-testid="resolve-contradiction-dialog"
++      >
++        <DialogHeader className="sr-only">
++          <DialogTitle>Resolve Contradiction</DialogTitle>
++          <DialogDescription>
++            Choose an authoritative resolution strategy for this conflict.
++          </DialogDescription>
++        </DialogHeader>
++        <ResolveDialogForm
++          key={contradiction.id}
++          contradiction={contradiction}
++          onOpenChange={onOpenChange}
++          onResolved={onResolved}
++        />
++      </DialogContent>
++    </Dialog>
++  )
++}
+diff --git a/src/features/analyst/server/actions/run-drift-analysis.ts b/src/features/analyst/server/actions/run-drift-analysis.ts
+new file mode 100644
+index 0000000..da61f94
+--- /dev/null
++++ b/src/features/analyst/server/actions/run-drift-analysis.ts
+@@ -0,0 +1,45 @@
++"use server"
++
++import { getDb } from "@/server/database"
++import { getCurrentGroupKeyOrThrow } from "@/server/group-access"
++import { publishDomainEvent } from "@/server/events/outbox"
++import type { DbOrTx } from "@/server/events/types"
++
++export interface RunDriftAnalysisResult {
++  success: boolean
++  eventId?: string
++  jobId?: string
++}
++
++export async function runDriftAnalysisAction(
++  ontologyIdOrInput: string | { ontologyId: string },
++  dbInstance?: DbOrTx
++): Promise<RunDriftAnalysisResult> {
++  const ontologyId =
++    typeof ontologyIdOrInput === "string"
++      ? ontologyIdOrInput
++      : ontologyIdOrInput?.ontologyId
++
++  if (!ontologyId || !ontologyId.trim()) {
++    throw new Error("ontologyId is required.")
++  }
++
++  const groupKey = await getCurrentGroupKeyOrThrow().catch(() => "shared")
++  const db = dbInstance ?? getDb()
++
++  const { eventId, jobId } = await publishDomainEvent(db, {
++    eventType: "analyst.drift_analysis_requested",
++    aggregateType: "ontology",
++    aggregateId: ontologyId.trim(),
++    payload: {
++      ontologyId: ontologyId.trim(),
++      groupKey,
++    },
++  })
++
++  return {
++    success: true,
++    eventId,
++    jobId,
++  }
++}
+diff --git a/src/features/analyst/types.ts b/src/features/analyst/types.ts
+index 784b075..8ec1fcc 100644
+--- a/src/features/analyst/types.ts
++++ b/src/features/analyst/types.ts
+@@ -97,3 +97,9 @@ export interface ResolveContradictionInput {
+   status: "resolved" | "dismissed"
+   actionNotes?: string
+ }
++
++export interface RunDriftAnalysisResult {
++  success: boolean
++  eventId?: string
++  jobId?: string
++}
+diff --git a/src/server/events/outbox.ts b/src/server/events/outbox.ts
+index 80b4bf0..5eec5b2 100644
+--- a/src/server/events/outbox.ts
++++ b/src/server/events/outbox.ts
+@@ -15,6 +15,7 @@ const EVENT_WORKER_ROUTING: Record<string, string> = {
+   "tabular.db_discover_requested": "tabular",
+   "tabular.db_profile_requested": "tabular",
+   "analyst.query_requested": "analyst",
++  "analyst.drift_analysis_requested": "analyst",
+ }
+ 
+ export function resolveTargetWorker(eventType: string): string {
+@@ -26,13 +27,15 @@ export async function publishDomainEvent(
+   event: DomainEventInput,
+   options?: PublishEventOptions
+ ): Promise<PublishedEventResult> {
+-  const [createdEvent] = await (tx as unknown as {
+-    insert: (table: unknown) => {
+-      values: (data: unknown) => {
+-        returning: (cols: unknown) => Promise<Array<{ id: string }>>
++  const [createdEvent] = await (
++    tx as unknown as {
++      insert: (table: unknown) => {
++        values: (data: unknown) => {
++          returning: (cols: unknown) => Promise<Array<{ id: string }>>
++        }
+       }
+     }
+-  })
++  )
+     .insert(domainEvents)
+     .values({
+       event_type: event.eventType,
+@@ -48,13 +51,15 @@ export async function publishDomainEvent(
+     options?.targetWorker || resolveTargetWorker(event.eventType)
+   const priority = options?.priority ?? 0
+ 
+-  const [createdJob] = await (tx as unknown as {
+-    insert: (table: unknown) => {
+-      values: (data: unknown) => {
+-        returning: (cols: unknown) => Promise<Array<{ id: string }>>
++  const [createdJob] = await (
++    tx as unknown as {
++      insert: (table: unknown) => {
++        values: (data: unknown) => {
++          returning: (cols: unknown) => Promise<Array<{ id: string }>>
++        }
+       }
+     }
+-  })
++  )
+     .insert(jobQueue)
+     .values({
+       event_id: eventId,
+diff --git a/tests/analyst-contradictions-dom.test.ts b/tests/analyst-contradictions-dom.test.ts
+new file mode 100644
+index 0000000..d404e90
+--- /dev/null
++++ b/tests/analyst-contradictions-dom.test.ts
+@@ -0,0 +1,488 @@
++import assert from "node:assert/strict"
++import fs from "node:fs"
++import path from "node:path"
++import { test } from "node:test"
++import { execFileSync } from "node:child_process"
++import { createRequire } from "node:module"
++import React from "react"
++
++const req = createRequire(import.meta.url)
++try {
++  const serverOnlyPath = req.resolve("server-only")
++  req.cache[serverOnlyPath] = {
++    id: serverOnlyPath,
++    filename: serverOnlyPath,
++    loaded: true,
++    exports: {},
++  } as unknown as NodeJS.Module
++} catch {
++  // Ignore if server-only cannot be resolved
++}
++
++import type { KnowledgeContradiction } from "../src/features/analyst/types"
++
++const isReactServer = process.execArgv.some((a) => a.includes("react-server"))
++const isChildTest = process.env.CHILD_REACT_DOM_TEST === "1"
++
++if (isChildTest || !isReactServer) {
++  const { renderToStaticMarkup } = await import("react-dom/server")
++  const { QueryClient, QueryClientProvider } =
++    await import("@tanstack/react-query")
++
++  // Sample contradictions fixtures
++  const sampleContradictionA: KnowledgeContradiction = {
++    id: "contra-1",
++    ontologyId: "ont-100",
++    groupKey: "shared",
++    entityId: "ent-1",
++    entityLabel: "Baltic Research Foundation",
++    relationName: "headquarters",
++    conflictType: "value_mismatch",
++    factA: {
++      id: "fact-1",
++      value: "Stockholm, Sweden",
++      documentTitle: "baltic_marine_2024.pdf",
++      quoteText:
++        "The Baltic Research Foundation established primary headquarters in Stockholm.",
++    },
++    factB: {
++      id: "fact-2",
++      value: "Helsinki, Finland",
++      sourceName: "nordic_orgs.csv",
++      quoteText: "Baltic Research Foundation | HQ: Helsinki | Row 42",
++    },
++    explanation:
++      "Conflicting headquarters statements detected: Document 2024 states Stockholm while dataset states Helsinki.",
++    status: "open",
++    resolutionAction: null,
++    createdAt: "2026-11-09T10:00:00.000Z",
++    updatedAt: "2026-11-09T10:00:00.000Z",
++  }
++
++  const sampleContradictionB: KnowledgeContradiction = {
++    id: "contra-2",
++    ontologyId: "ont-100",
++    groupKey: "shared",
++    entityId: "ent-2",
++    entityLabel: "Gulf Monitoring Station",
++    relationName: "operational_status",
++    conflictType: "temporal_drift",
++    factA: {
++      id: "fact-3",
++      value: "Active",
++      documentTitle: "annual_report_2023.pdf",
++    },
++    factB: {
++      id: "fact-4",
++      value: "Decommissioned",
++      documentTitle: "decommission_notice_2025.pdf",
++    },
++    explanation:
++      "Temporal drift identified across consecutive monitoring reports.",
++    status: "resolved",
++    resolutionAction:
++      "Keep Statement B (Mark A as invalid): Decommissioned in 2025",
++    createdAt: "2026-11-09T11:00:00.000Z",
++    updatedAt: "2026-11-09T12:00:00.000Z",
++  }
++
++  const sampleContradictionC: KnowledgeContradiction = {
++    id: "contra-3",
++    ontologyId: "ont-100",
++    groupKey: "shared",
++    entityId: "ent-3",
++    entityLabel: "Algae Bloom Index",
++    relationName: "critical_threshold",
++    conflictType: "negation",
++    factA: {
++      id: "fact-5",
++      value: "Exceeded Safe Limit",
++      documentTitle: "water_quality_2026.pdf",
++    },
++    factB: {
++      id: "fact-6",
++      value: "Within Normal Range",
++      documentTitle: "satellite_chlorophyll_2026.pdf",
++    },
++    explanation: "Direct negation between lab water sample and satellite data.",
++    status: "dismissed",
++    resolutionAction:
++      "Dismiss as Compatible (Both valid in context): Measured at different depths",
++    createdAt: "2026-11-09T12:00:00.000Z",
++    updatedAt: "2026-11-09T13:00:00.000Z",
++  }
++
++  // Test 1: ContradictionCard DOM rendering for Value Mismatch
++  test("ContradictionCard renders side-by-side statement comparison, conflict type badges, and explanation", async () => {
++    const { ContradictionCard } =
++      await import("../src/features/analyst/components/contradictions-view/contradiction-card")
++
++    const html = renderToStaticMarkup(
++      React.createElement(ContradictionCard, {
++        contradiction: sampleContradictionA,
++        onResolveClick: () => {},
++      })
++    )
++
++    // Entity & Relation
++    assert.ok(
++      html.includes("Baltic Research Foundation"),
++      "Must render entity label"
++    )
++    assert.ok(html.includes("headquarters"), "Must render relation name")
++
++    // Badges
++    assert.ok(
++      html.includes("Value Mismatch"),
++      "Must render Value Mismatch conflict badge"
++    )
++    assert.ok(html.includes("Open"), "Must render Open status badge")
++
++    // Statement A
++    assert.ok(
++      html.includes("Stockholm, Sweden"),
++      "Must render Statement A value"
++    )
++    assert.ok(
++      html.includes("baltic_marine_2024.pdf"),
++      "Must render Statement A source title"
++    )
++    assert.ok(
++      html.includes("The Baltic Research Foundation established primary"),
++      "Must render Statement A quote text"
++    )
++
++    // Statement B
++    assert.ok(
++      html.includes("Helsinki, Finland"),
++      "Must render Statement B value"
++    )
++    assert.ok(
++      html.includes("nordic_orgs.csv"),
++      "Must render Statement B source title"
++    )
++    assert.ok(
++      html.includes("Baltic Research Foundation | HQ: Helsinki"),
++      "Must render Statement B quote text"
++    )
++
++    // Explanation
++    assert.ok(
++      html.includes(sampleContradictionA.explanation),
++      "Must render contradiction explanation"
++    )
++
++    // Action button
++    assert.ok(
++      html.includes("Resolve Conflict"),
++      "Must render active Resolve Conflict button for open contradiction"
++    )
++  })
++
++  // Test 2: ContradictionCard renders Temporal Drift and Negation badges + Resolved state
++  test("ContradictionCard renders Temporal Drift badge and Resolution Details for resolved conflict", async () => {
++    const { ContradictionCard } =
++      await import("../src/features/analyst/components/contradictions-view/contradiction-card")
++
++    const html = renderToStaticMarkup(
++      React.createElement(ContradictionCard, {
++        contradiction: sampleContradictionB,
++        onResolveClick: () => {},
++      })
++    )
++
++    assert.ok(
++      html.includes("Temporal Drift"),
++      "Must render Temporal Drift conflict badge"
++    )
++    assert.ok(html.includes("Resolved"), "Must render Resolved status badge")
++    assert.ok(
++      html.includes("Resolution Details"),
++      "Must render Resolution Details button when resolved"
++    )
++    assert.ok(
++      html.includes("Keep Statement B (Mark A as invalid)"),
++      "Must display resolutionAction note"
++    )
++  })
++
++  test("ContradictionCard renders Negation badge and Dismissed status", async () => {
++    const { ContradictionCard } =
++      await import("../src/features/analyst/components/contradictions-view/contradiction-card")
++
++    const html = renderToStaticMarkup(
++      React.createElement(ContradictionCard, {
++        contradiction: sampleContradictionC,
++        onResolveClick: () => {},
++      })
++    )
++
++    assert.ok(
++      html.includes("Negation / Direct Contradiction"),
++      "Must render Negation conflict badge"
++    )
++    assert.ok(html.includes("Dismissed"), "Must render Dismissed status badge")
++  })
++
++  // Test 3: ResolveDialog rendering options and strategies
++  test("ResolveDialog renders three resolution strategies and custom notes input inline", async () => {
++    const { ResolveDialog } =
++      await import("../src/features/analyst/components/contradictions-view/resolve-dialog")
++
++    const html = renderToStaticMarkup(
++      React.createElement(ResolveDialog, {
++        contradiction: sampleContradictionA,
++        open: true,
++        onOpenChange: () => {},
++        inline: true,
++      })
++    )
++
++    assert.ok(
++      html.includes("Resolve Contradiction"),
++      "Must render dialog title"
++    )
++    assert.ok(
++      html.includes("Baltic Research Foundation"),
++      "Must render contradiction entity in dialog"
++    )
++    assert.ok(
++      html.includes("Keep Statement A (Mark B as invalid)"),
++      "Must render keep_a strategy option"
++    )
++    assert.ok(
++      html.includes("Keep Statement B (Mark A as invalid)"),
++      "Must render keep_b strategy option"
++    )
++    assert.ok(
++      html.includes("Dismiss as Compatible (Both valid in context)"),
++      "Must render dismiss strategy option"
++    )
++    assert.ok(
++      html.includes("Resolution Notes (Optional)"),
++      "Must render custom resolution notes label"
++    )
++    assert.ok(
++      html.includes("Confirm Resolution"),
++      "Must render Confirm Resolution button"
++    )
++  })
++
++  // Test 4: ContradictionsTab renders list of cards, count badge, and drift analysis button
++  test("ContradictionsTab renders list of cards, count badge, and drift analysis button", async () => {
++    const { ContradictionsTab } =
++      await import("../src/features/analyst/components/contradictions-view/contradictions-tab")
++
++    const queryClient = new QueryClient({
++      defaultOptions: { queries: { retry: false } },
++    })
++
++    const html = renderToStaticMarkup(
++      React.createElement(
++        QueryClientProvider,
++        { client: queryClient },
++        React.createElement(ContradictionsTab, {
++          ontologyId: "ont-100",
++          contradictions: [
++            sampleContradictionA,
++            sampleContradictionB,
++            sampleContradictionC,
++          ],
++        })
++      )
++    )
++
++    assert.ok(
++      html.includes("Knowledge Contradictions &amp; Semantic Drift") ||
++        html.includes("Knowledge Contradictions & Semantic Drift"),
++      "Must render contradictions tab header"
++    )
++    assert.ok(
++      html.includes("1 open conflict"),
++      "Must render open conflict count badge"
++    )
++    assert.ok(
++      html.includes("Run Drift Analysis"),
++      "Must render Run Drift Analysis button"
++    )
++    assert.ok(
++      html.includes("Baltic Research Foundation"),
++      "Must render contradiction A card"
++    )
++    assert.ok(
++      html.includes("Gulf Monitoring Station"),
++      "Must render contradiction B card"
++    )
++    assert.ok(
++      html.includes("Algae Bloom Index"),
++      "Must render contradiction C card"
++    )
++  })
++
++  // Test 5: ContradictionsTab renders empty state when 0 contradictions exist
++  test("ContradictionsTab renders coherent empty state when 0 contradictions exist", async () => {
++    const { ContradictionsTab } =
++      await import("../src/features/analyst/components/contradictions-view/contradictions-tab")
++
++    const queryClient = new QueryClient({
++      defaultOptions: { queries: { retry: false } },
++    })
++
++    const html = renderToStaticMarkup(
++      React.createElement(
++        QueryClientProvider,
++        { client: queryClient },
++        React.createElement(ContradictionsTab, {
++          ontologyId: "ont-100",
++          contradictions: [],
++        })
++      )
++    )
++
++    assert.ok(
++      html.includes(
++        "Knowledge Graph is coherent: no conflicting assertions detected."
++      ),
++      "Must render coherent empty state message"
++    )
++    assert.ok(
++      html.includes("0 open conflicts"),
++      "Must render 0 open conflicts badge"
++    )
++  })
++}
++
++// Test 6: runDriftAnalysisAction outbox event creation
++test("runDriftAnalysisAction validates ontologyId and dispatches domain event", async () => {
++  const { runDriftAnalysisAction } =
++    await import("../src/features/analyst/server/actions/run-drift-analysis")
++
++  // Empty validation
++  await assert.rejects(
++    () => runDriftAnalysisAction(""),
++    /ontologyId is required/
++  )
++  await assert.rejects(
++    () => runDriftAnalysisAction("   "),
++    /ontologyId is required/
++  )
++
++  const insertedEvents: Array<Record<string, unknown>> = []
++  const insertedJobs: Array<Record<string, unknown>> = []
++
++  const mockDb = {
++    insert: () => ({
++      values: (val: Record<string, unknown>) => {
++        if ("event_type" in val) {
++          insertedEvents.push(val)
++          return {
++            returning: () => Promise.resolve([{ id: "mock-evt-drift-123" }]),
++          }
++        }
++        if ("target_worker" in val) {
++          insertedJobs.push(val)
++          return {
++            returning: () => Promise.resolve([{ id: "mock-job-drift-456" }]),
++          }
++        }
++        return {
++          returning: () => Promise.resolve([{ id: "mock-id-789" }]),
++        }
++      },
++    }),
++  }
++
++  const result = await runDriftAnalysisAction(
++    "ont-drift-100",
++    mockDb as unknown as Parameters<typeof runDriftAnalysisAction>[1]
++  )
++
++  assert.equal(result.success, true)
++  assert.equal(result.eventId, "mock-evt-drift-123")
++  assert.equal(result.jobId, "mock-job-drift-456")
++
++  assert.equal(insertedEvents.length, 1)
++  assert.equal(insertedEvents[0].event_type, "analyst.drift_analysis_requested")
++  assert.equal(insertedEvents[0].aggregate_type, "ontology")
++  assert.equal(insertedEvents[0].aggregate_id, "ont-drift-100")
++
++  const payload = insertedEvents[0].payload as Record<string, unknown>
++  assert.equal(payload.ontologyId, "ont-drift-100")
++  assert.equal(payload.groupKey, "shared")
++
++  assert.equal(insertedJobs.length, 1)
++  assert.equal(insertedJobs[0].target_worker, "analyst")
++})
++
++// Test 7: EVENT_WORKER_ROUTING in outbox.ts maps analyst.drift_analysis_requested
++test("resolveTargetWorker routes analyst.drift_analysis_requested to analyst", async () => {
++  const { resolveTargetWorker } = await import("../src/server/events/outbox")
++
++  assert.equal(
++    resolveTargetWorker("analyst.drift_analysis_requested"),
++    "analyst"
++  )
++})
++
++// Test 8: AnalystShell embeds ContradictionsTab
++test("AnalystShell imports and embeds ContradictionsTab component", () => {
++  const shellPath = path.resolve(
++    process.cwd(),
++    "src/features/analyst/components/analyst-shell/analyst-shell.tsx"
++  )
++  const content = fs.readFileSync(shellPath, "utf-8")
++
++  assert.ok(
++    content.includes("ContradictionsTab"),
++    "AnalystShell must import ContradictionsTab"
++  )
++  assert.ok(
++    content.includes("<ContradictionsTab ontologyId={ontologyId} />"),
++    "AnalystShell must mount ContradictionsTab in contradictions tab panel"
++  )
++})
++
++if (isReactServer && !isChildTest) {
++  test("Client DOM rendering tests for ContradictionCard, ResolveDialog, and ContradictionsTab via tsx runner", () => {
++    const tsxCli = path.resolve(
++      process.cwd(),
++      "node_modules/.pnpm/tsx@4.23.15/node_modules/tsx/dist/cli.mjs"
++    )
++    const fallbackCli = path.resolve(
++      process.cwd(),
++      "node_modules/tsx/dist/cli.mjs"
++    )
++    const cliToUse = fs.existsSync(fallbackCli) ? fallbackCli : tsxCli
++
++    const testFile = path.resolve(
++      process.cwd(),
++      "tests/analyst-contradictions-dom.test.ts"
++    )
++    const childEnv: NodeJS.ProcessEnv = {
++      ...process.env,
++      CHILD_REACT_DOM_TEST: "1",
++    }
++    for (const key of Object.keys(childEnv)) {
++      if (key.startsWith("NODE_TEST_")) {
++        delete childEnv[key]
++      }
++    }
++
++    const output = execFileSync(
++      process.execPath,
++      [cliToUse, "--test", testFile],
++      {
++        encoding: "utf-8",
++        env: childEnv,
++      }
++    )
++    assert.ok(
++      output.includes("pass") || output.includes("ok"),
++      "Child client DOM rendering tests must pass"
++    )
++    assert.ok(
++      !output.includes("fail 1"),
++      "Child client DOM tests must have 0 failures"
++    )
++  })
++}

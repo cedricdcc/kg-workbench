@@ -1,0 +1,1526 @@
+diff --git a/src/features/analyst/README.md b/src/features/analyst/README.md
+index 299cd25..9522984 100644
+--- a/src/features/analyst/README.md
++++ b/src/features/analyst/README.md
+@@ -15,6 +15,16 @@ entry_points:
+     purpose: Main client shell layout coordinating conversation sidebar, chat and contradiction tabs, citation drawer, and subgraph modal.
+   - path: src/features/analyst/components/conversation-sidebar/conversation-sidebar.tsx
+     purpose: Left sidebar listing analyst conversations with search filter, new analysis creation, and deletion.
++  - path: src/features/analyst/components/chat-view/chat-message-list.tsx
++    purpose: Chronological message list view with empty state, auto-scrolling, and thinking indicators.
++  - path: src/features/analyst/components/chat-view/chat-message-item.tsx
++    purpose: Message item renderer for user questions and assistant answers with parsed citation badges, reasoning trace card, and subgraph launcher.
++  - path: src/features/analyst/components/chat-view/chat-input-bar.tsx
++    purpose: Query input bar with suggested question chips, Enter-to-submit keyboard handlers, and loading states.
++  - path: src/features/analyst/components/chat-view/reasoning-trace-card.tsx
++    purpose: Collapsible step-by-step reasoning trace card with execution stage badges and explanations.
++  - path: src/features/analyst/components/citation-drawer/citation-inspector.tsx
++    purpose: Slide-over drawer and card displaying document paragraphs or tabular records with full quote evidence.
+ server_entry_points:
+   - path: src/features/analyst/server/actions/create-conversation.ts
+     purpose: Server action to initialize an analyst conversation.
+diff --git a/src/features/analyst/components/analyst-shell/analyst-shell.tsx b/src/features/analyst/components/analyst-shell/analyst-shell.tsx
+index 2d24535..0f5aa2f 100644
+--- a/src/features/analyst/components/analyst-shell/analyst-shell.tsx
++++ b/src/features/analyst/components/analyst-shell/analyst-shell.tsx
+@@ -2,15 +2,16 @@
+ 
+ import { createContext, useContext, useMemo, useState } from "react"
+ import { useRouter } from "next/navigation"
++import { useQuery } from "@tanstack/react-query"
+ import {
+   AlertCircle,
+   AlertTriangle,
+   CheckCircle2,
+-  FileText,
+   MessageSquare,
+   Network,
+   Sparkles,
+ } from "lucide-react"
++import { toast } from "sonner"
+ 
+ import { Badge } from "@/components/ui/badge"
+ import { Button } from "@/components/ui/button"
+@@ -21,13 +22,6 @@ import {
+   DialogHeader,
+   DialogTitle,
+ } from "@/components/ui/dialog"
+-import {
+-  Sheet,
+-  SheetContent,
+-  SheetDescription,
+-  SheetHeader,
+-  SheetTitle,
+-} from "@/components/ui/sheet"
+ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+ import { routes } from "@/lib/routes"
+ import type { SystemServiceDisplay } from "@/features/settings/server/queries/get-system-services"
+@@ -37,7 +31,12 @@ import type {
+   AnalystSubgraph,
+ } from "../../types"
+ import { createConversationAction } from "../../server/actions/create-conversation"
++import { sendQueryAction } from "../../server/actions/send-query"
++import { getMessagesQuery } from "../../server/queries/get-messages"
+ import { ConversationSidebar } from "../conversation-sidebar/conversation-sidebar"
++import { ChatMessageList } from "../chat-view/chat-message-list"
++import { ChatInputBar } from "../chat-view/chat-input-bar"
++import { CitationInspector } from "../citation-drawer/citation-inspector"
+ 
+ export interface AnalystShellContextValue {
+   selectedConversationId: string | null
+@@ -90,6 +89,30 @@ export function AnalystShell({
+   )
+   const [isSubgraphModalOpen, setIsSubgraphModalOpen] = useState(false)
+   const [isCreatingQuick, setIsCreatingQuick] = useState(false)
++  const [isSending, setIsSending] = useState(false)
++
++  // Polling / fetching conversation messages
++  const { data: messages = [], refetch: refetchMessages } = useQuery({
++    queryKey: ["analyst-messages", selectedConversationId],
++    queryFn: async () => {
++      if (!selectedConversationId) return []
++      return await getMessagesQuery(selectedConversationId)
++    },
++    enabled: Boolean(selectedConversationId),
++    refetchInterval: (query) => {
++      const list = query.state.data ?? []
++      const lastMessage = list[list.length - 1]
++      if (lastMessage && lastMessage.sender === "user") {
++        return 2000
++      }
++      return false
++    },
++  })
++
++  const isAssistantThinking = useMemo(() => {
++    if (!messages.length) return false
++    return messages[messages.length - 1]?.sender === "user"
++  }, [messages])
+ 
+   const selectedConversation = useMemo(
+     () => conversations.find((c) => c.id === selectedConversationId) ?? null,
+@@ -151,11 +174,34 @@ export function AnalystShell({
+         title: "New Analysis",
+       })
+       handleConversationCreated(newConv)
++    } catch (err) {
++      toast.error(
++        err instanceof Error ? err.message : "Failed to create new analysis"
++      )
+     } finally {
+       setIsCreatingQuick(false)
+     }
+   }
+ 
++  async function handleSendMessage(queryText: string) {
++    if (!selectedConversationId || !ontologyId || isSending) return
++    setIsSending(true)
++    try {
++      await sendQueryAction({
++        conversationId: selectedConversationId,
++        ontologyId,
++        query: queryText,
++      })
++      await refetchMessages()
++    } catch (err) {
++      toast.error(
++        err instanceof Error ? err.message : "Failed to dispatch graph query"
++      )
++    } finally {
++      setIsSending(false)
++    }
++  }
++
+   const contextValue: AnalystShellContextValue = useMemo(
+     () => ({
+       selectedConversationId,
+@@ -279,24 +325,19 @@ export function AnalystShell({
+                       </div>
+                     </div>
+ 
+-                    {/* Chat Content Slot (Task 7 will mount ChatMessageList and ChatInputBar here) */}
+-                    <div
+-                      className="flex flex-1 flex-col items-center justify-center p-8 text-center"
+-                      data-testid="analyst-chat-placeholder"
+-                    >
+-                      <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
+-                        <Sparkles className="h-6 w-6" />
+-                      </div>
+-                      <h3 className="mb-1 text-sm font-semibold">
+-                        Start Knowledge Graph Query
+-                      </h3>
+-                      <p className="max-w-md text-xs text-muted-foreground">
+-                        Ask natural language questions about your ontology and
+-                        accepted facts. The analyst will extract multi-hop
+-                        paths, verify paragraph citations, and detect semantic
+-                        drift.
+-                      </p>
+-                    </div>
++                    {/* Chat Messages Thread */}
++                    <ChatMessageList
++                      messages={messages}
++                      isLoading={isSending || isAssistantThinking}
++                      onSelectCitation={handleOpenCitation}
++                      onViewSubgraph={handleOpenSubgraph}
++                    />
++
++                    {/* Chat Input Bar */}
++                    <ChatInputBar
++                      onSubmit={handleSendMessage}
++                      isLoading={isSending}
++                    />
+                   </div>
+                 ) : (
+                   <div className="flex flex-1 flex-col items-center justify-center p-8 text-center">
+@@ -334,7 +375,7 @@ export function AnalystShell({
+                     <div className="flex items-center gap-2">
+                       <AlertTriangle className="h-4 w-4 text-amber-500" />
+                       <h2 className="text-sm font-semibold">
+-                        Knowledge Contradictions & Semantic Drift
++                        Knowledge Contradictions &amp; Semantic Drift
+                       </h2>
+                     </div>
+                     <p className="text-xs text-muted-foreground">
+@@ -355,54 +396,12 @@ export function AnalystShell({
+         </div>
+ 
+         {/* Citation Drawer / Sheet */}
+-        <Sheet
++        <CitationInspector
++          data-testid="analyst-citation-drawer"
++          citation={activeCitation}
+           open={isCitationDrawerOpen}
+           onOpenChange={setIsCitationDrawerOpen}
+-        >
+-          <SheetContent
+-            side="right"
+-            className="w-full sm:max-w-md"
+-            data-testid="analyst-citation-drawer"
+-          >
+-            <SheetHeader>
+-              <div className="flex items-center gap-2">
+-                <FileText className="h-4 w-4 text-primary" />
+-                <SheetTitle className="text-sm">Citation Source</SheetTitle>
+-              </div>
+-              <SheetDescription className="text-xs">
+-                {activeCitation?.sourceType === "table"
+-                  ? "Tabular record verification"
+-                  : "Unstructured document paragraph verification"}
+-              </SheetDescription>
+-            </SheetHeader>
+-
+-            {activeCitation && (
+-              <div className="mt-4 space-y-4 text-xs">
+-                <div>
+-                  <span className="font-medium text-foreground">Source:</span>{" "}
+-                  <span className="text-muted-foreground">
+-                    {activeCitation.sourceName}
+-                  </span>
+-                </div>
+-                {activeCitation.paragraphIndex !== undefined && (
+-                  <div>
+-                    <span className="font-medium text-foreground">
+-                      Paragraph:
+-                    </span>{" "}
+-                    <span className="text-muted-foreground">
+-                      §{activeCitation.paragraphIndex}
+-                    </span>
+-                  </div>
+-                )}
+-                {activeCitation.quoteText && (
+-                  <div className="rounded-md border bg-muted/50 p-3 italic">
+-                    &ldquo;{activeCitation.quoteText}&rdquo;
+-                  </div>
+-                )}
+-              </div>
+-            )}
+-          </SheetContent>
+-        </Sheet>
++        />
+ 
+         {/* Subgraph Visualizer Modal */}
+         <Dialog
+diff --git a/src/features/analyst/components/chat-view/chat-input-bar.tsx b/src/features/analyst/components/chat-view/chat-input-bar.tsx
+new file mode 100644
+index 0000000..73ca749
+--- /dev/null
++++ b/src/features/analyst/components/chat-view/chat-input-bar.tsx
+@@ -0,0 +1,124 @@
++"use client"
++
++import { useState, useRef, type KeyboardEvent } from "react"
++import { Loader2, Send, Sparkles } from "lucide-react"
++
++import { Button } from "@/components/ui/button"
++import { Textarea } from "@/components/ui/textarea"
++import { cn } from "@/lib/utils"
++
++export const DEFAULT_SUGGESTED_QUESTIONS = [
++  "Find all organizations located in Finland",
++  "What relationships connect marine ecology research?",
++  "Detect conflicting facts or semantic drift across datasets",
++]
++
++export interface ChatInputBarProps {
++  onSubmit: (query: string) => void | Promise<void>
++  isLoading?: boolean
++  disabled?: boolean
++  suggestedQuestions?: string[]
++  placeholder?: string
++  className?: string
++}
++
++export function ChatInputBar({
++  onSubmit,
++  isLoading = false,
++  disabled = false,
++  suggestedQuestions = DEFAULT_SUGGESTED_QUESTIONS,
++  placeholder = "Ask a question about your knowledge graph, accepted facts, or mapped tables...",
++  className,
++}: ChatInputBarProps) {
++  const [query, setQuery] = useState("")
++  const textareaRef = useRef<HTMLTextAreaElement>(null)
++
++  function handleSend() {
++    const trimmed = query.trim()
++    if (!trimmed || isLoading || disabled) return
++    onSubmit(trimmed)
++    setQuery("")
++  }
++
++  function handleKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
++    if (e.key === "Enter" && !e.shiftKey) {
++      e.preventDefault()
++      handleSend()
++    }
++  }
++
++  function handleSelectChip(suggestion: string) {
++    setQuery(suggestion)
++    textareaRef.current?.focus()
++  }
++
++  return (
++    <div
++      className={cn(
++        "space-y-2.5 border-t bg-card/80 p-3 backdrop-blur-sm",
++        className
++      )}
++      data-testid="chat-input-bar"
++    >
++      {/* Suggested Question Chips */}
++      {suggestedQuestions.length > 0 && (
++        <div className="flex flex-wrap items-center gap-1.5">
++          <span className="mr-1 flex items-center gap-1 text-[10px] font-semibold text-muted-foreground uppercase">
++            <Sparkles className="h-3 w-3 text-primary" /> Suggestions:
++          </span>
++          {suggestedQuestions.map((question, i) => (
++            <button
++              key={i}
++              type="button"
++              onClick={() => handleSelectChip(question)}
++              disabled={isLoading || disabled}
++              className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-border/80 bg-background/90 px-2.5 py-1 text-[11px] text-muted-foreground transition hover:border-primary/50 hover:bg-muted hover:text-foreground disabled:opacity-50"
++              data-testid="suggested-chip"
++            >
++              <span>{question}</span>
++            </button>
++          ))}
++        </div>
++      )}
++
++      {/* Input Textarea & Submit */}
++      <form
++        onSubmit={(e) => {
++          e.preventDefault()
++          handleSend()
++        }}
++        className="relative flex items-end gap-2"
++      >
++        <div className="relative flex-1">
++          <Textarea
++            ref={textareaRef}
++            value={query}
++            onChange={(e) => setQuery(e.target.value)}
++            onKeyDown={handleKeyDown}
++            placeholder={placeholder}
++            disabled={isLoading || disabled}
++            rows={2}
++            className="max-h-32 min-h-[56px] resize-none pr-12 text-xs leading-relaxed focus-visible:ring-primary/40"
++            data-testid="chat-input-textarea"
++          />
++        </div>
++
++        <Button
++          type="submit"
++          size="icon"
++          disabled={!query.trim() || isLoading || disabled}
++          className="h-9 w-9 shrink-0 rounded-lg"
++          data-testid="chat-submit-btn"
++          title={isLoading ? "Analyzing..." : "Send query (Enter)"}
++        >
++          {isLoading ? (
++            <Loader2 className="h-4 w-4 animate-spin" />
++          ) : (
++            <Send className="h-4 w-4" />
++          )}
++          <span className="sr-only">Send query</span>
++        </Button>
++      </form>
++    </div>
++  )
++}
+diff --git a/src/features/analyst/components/chat-view/chat-message-item.tsx b/src/features/analyst/components/chat-view/chat-message-item.tsx
+new file mode 100644
+index 0000000..badf6b4
+--- /dev/null
++++ b/src/features/analyst/components/chat-view/chat-message-item.tsx
+@@ -0,0 +1,272 @@
++"use client"
++
++import { useMemo } from "react"
++import {
++  FileText,
++  Network,
++  Sparkles,
++  Table as TableIcon,
++  User,
++} from "lucide-react"
++
++import { Badge } from "@/components/ui/badge"
++import { Button } from "@/components/ui/button"
++import { cn } from "@/lib/utils"
++import type {
++  AnalystCitation,
++  AnalystMessage,
++  AnalystSubgraph,
++} from "../../types"
++import { ReasoningTraceCard } from "./reasoning-trace-card"
++
++export interface ChatMessageItemProps {
++  message: AnalystMessage
++  onSelectCitation?: (citation: AnalystCitation) => void
++  onViewSubgraph?: (subgraph: AnalystSubgraph) => void
++  defaultTraceOpen?: boolean
++  className?: string
++}
++
++const CITATION_REGEX =
++  /\[(Doc|Table):\s*([^\]#§\n]+?)(?:\s*(?:§|#)\s*([^\]\n]+))?\]/gi
++
++interface ContentToken {
++  key: string
++  type: "text" | "citation"
++  text: string
++  citation?: AnalystCitation
++}
++
++function parseContentWithCitations(
++  content: string,
++  citations: AnalystCitation[] = []
++): ContentToken[] {
++  const tokens: ContentToken[] = []
++  let lastIndex = 0
++  const regex = new RegExp(CITATION_REGEX.source, "gi")
++  let match: RegExpExecArray | null
++
++  while ((match = regex.exec(content)) !== null) {
++    if (match.index > lastIndex) {
++      tokens.push({
++        key: `txt-${lastIndex}`,
++        type: "text",
++        text: content.slice(lastIndex, match.index),
++      })
++    }
++
++    const rawType = match[1]?.toLowerCase()
++    const kind: "document" | "table" =
++      rawType === "table" ? "table" : "document"
++    const rawName = match[2]?.trim() ?? ""
++    const rawAnchor = match[3]?.trim()
++
++    // Match with message.citations if provided
++    let matched = citations.find((c) => {
++      if (c.sourceType !== kind) return false
++      if (c.sourceName.toLowerCase() !== rawName.toLowerCase()) return false
++      if (rawAnchor) {
++        if (kind === "document") {
++          return c.paragraphIndex === parseInt(rawAnchor, 10)
++        } else {
++          return c.tableRowKey === rawAnchor
++        }
++      }
++      return true
++    })
++
++    if (!matched) {
++      matched = citations.find(
++        (c) =>
++          c.sourceType === kind &&
++          c.sourceName.toLowerCase() === rawName.toLowerCase()
++      )
++    }
++
++    const effectiveCitation: AnalystCitation = matched ?? {
++      sourceType: kind,
++      sourceId: rawName,
++      sourceName: rawName,
++      paragraphIndex:
++        kind === "document" && rawAnchor && !isNaN(Number(rawAnchor))
++          ? Number(rawAnchor)
++          : undefined,
++      tableRowKey: kind === "table" && rawAnchor ? rawAnchor : undefined,
++    }
++
++    tokens.push({
++      key: `cit-${match.index}`,
++      type: "citation",
++      text: match[0],
++      citation: effectiveCitation,
++    })
++
++    lastIndex = regex.lastIndex
++  }
++
++  if (lastIndex < content.length) {
++    tokens.push({
++      key: `txt-${lastIndex}`,
++      type: "text",
++      text: content.slice(lastIndex),
++    })
++  }
++
++  return tokens
++}
++
++export function ChatMessageItem({
++  message,
++  onSelectCitation,
++  onViewSubgraph,
++  defaultTraceOpen = false,
++  className,
++}: ChatMessageItemProps) {
++  const isUser = message.sender === "user"
++
++  const parsedTokens = useMemo(() => {
++    if (isUser) return []
++    return parseContentWithCitations(message.content, message.citations ?? [])
++  }, [message.content, message.citations, isUser])
++
++  if (isUser) {
++    return (
++      <div
++        className={cn("flex justify-end gap-3", className)}
++        data-sender="user"
++        data-testid="chat-message-user"
++      >
++        <div className="flex max-w-2xl flex-col items-end">
++          <div className="rounded-2xl rounded-tr-xs bg-primary px-4 py-2.5 text-xs text-primary-foreground shadow-xs">
++            <p className="leading-relaxed whitespace-pre-wrap">
++              {message.content}
++            </p>
++          </div>
++          <span className="mt-1 text-[10px] text-muted-foreground">
++            {new Date(message.createdAt).toLocaleTimeString([], {
++              hour: "2-digit",
++              minute: "2-digit",
++            })}
++          </span>
++        </div>
++        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary select-none">
++          <User className="h-4 w-4" />
++        </div>
++      </div>
++    )
++  }
++
++  return (
++    <div
++      className={cn("flex items-start gap-3", className)}
++      data-sender="assistant"
++      data-testid="chat-message-assistant"
++    >
++      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary select-none">
++        <Sparkles className="h-4 w-4" />
++      </div>
++
++      <div className="flex max-w-3xl min-w-0 flex-1 flex-col gap-3">
++        <div className="rounded-2xl rounded-tl-xs border bg-card p-4 text-xs text-card-foreground shadow-xs">
++          {/* Formatted Text Content with parsed citation pills */}
++          <div className="leading-relaxed whitespace-pre-wrap text-foreground">
++            {parsedTokens.map((token) => {
++              if (token.type === "text") {
++                return <span key={token.key}>{token.text}</span>
++              }
++
++              const cit = token.citation!
++              const isTable = cit.sourceType === "table"
++
++              return (
++                <button
++                  key={token.key}
++                  type="button"
++                  onClick={() => onSelectCitation?.(cit)}
++                  className="mx-1 inline-flex cursor-pointer items-center gap-1 rounded-full border border-primary/20 bg-primary/10 px-2 py-0.5 align-baseline font-mono text-[11px] font-medium text-primary transition-colors hover:border-primary/40 hover:bg-primary/20"
++                  data-testid="citation-pill"
++                  data-citation-source={cit.sourceName}
++                  title={`Inspect citation: ${cit.sourceName}`}
++                >
++                  {isTable ? (
++                    <TableIcon className="h-3 w-3 shrink-0" />
++                  ) : (
++                    <FileText className="h-3 w-3 shrink-0" />
++                  )}
++                  <span>{cit.sourceName}</span>
++                  {cit.paragraphIndex !== undefined && (
++                    <span className="opacity-80">§{cit.paragraphIndex}</span>
++                  )}
++                  {cit.tableRowKey && (
++                    <span className="opacity-80">#{cit.tableRowKey}</span>
++                  )}
++                </button>
++              )
++            })}
++          </div>
++
++          {/* Additional Sources List if citations provided */}
++          {message.citations && message.citations.length > 0 && (
++            <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-border/50 pt-2.5 text-[11px]">
++              <span className="mr-1 flex items-center gap-1 font-medium text-muted-foreground">
++                <FileText className="h-3 w-3" /> Sources:
++              </span>
++              {message.citations.map((c, i) => (
++                <button
++                  key={i}
++                  type="button"
++                  onClick={() => onSelectCitation?.(c)}
++                  className="inline-flex cursor-pointer items-center gap-1 rounded-full border bg-muted/40 px-2 py-0.5 font-mono text-[10px] transition-colors hover:bg-primary/10 hover:text-primary"
++                  data-testid="citation-pill"
++                >
++                  <span>{c.sourceName}</span>
++                  {c.paragraphIndex !== undefined && (
++                    <span>§{c.paragraphIndex}</span>
++                  )}
++                  {c.tableRowKey && <span>#{c.tableRowKey}</span>}
++                </button>
++              ))}
++            </div>
++          )}
++
++          {/* Subgraph button */}
++          {message.subgraph && (
++            <div className="mt-3 border-t border-border/40 pt-2">
++              <Button
++                variant="outline"
++                size="sm"
++                onClick={() => onViewSubgraph?.(message.subgraph!)}
++                className="h-7 gap-1.5 text-xs"
++                data-testid="view-subgraph-btn"
++              >
++                <Network className="h-3.5 w-3.5 text-primary" />
++                <span>View Reasoning Subgraph</span>
++                <Badge
++                  variant="secondary"
++                  className="ml-1 h-4 px-1 text-[10px] font-normal"
++                >
++                  {message.subgraph.nodes.length} nodes
++                </Badge>
++              </Button>
++            </div>
++          )}
++        </div>
++
++        {/* Embedded Reasoning Trace Card */}
++        {message.reasoningTrace && message.reasoningTrace.length > 0 && (
++          <ReasoningTraceCard
++            steps={message.reasoningTrace}
++            defaultOpen={defaultTraceOpen}
++          />
++        )}
++
++        <span className="px-1 text-[10px] text-muted-foreground">
++          {new Date(message.createdAt).toLocaleTimeString([], {
++            hour: "2-digit",
++            minute: "2-digit",
++          })}
++        </span>
++      </div>
++    </div>
++  )
++}
+diff --git a/src/features/analyst/components/chat-view/chat-message-list.tsx b/src/features/analyst/components/chat-view/chat-message-list.tsx
+new file mode 100644
+index 0000000..1f86024
+--- /dev/null
++++ b/src/features/analyst/components/chat-view/chat-message-list.tsx
+@@ -0,0 +1,92 @@
++"use client"
++
++import { useEffect, useRef } from "react"
++import { Sparkles } from "lucide-react"
++
++import { cn } from "@/lib/utils"
++import type {
++  AnalystCitation,
++  AnalystMessage,
++  AnalystSubgraph,
++} from "../../types"
++import { ChatMessageItem } from "./chat-message-item"
++
++export interface ChatMessageListProps {
++  messages?: AnalystMessage[]
++  isLoading?: boolean
++  onSelectCitation?: (citation: AnalystCitation) => void
++  onViewSubgraph?: (subgraph: AnalystSubgraph) => void
++  onSelectSuggestion?: (question: string) => void
++  defaultTraceOpen?: boolean
++  className?: string
++}
++
++export function ChatMessageList({
++  messages = [],
++  isLoading = false,
++  onSelectCitation,
++  onViewSubgraph,
++  defaultTraceOpen = false,
++  className,
++}: ChatMessageListProps) {
++  const messagesEndRef = useRef<HTMLDivElement>(null)
++
++  useEffect(() => {
++    messagesEndRef.current?.scrollIntoView?.({ behavior: "smooth" })
++  }, [messages.length, isLoading])
++
++  if (messages.length === 0) {
++    return (
++      <div
++        className={cn(
++          "flex flex-1 flex-col items-center justify-center p-8 text-center select-none",
++          className
++        )}
++        data-testid="chat-empty-state"
++      >
++        <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
++          <Sparkles className="h-6 w-6" />
++        </div>
++        <h3 className="mb-1 text-sm font-semibold text-foreground">
++          Start Knowledge Graph Query
++        </h3>
++        <p className="max-w-md text-xs leading-relaxed text-muted-foreground">
++          Ask natural language questions about your ontology, accepted facts,
++          and mapped tabular datasets. The analyst will extract multi-hop paths,
++          verify paragraph citations, and detect semantic drift.
++        </p>
++      </div>
++    )
++  }
++
++  return (
++    <div
++      className={cn("flex-1 space-y-4 overflow-y-auto p-4", className)}
++      data-testid="chat-message-list"
++    >
++      {messages.map((message) => (
++        <ChatMessageItem
++          key={message.id}
++          message={message}
++          onSelectCitation={onSelectCitation}
++          onViewSubgraph={onViewSubgraph}
++          defaultTraceOpen={defaultTraceOpen}
++        />
++      ))}
++
++      {isLoading && (
++        <div
++          className="flex max-w-md animate-pulse items-center gap-2.5 rounded-lg border border-primary/20 bg-primary/5 p-3 text-xs text-primary"
++          data-testid="analyst-thinking-indicator"
++        >
++          <Sparkles className="h-4 w-4 shrink-0 animate-spin text-primary" />
++          <span className="font-medium">
++            Analyst is reasoning over graph paths &amp; verifying citations...
++          </span>
++        </div>
++      )}
++
++      <div ref={messagesEndRef} />
++    </div>
++  )
++}
+diff --git a/src/features/analyst/components/chat-view/reasoning-trace-card.tsx b/src/features/analyst/components/chat-view/reasoning-trace-card.tsx
+new file mode 100644
+index 0000000..b694281
+--- /dev/null
++++ b/src/features/analyst/components/chat-view/reasoning-trace-card.tsx
+@@ -0,0 +1,109 @@
++"use client"
++
++import { useState } from "react"
++import { Brain, ChevronDown, ChevronRight } from "lucide-react"
++
++import { Badge } from "@/components/ui/badge"
++import { cn } from "@/lib/utils"
++import type { AnalystReasoningStep } from "../../types"
++
++export interface ReasoningTraceCardProps {
++  steps?: AnalystReasoningStep[]
++  defaultOpen?: boolean
++  open?: boolean
++  onOpenChange?: (open: boolean) => void
++  className?: string
++}
++
++export function ReasoningTraceCard({
++  steps = [],
++  defaultOpen = false,
++  open: controlledOpen,
++  onOpenChange,
++  className,
++}: ReasoningTraceCardProps) {
++  const [internalOpen, setInternalOpen] = useState(defaultOpen)
++  const isControlled = controlledOpen !== undefined
++  const isOpen = isControlled ? controlledOpen : internalOpen
++
++  if (!steps || steps.length === 0) {
++    return null
++  }
++
++  function handleToggle() {
++    const next = !isOpen
++    if (!isControlled) {
++      setInternalOpen(next)
++    }
++    onOpenChange?.(next)
++  }
++
++  return (
++    <div
++      className={cn(
++        "rounded-lg border bg-muted/30 text-xs transition-colors",
++        isOpen && "bg-muted/40",
++        className
++      )}
++      data-testid="reasoning-trace-card"
++    >
++      <button
++        type="button"
++        onClick={handleToggle}
++        className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left transition-colors hover:bg-muted/50"
++        data-testid="reasoning-trace-toggle"
++        aria-expanded={isOpen}
++      >
++        <div className="flex items-center gap-2">
++          <Brain className="h-3.5 w-3.5 text-primary" />
++          <span className="text-xs font-medium text-foreground">
++            Reasoning Trace
++          </span>
++          <Badge
++            variant="secondary"
++            className="h-4 px-1.5 text-[10px] font-normal"
++          >
++            {steps.length} {steps.length === 1 ? "step" : "steps"}
++          </Badge>
++        </div>
++        <div className="text-muted-foreground">
++          {isOpen ? (
++            <ChevronDown className="h-3.5 w-3.5" />
++          ) : (
++            <ChevronRight className="h-3.5 w-3.5" />
++          )}
++        </div>
++      </button>
++
++      {isOpen && (
++        <div
++          className="space-y-2.5 border-t px-3 py-2.5"
++          data-testid="reasoning-trace-expanded"
++        >
++          {steps.map((stepItem, index) => (
++            <div
++              key={index}
++              className="flex flex-col gap-1 rounded border border-border/50 bg-background/80 p-2.5"
++              data-testid="reasoning-trace-step"
++            >
++              <div className="flex items-center gap-2">
++                <Badge
++                  variant="outline"
++                  className="h-4 px-1.5 font-mono text-[10px]"
++                >
++                  Step {index + 1}
++                </Badge>
++                <span className="text-xs font-medium text-foreground">
++                  {stepItem.step}
++                </span>
++              </div>
++              <p className="text-xs leading-relaxed whitespace-pre-line text-muted-foreground">
++                {stepItem.detail}
++              </p>
++            </div>
++          ))}
++        </div>
++      )}
++    </div>
++  )
++}
+diff --git a/src/features/analyst/components/citation-drawer/citation-inspector.tsx b/src/features/analyst/components/citation-drawer/citation-inspector.tsx
+new file mode 100644
+index 0000000..37a7f0a
+--- /dev/null
++++ b/src/features/analyst/components/citation-drawer/citation-inspector.tsx
+@@ -0,0 +1,213 @@
++"use client"
++
++import { BookOpen, FileText, Hash, Table as TableIcon } from "lucide-react"
++
++import { Badge } from "@/components/ui/badge"
++import {
++  Sheet,
++  SheetContent,
++  SheetDescription,
++  SheetHeader,
++  SheetTitle,
++} from "@/components/ui/sheet"
++import { cn } from "@/lib/utils"
++import type { AnalystCitation } from "../../types"
++
++export interface CitationInspectorContentProps {
++  citation: AnalystCitation | null
++  className?: string
++  onClose?: () => void
++}
++
++export function CitationInspectorContent({
++  citation,
++  className,
++}: CitationInspectorContentProps) {
++  if (!citation) {
++    return (
++      <div className="flex flex-col items-center justify-center p-8 text-center text-xs text-muted-foreground">
++        No citation selected.
++      </div>
++    )
++  }
++
++  const isTable = citation.sourceType === "table"
++  const extendedCitation = citation as AnalystCitation & {
++    contextText?: string
++    contextPreview?: string
++  }
++  const context =
++    extendedCitation.contextText || extendedCitation.contextPreview
++
++  return (
++    <div className={cn("space-y-5 text-xs", className)}>
++      <div className="flex items-center gap-2">
++        <Badge
++          variant="secondary"
++          className="gap-1 px-2 py-0.5 text-[11px] font-medium capitalize"
++        >
++          {isTable ? (
++            <TableIcon className="h-3 w-3" />
++          ) : (
++            <FileText className="h-3 w-3" />
++          )}
++          <span>{isTable ? "Tabular Dataset" : "Document"}</span>
++        </Badge>
++      </div>
++
++      {/* Source Name / Title */}
++      <div className="space-y-1">
++        <span className="text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
++          {isTable ? "Table Name" : "Document Title"}
++        </span>
++        <div className="text-sm font-semibold break-words text-foreground">
++          {citation.sourceName}
++        </div>
++      </div>
++
++      {/* Source Coordinates */}
++      <div className="grid grid-cols-2 gap-2">
++        {citation.paragraphIndex !== undefined && (
++          <div className="rounded-md border bg-muted/20 p-2.5">
++            <span className="text-[10px] font-medium text-muted-foreground">
++              Paragraph
++            </span>
++            <div className="font-mono text-xs font-semibold text-foreground">
++              §{citation.paragraphIndex}
++            </div>
++          </div>
++        )}
++
++        {(citation.pageFrom !== undefined || citation.pageTo !== undefined) && (
++          <div className="rounded-md border bg-muted/20 p-2.5">
++            <span className="flex items-center gap-1 text-[10px] font-medium text-muted-foreground">
++              <BookOpen className="h-3 w-3" /> Page
++            </span>
++            <div className="font-mono text-xs font-semibold text-foreground">
++              {citation.pageFrom !== undefined ? citation.pageFrom : ""}
++              {citation.pageTo !== undefined &&
++              citation.pageTo !== citation.pageFrom
++                ? ` - ${citation.pageTo}`
++                : ""}
++            </div>
++          </div>
++        )}
++
++        {citation.tableRowKey && (
++          <div className="rounded-md border bg-muted/20 p-2.5">
++            <span className="flex items-center gap-1 text-[10px] font-medium text-muted-foreground">
++              <Hash className="h-3 w-3" /> Row Key
++            </span>
++            <div className="truncate font-mono text-xs font-semibold text-foreground">
++              {citation.tableRowKey}
++            </div>
++          </div>
++        )}
++      </div>
++
++      {/* Verifiable Evidence Quote */}
++      {citation.quoteText && (
++        <div className="space-y-1.5">
++          <span className="text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
++            Verifiable Evidence Quote
++          </span>
++          <div
++            className="rounded-md border bg-muted/40 p-3 text-xs leading-relaxed text-foreground italic shadow-xs"
++            data-testid="citation-quote"
++          >
++            &ldquo;{citation.quoteText}&rdquo;
++          </div>
++        </div>
++      )}
++
++      {/* Context Preview */}
++      {context && (
++        <div className="space-y-1.5" data-testid="citation-context">
++          <span className="text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
++            Context Preview
++          </span>
++          <div className="rounded-md border bg-background/80 p-3 text-xs leading-relaxed text-muted-foreground">
++            {context}
++          </div>
++        </div>
++      )}
++    </div>
++  )
++}
++
++export interface CitationInspectorProps {
++  citation: AnalystCitation | null
++  open: boolean
++  onOpenChange: (open: boolean) => void
++  inline?: boolean
++  className?: string
++  "data-testid"?: string
++}
++
++export function CitationInspector({
++  citation,
++  open,
++  onOpenChange,
++  inline = false,
++  className,
++  "data-testid": dataTestId = "analyst-citation-drawer",
++}: CitationInspectorProps) {
++  if (inline) {
++    if (!open) return null
++    return (
++      <div
++        className={cn(
++          "w-full max-w-md rounded-lg border bg-card p-6 shadow-md",
++          className
++        )}
++        data-testid={dataTestId}
++      >
++        <div className="mb-4 border-b pb-3">
++          <h3 className="text-sm font-semibold">Citation Source</h3>
++          <p className="text-xs text-muted-foreground">
++            {citation?.sourceType === "table"
++              ? "Tabular record verification"
++              : "Unstructured document paragraph verification"}
++          </p>
++        </div>
++        <CitationInspectorContent
++          citation={citation}
++          onClose={() => onOpenChange(false)}
++        />
++      </div>
++    )
++  }
++
++  return (
++    <Sheet open={open} onOpenChange={onOpenChange}>
++      <SheetContent
++        side="right"
++        className={cn("w-full overflow-y-auto sm:max-w-md", className)}
++        data-testid={dataTestId}
++      >
++        <SheetHeader>
++          <div className="flex items-center gap-2">
++            {citation?.sourceType === "table" ? (
++              <TableIcon className="h-4 w-4 text-primary" />
++            ) : (
++              <FileText className="h-4 w-4 text-primary" />
++            )}
++            <SheetTitle className="text-sm">Citation Source</SheetTitle>
++          </div>
++          <SheetDescription className="text-xs">
++            {citation?.sourceType === "table"
++              ? "Tabular record verification"
++              : "Unstructured document paragraph verification"}
++          </SheetDescription>
++        </SheetHeader>
++
++        <div className="mt-4">
++          <CitationInspectorContent
++            citation={citation}
++            onClose={() => onOpenChange(false)}
++          />
++        </div>
++      </SheetContent>
++    </Sheet>
++  )
++}
+diff --git a/tests/analyst-chat-dom.test.ts b/tests/analyst-chat-dom.test.ts
+new file mode 100644
+index 0000000..da1ab97
+--- /dev/null
++++ b/tests/analyst-chat-dom.test.ts
+@@ -0,0 +1,438 @@
++import assert from "node:assert/strict"
++import fs from "node:fs"
++import path from "node:path"
++import { test } from "node:test"
++import { execFileSync } from "node:child_process"
++import React from "react"
++
++import type {
++  AnalystCitation,
++  AnalystMessage,
++  AnalystReasoningStep,
++  AnalystSubgraph,
++} from "../src/features/analyst/types"
++
++const isReactServer = process.execArgv.some((a) => a.includes("react-server"))
++const isChildTest = process.env.CHILD_REACT_DOM_TEST === "1"
++
++if (isChildTest || !isReactServer) {
++  const { renderToStaticMarkup } = await import("react-dom/server")
++
++  // Test 1: ChatMessageItem DOM rendering for User and Assistant
++  test("ChatMessageItem renders user message content", async () => {
++    const { ChatMessageItem } =
++      await import("../src/features/analyst/components/chat-view/chat-message-item")
++
++    const userMsg: AnalystMessage = {
++      id: "msg-user-1",
++      conversationId: "conv-1",
++      sender: "user",
++      content: "Which marine institutes study Baltic salinity?",
++      createdAt: "2026-11-09T10:00:00.000Z",
++    }
++
++    const html = renderToStaticMarkup(
++      React.createElement(ChatMessageItem, { message: userMsg })
++    )
++
++    assert.ok(
++      html.includes("Which marine institutes study Baltic salinity?"),
++      "Must display user question text"
++    )
++    assert.ok(
++      html.includes('data-sender="user"'),
++      "Must have user sender attribute"
++    )
++  })
++
++  test("ChatMessageItem renders assistant message with parsed citation pills and subgraph button", async () => {
++    const { ChatMessageItem } =
++      await import("../src/features/analyst/components/chat-view/chat-message-item")
++
++    const citations: AnalystCitation[] = [
++      {
++        sourceType: "document",
++        sourceId: "doc-1",
++        sourceName: "baltic_marine_2026.pdf",
++        paragraphIndex: 14,
++        pageFrom: 3,
++        pageTo: 4,
++        quoteText:
++          "Baltic Institute monitors salinity gradients across the Gulf of Finland.",
++      },
++      {
++        sourceType: "table",
++        sourceId: "table-1",
++        sourceName: "institutions.csv",
++        tableRowKey: "row-42",
++        quoteText: "Finnish Marine Hub | Helsinki | Est. 1982",
++      },
++    ]
++
++    const subgraph: AnalystSubgraph = {
++      nodes: [
++        { id: "n1", label: "Baltic Institute", kind: "Organization" },
++        { id: "n2", label: "Gulf of Finland", kind: "Location" },
++      ],
++      edges: [{ id: "e1", source: "n1", target: "n2", label: "monitors" }],
++    }
++
++    const reasoningTrace: AnalystReasoningStep[] = [
++      {
++        step: "Anchor entity identification",
++        detail:
++          "Identified Baltic Institute and Finnish Marine Hub as focus nodes.",
++      },
++      {
++        step: "2-hop path expansion",
++        detail:
++          "Traversed monitors relation to Gulf of Finland salinity sensors.",
++      },
++    ]
++
++    const assistantMsg: AnalystMessage = {
++      id: "msg-asst-1",
++      conversationId: "conv-1",
++      sender: "assistant",
++      content:
++        "Two organizations study Baltic salinity: the Baltic Institute according to [Doc: baltic_marine_2026.pdf §14] and Finnish Marine Hub from [Table: institutions.csv #row-42].",
++      reasoningTrace,
++      subgraph,
++      citations,
++      createdAt: "2026-11-09T10:00:05.000Z",
++    }
++
++    const html = renderToStaticMarkup(
++      React.createElement(ChatMessageItem, {
++        message: assistantMsg,
++        defaultTraceOpen: true,
++      })
++    )
++
++    assert.ok(
++      html.includes('data-sender="assistant"'),
++      "Must have assistant sender attribute"
++    )
++    assert.ok(
++      html.includes("baltic_marine_2026.pdf"),
++      "Must render parsed document citation pill"
++    )
++    assert.ok(
++      html.includes("institutions.csv"),
++      "Must render parsed table citation pill"
++    )
++    assert.ok(
++      html.includes("View Reasoning Subgraph"),
++      "Must render View Reasoning Subgraph button when subgraph is present"
++    )
++    assert.ok(
++      html.includes("Anchor entity identification"),
++      "Must embed ReasoningTraceCard with step details"
++    )
++  })
++
++  // Test 2: ReasoningTraceCard collapsible rendering
++  test("ReasoningTraceCard renders step badges and collapsible details", async () => {
++    const { ReasoningTraceCard } =
++      await import("../src/features/analyst/components/chat-view/reasoning-trace-card")
++
++    const steps: AnalystReasoningStep[] = [
++      {
++        step: "Identified anchor entities",
++        detail: "Found 2 matching organizations in accepted KG facts.",
++      },
++      {
++        step: "Expanded 2-hop neighborhood",
++        detail: "Connected organizations to salinity measurement stations.",
++      },
++      {
++        step: "Verified paragraph citations",
++        detail: "Validated evidence anchors across source document paragraphs.",
++      },
++    ]
++
++    // Test collapsed state
++    const collapsedHtml = renderToStaticMarkup(
++      React.createElement(ReasoningTraceCard, { steps, defaultOpen: false })
++    )
++    assert.ok(
++      collapsedHtml.includes("Reasoning Trace"),
++      "Must render card title"
++    )
++    assert.ok(
++      collapsedHtml.includes("3 steps"),
++      "Must display step count badge in collapsed header"
++    )
++
++    // Test expanded state
++    const expandedHtml = renderToStaticMarkup(
++      React.createElement(ReasoningTraceCard, { steps, defaultOpen: true })
++    )
++    assert.ok(
++      expandedHtml.includes("Step 1"),
++      "Must render execution badge for step 1"
++    )
++    assert.ok(
++      expandedHtml.includes("Identified anchor entities"),
++      "Must render step title"
++    )
++    assert.ok(
++      expandedHtml.includes("Expanded 2-hop neighborhood"),
++      "Must render step 2 title"
++    )
++    assert.ok(
++      expandedHtml.includes(
++        "Validated evidence anchors across source document paragraphs."
++      ),
++      "Must render step 3 detail text"
++    )
++  })
++
++  // Test 3: CitationInspector slide-over drawer content rendering
++  test("CitationInspector renders document citation with quote text and page numbers", async () => {
++    const { CitationInspector } =
++      await import("../src/features/analyst/components/citation-drawer/citation-inspector")
++
++    const citation: AnalystCitation = {
++      sourceType: "document",
++      sourceId: "doc-99",
++      sourceName: "gulf_salinity_report.pdf",
++      paragraphIndex: 7,
++      pageFrom: 12,
++      pageTo: 13,
++      quoteText:
++        "Salinity concentration in western Gulf reached 6.2 PSU during summer measurements.",
++    }
++
++    const html = renderToStaticMarkup(
++      React.createElement(CitationInspector, {
++        citation,
++        open: true,
++        inline: true,
++        onOpenChange: () => {},
++      })
++    )
++
++    assert.ok(
++      html.includes("gulf_salinity_report.pdf"),
++      "Must display document title"
++    )
++    assert.ok(html.includes("§7"), "Must display paragraph index")
++    assert.ok(
++      html.includes("12") && html.includes("13"),
++      "Must display page numbers"
++    )
++    assert.ok(
++      html.includes("Salinity concentration in western Gulf reached 6.2 PSU"),
++      "Must display full quote text"
++    )
++    assert.ok(html.includes("Document"), "Must display source type badge")
++  })
++
++  test("CitationInspector renders table citation with row key and tabular details", async () => {
++    const { CitationInspector } =
++      await import("../src/features/analyst/components/citation-drawer/citation-inspector")
++
++    const citation: AnalystCitation = {
++      sourceType: "table",
++      sourceId: "tbl-5",
++      sourceName: "environmental_monitoring_stations.csv",
++      tableRowKey: "station-401",
++      quoteText: "ST-401 | Helsinki Archipelago | 59.9° N, 24.8° E | Active",
++    }
++
++    const html = renderToStaticMarkup(
++      React.createElement(CitationInspector, {
++        citation,
++        open: true,
++        inline: true,
++        onOpenChange: () => {},
++      })
++    )
++
++    assert.ok(
++      html.includes("environmental_monitoring_stations.csv"),
++      "Must display table source name"
++    )
++    assert.ok(html.includes("station-401"), "Must display table row key")
++    assert.ok(
++      html.includes("ST-401 | Helsinki Archipelago"),
++      "Must display quote text preview"
++    )
++    assert.ok(
++      html.includes("Table") || html.includes("Tabular"),
++      "Must display table source type badge"
++    )
++  })
++
++  // Test 4: ChatInputBar renders textarea, submit button, and suggested question chips
++  test("ChatInputBar renders input textarea and suggested chips", async () => {
++    const { ChatInputBar } =
++      await import("../src/features/analyst/components/chat-view/chat-input-bar")
++
++    const html = renderToStaticMarkup(
++      React.createElement(ChatInputBar, {
++        onSubmit: () => {},
++        suggestedQuestions: [
++          "Find all organizations located in Finland",
++          "What relationships connect marine ecology research?",
++        ],
++      })
++    )
++
++    assert.ok(
++      html.includes("Find all organizations located in Finland"),
++      "Must render suggested question chip 1"
++    )
++    assert.ok(
++      html.includes("What relationships connect marine ecology research?"),
++      "Must render suggested question chip 2"
++    )
++    assert.ok(
++      html.includes("Ask a question about your knowledge graph"),
++      "Must render textarea placeholder"
++    )
++  })
++
++  test("ChatInputBar indicates loading state when in flight", async () => {
++    const { ChatInputBar } =
++      await import("../src/features/analyst/components/chat-view/chat-input-bar")
++
++    const html = renderToStaticMarkup(
++      React.createElement(ChatInputBar, {
++        onSubmit: () => {},
++        isLoading: true,
++      })
++    )
++
++    assert.ok(
++      html.includes("disabled") || html.includes("aria-disabled"),
++      "Submit button must be disabled when loading"
++    )
++  })
++
++  // Test 5: ChatMessageList renders message thread and loading indicator
++  test("ChatMessageList renders empty state when no messages", async () => {
++    const { ChatMessageList } =
++      await import("../src/features/analyst/components/chat-view/chat-message-list")
++
++    const html = renderToStaticMarkup(
++      React.createElement(ChatMessageList, {
++        messages: [],
++        isLoading: false,
++      })
++    )
++
++    assert.ok(
++      html.includes("Start Knowledge Graph Query") ||
++        html.includes("Ask natural language questions"),
++      "Must render informative empty state"
++    )
++  })
++
++  test("ChatMessageList renders messages and active reasoning indicator", async () => {
++    const { ChatMessageList } =
++      await import("../src/features/analyst/components/chat-view/chat-message-list")
++
++    const messages: AnalystMessage[] = [
++      {
++        id: "m1",
++        conversationId: "c1",
++        sender: "user",
++        content: "List research centers in the Baltic.",
++        createdAt: "2026-11-09T10:00:00.000Z",
++      },
++    ]
++
++    const html = renderToStaticMarkup(
++      React.createElement(ChatMessageList, {
++        messages,
++        isLoading: true,
++      })
++    )
++
++    assert.ok(
++      html.includes("List research centers in the Baltic."),
++      "Must render user message in list"
++    )
++    assert.ok(
++      html.includes("Analyst is reasoning") || html.includes("Analyzing"),
++      "Must render in-progress reasoning state indicator when query is loading"
++    )
++  })
++}
++
++// Test 6: AnalystShell layout wires ChatView, CitationInspector, and Subgraph modal
++test("AnalystShell references ChatMessageList, ChatInputBar, and CitationInspector", () => {
++  const shellPath = path.resolve(
++    process.cwd(),
++    "src/features/analyst/components/analyst-shell/analyst-shell.tsx"
++  )
++  const content = fs.readFileSync(shellPath, "utf-8")
++
++  assert.ok(
++    content.includes("ChatMessageList"),
++    "AnalystShell must import and embed ChatMessageList"
++  )
++  assert.ok(
++    content.includes("ChatInputBar"),
++    "AnalystShell must import and embed ChatInputBar"
++  )
++  assert.ok(
++    content.includes("CitationInspector"),
++    "AnalystShell must import and embed CitationInspector"
++  )
++  assert.ok(
++    content.includes("sendQueryAction"),
++    "AnalystShell must connect sendQueryAction for queries"
++  )
++  assert.ok(
++    content.includes("getMessagesQuery"),
++    "AnalystShell must call getMessagesQuery for message fetching"
++  )
++})
++
++if (isReactServer && !isChildTest) {
++  test("Client DOM rendering tests for ChatMessageItem, ReasoningTraceCard, ChatInputBar, and ChatMessageList via tsx runner", () => {
++    const tsxCli = path.resolve(
++      process.cwd(),
++      "node_modules/.pnpm/tsx@4.23.15/node_modules/tsx/dist/cli.mjs"
++    )
++    const fallbackCli = path.resolve(
++      process.cwd(),
++      "node_modules/tsx/dist/cli.mjs"
++    )
++    const cliToUse = fs.existsSync(fallbackCli) ? fallbackCli : tsxCli
++
++    const testFile = path.resolve(
++      process.cwd(),
++      "tests/analyst-chat-dom.test.ts"
++    )
++    const childEnv: NodeJS.ProcessEnv = {
++      ...process.env,
++      CHILD_REACT_DOM_TEST: "1",
++    }
++    for (const key of Object.keys(childEnv)) {
++      if (key.startsWith("NODE_TEST_")) {
++        delete childEnv[key]
++      }
++    }
++
++    const output = execFileSync(
++      process.execPath,
++      [cliToUse, "--test", testFile],
++      {
++        encoding: "utf-8",
++        env: childEnv,
++      }
++    )
++    assert.ok(
++      output.includes("pass") || output.includes("ok"),
++      "Child client DOM rendering tests must pass"
++    )
++    assert.ok(
++      !output.includes("fail 1"),
++      "Child client DOM tests must have 0 failures"
++    )
++  })
++}

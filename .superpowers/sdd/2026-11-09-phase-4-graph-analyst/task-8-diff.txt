@@ -1,0 +1,1125 @@
+diff --git a/src/features/analyst/README.md b/src/features/analyst/README.md
+index 9522984..6ba78d9 100644
+--- a/src/features/analyst/README.md
++++ b/src/features/analyst/README.md
+@@ -25,6 +25,10 @@ entry_points:
+     purpose: Collapsible step-by-step reasoning trace card with execution stage badges and explanations.
+   - path: src/features/analyst/components/citation-drawer/citation-inspector.tsx
+     purpose: Slide-over drawer and card displaying document paragraphs or tabular records with full quote evidence.
++  - path: src/features/analyst/components/subgraph-preview/analyst-subgraph-modal.tsx
++    purpose: Dialog displaying reasoning subgraph overview with node/edge counts, entity kind legend, and interactive canvas.
++  - path: src/features/analyst/components/subgraph-preview/subgraph-flow-view.tsx
++    purpose: Interactive React Flow graph canvas computing Dagre rankdir layout, directional handle routing, and styled kind badges.
+ server_entry_points:
+   - path: src/features/analyst/server/actions/create-conversation.ts
+     purpose: Server action to initialize an analyst conversation.
+@@ -56,4 +60,5 @@ Graph Intelligence & Natural Language Analyst subsystem integrating with the Net
+ 3. **Conversation Management (`ConversationSidebar`)**: Enables creating new analyses, searching existing conversations, selecting active threads, and deleting conversation history with cascade deletion.
+ 4. **Natural Language Query Engine**: Dispatches user queries through transactional outbox domain events (`analyst.query_requested`), picked up by the Python NetworkX analyst daemon for multi-hop path extraction.
+ 5. **Verifiable Citations**: Traces answers back to specific document paragraphs and tabular dataset rows with inline citation chips and slide-over inspector.
+-6. **Contradiction Resolution**: Surfaces conflicting assertions across documents and datasets, categorizing them by conflict type (`value_mismatch`, `temporal_drift`, `negation`) with user resolution options.
++6. **Reasoning Subgraph Visualizer (`subgraph-preview/`)**: Interactive Dagre-directed React Flow graph canvas visualizing the entities, kinds, and relations traversed to answer multi-hop analyst queries with pan/zoom controls, background grid, and entity-kind legends.
++7. **Contradiction Resolution**: Surfaces conflicting assertions across documents and datasets, categorizing them by conflict type (`value_mismatch`, `temporal_drift`, `negation`) with user resolution options.
+diff --git a/src/features/analyst/components/analyst-shell/analyst-shell.tsx b/src/features/analyst/components/analyst-shell/analyst-shell.tsx
+index 0f5aa2f..b80af55 100644
+--- a/src/features/analyst/components/analyst-shell/analyst-shell.tsx
++++ b/src/features/analyst/components/analyst-shell/analyst-shell.tsx
+@@ -8,20 +8,12 @@ import {
+   AlertTriangle,
+   CheckCircle2,
+   MessageSquare,
+-  Network,
+   Sparkles,
+ } from "lucide-react"
+ import { toast } from "sonner"
+ 
+ import { Badge } from "@/components/ui/badge"
+ import { Button } from "@/components/ui/button"
+-import {
+-  Dialog,
+-  DialogContent,
+-  DialogDescription,
+-  DialogHeader,
+-  DialogTitle,
+-} from "@/components/ui/dialog"
+ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+ import { routes } from "@/lib/routes"
+ import type { SystemServiceDisplay } from "@/features/settings/server/queries/get-system-services"
+@@ -37,6 +29,7 @@ import { ConversationSidebar } from "../conversation-sidebar/conversation-sideba
+ import { ChatMessageList } from "../chat-view/chat-message-list"
+ import { ChatInputBar } from "../chat-view/chat-input-bar"
+ import { CitationInspector } from "../citation-drawer/citation-inspector"
++import { AnalystSubgraphModal } from "../subgraph-preview/analyst-subgraph-modal"
+ 
+ export interface AnalystShellContextValue {
+   selectedConversationId: string | null
+@@ -404,34 +397,11 @@ export function AnalystShell({
+         />
+ 
+         {/* Subgraph Visualizer Modal */}
+-        <Dialog
++        <AnalystSubgraphModal
+           open={isSubgraphModalOpen}
+           onOpenChange={setIsSubgraphModalOpen}
+-        >
+-          <DialogContent
+-            className="max-w-3xl"
+-            data-testid="analyst-subgraph-modal"
+-          >
+-            <DialogHeader>
+-              <div className="flex items-center gap-2">
+-                <Network className="h-4 w-4 text-primary" />
+-                <DialogTitle className="text-sm">
+-                  Reasoning Subgraph
+-                </DialogTitle>
+-              </div>
+-              <DialogDescription className="text-xs">
+-                Entities and relations traversed to answer this query.
+-              </DialogDescription>
+-            </DialogHeader>
+-
+-            {activeSubgraph && (
+-              <div className="py-6 text-center text-xs text-muted-foreground">
+-                Subgraph preview with {activeSubgraph.nodes.length} nodes and{" "}
+-                {activeSubgraph.edges.length} edges.
+-              </div>
+-            )}
+-          </DialogContent>
+-        </Dialog>
++          subgraph={activeSubgraph}
++        />
+       </div>
+     </AnalystShellContext.Provider>
+   )
+diff --git a/src/features/analyst/components/subgraph-preview/analyst-subgraph-modal.tsx b/src/features/analyst/components/subgraph-preview/analyst-subgraph-modal.tsx
+new file mode 100644
+index 0000000..3ee09b8
+--- /dev/null
++++ b/src/features/analyst/components/subgraph-preview/analyst-subgraph-modal.tsx
+@@ -0,0 +1,202 @@
++"use client"
++
++import { useMemo } from "react"
++import { Network } from "lucide-react"
++
++import { Badge } from "@/components/ui/badge"
++import { Button } from "@/components/ui/button"
++import {
++  Dialog,
++  DialogContent,
++  DialogDescription,
++  DialogFooter,
++  DialogHeader,
++  DialogTitle,
++} from "@/components/ui/dialog"
++import { cn } from "@/lib/utils"
++import type { AnalystSubgraph } from "../../types"
++import { getKindStyles, SubgraphFlowView } from "./subgraph-flow-view"
++
++export interface AnalystSubgraphModalProps {
++  open: boolean
++  onOpenChange: (open: boolean) => void
++  subgraph: AnalystSubgraph | null
++  inline?: boolean
++  className?: string
++  "data-testid"?: string
++}
++
++export function AnalystSubgraphModal({
++  open,
++  onOpenChange,
++  subgraph,
++  inline = false,
++  className,
++  "data-testid": dataTestId = "analyst-subgraph-modal",
++}: AnalystSubgraphModalProps) {
++  const nodes = useMemo(() => subgraph?.nodes ?? [], [subgraph?.nodes])
++  const edges = useMemo(() => subgraph?.edges ?? [], [subgraph?.edges])
++  const nodeCount = nodes.length
++  const edgeCount = edges.length
++
++  const distinctKinds = useMemo(() => {
++    const kinds = new Set<string>()
++    for (const node of nodes) {
++      if (node.kind) {
++        kinds.add(node.kind)
++      }
++    }
++    return Array.from(kinds)
++  }, [nodes])
++
++  const headerContent = (
++    <>
++      <div className="flex flex-wrap items-center justify-between gap-2">
++        <div className="flex items-center gap-2">
++          <Network className="h-4 w-4 text-primary" />
++          <span className="text-sm font-semibold tracking-tight">
++            Reasoning Subgraph
++          </span>
++        </div>
++
++        <div className="flex items-center gap-1.5">
++          <Badge
++            variant="secondary"
++            className="text-[11px] font-normal"
++            data-testid="subgraph-node-count-badge"
++          >
++            {nodeCount} {nodeCount === 1 ? "node" : "nodes"}
++          </Badge>
++          <Badge
++            variant="outline"
++            className="text-[11px] font-normal"
++            data-testid="subgraph-edge-count-badge"
++          >
++            {edgeCount} {edgeCount === 1 ? "edge" : "edges"}
++          </Badge>
++        </div>
++      </div>
++
++      <p className="text-xs text-muted-foreground">
++        Interactive visualization of the entities and relations traversed to
++        answer this query.
++      </p>
++    </>
++  )
++
++  const footerContent = (
++    <>
++      <div
++        className="flex flex-wrap items-center gap-1.5"
++        data-testid="subgraph-kind-legend"
++      >
++        <span className="text-[11px] font-medium text-muted-foreground">
++          Legend:
++        </span>
++        {distinctKinds.length > 0 ? (
++          distinctKinds.map((kind) => {
++            const styles = getKindStyles(kind)
++            return (
++              <span
++                key={kind}
++                className={cn(
++                  "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium",
++                  styles.badge
++                )}
++              >
++                <span className={cn("h-1.5 w-1.5 rounded-full", styles.dot)} />
++                {kind}
++              </span>
++            )
++          })
++        ) : (
++          <span className="text-[10px] text-muted-foreground">
++            No entity kinds
++          </span>
++        )}
++      </div>
++
++      <Button
++        type="button"
++        variant="outline"
++        size="sm"
++        onClick={() => onOpenChange(false)}
++        className="h-8 text-xs"
++      >
++        Close
++      </Button>
++    </>
++  )
++
++  if (inline) {
++    return (
++      <div
++        className={cn(
++          "flex w-full max-w-4xl flex-col gap-4 rounded-lg border bg-card p-6 text-card-foreground shadow-sm",
++          className
++        )}
++        data-testid={dataTestId}
++      >
++        <div className="flex flex-col gap-1.5 text-left">{headerContent}</div>
++
++        <div className="min-h-[400px] w-full">
++          <SubgraphFlowView nodes={nodes} edges={edges} />
++        </div>
++
++        <div className="flex flex-col gap-3 border-t pt-3 sm:flex-row sm:items-center sm:justify-between">
++          {footerContent}
++        </div>
++      </div>
++    )
++  }
++
++  return (
++    <Dialog open={open} onOpenChange={onOpenChange}>
++      <DialogContent
++        className={cn("flex max-w-4xl flex-col gap-4 p-6", className)}
++        data-testid={dataTestId}
++      >
++        <DialogHeader className="flex flex-col gap-1.5 text-left">
++          <div className="flex flex-wrap items-center justify-between gap-2">
++            <div className="flex items-center gap-2">
++              <Network className="h-4 w-4 text-primary" />
++              <DialogTitle className="text-sm font-semibold tracking-tight">
++                Reasoning Subgraph
++              </DialogTitle>
++            </div>
++
++            <div className="flex items-center gap-1.5">
++              <Badge
++                variant="secondary"
++                className="text-[11px] font-normal"
++                data-testid="subgraph-node-count-badge"
++              >
++                {nodeCount} {nodeCount === 1 ? "node" : "nodes"}
++              </Badge>
++              <Badge
++                variant="outline"
++                className="text-[11px] font-normal"
++                data-testid="subgraph-edge-count-badge"
++              >
++                {edgeCount} {edgeCount === 1 ? "edge" : "edges"}
++              </Badge>
++            </div>
++          </div>
++
++          <DialogDescription className="text-xs text-muted-foreground">
++            Interactive visualization of the entities and relations traversed to
++            answer this query.
++          </DialogDescription>
++        </DialogHeader>
++
++        <div className="min-h-[400px] w-full">
++          <SubgraphFlowView nodes={nodes} edges={edges} />
++        </div>
++
++        <DialogFooter className="flex flex-col gap-3 border-t pt-3 sm:flex-row sm:items-center sm:justify-between">
++          {footerContent}
++        </DialogFooter>
++      </DialogContent>
++    </Dialog>
++  )
++}
+diff --git a/src/features/analyst/components/subgraph-preview/subgraph-flow-view.tsx b/src/features/analyst/components/subgraph-preview/subgraph-flow-view.tsx
+new file mode 100644
+index 0000000..ee277e7
+--- /dev/null
++++ b/src/features/analyst/components/subgraph-preview/subgraph-flow-view.tsx
+@@ -0,0 +1,422 @@
++"use client"
++
++import { useMemo } from "react"
++import {
++  Background,
++  Controls,
++  Handle,
++  MarkerType,
++  Position,
++  ReactFlow,
++  type Edge,
++  type Node,
++  type NodeProps,
++} from "@xyflow/react"
++import { Network } from "lucide-react"
++
++if (typeof window !== "undefined") {
++  import("@xyflow/react/dist/style.css")
++}
++
++import { layoutWithDagre, selectHandles } from "@/lib/flow-layout"
++import { cn } from "@/lib/utils"
++import type { AnalystSubgraphEdge, AnalystSubgraphNode } from "../../types"
++
++export interface KindStyle {
++  badge: string
++  dot: string
++  border: string
++}
++
++/**
++ * Returns distinct badge, dot, and border styling for entity kinds
++ * (e.g., Organization, Location, Person, Concept, Dataset).
++ */
++export function getKindStyles(kind?: string): KindStyle {
++  const normalized = (kind || "").toLowerCase().trim()
++
++  if (
++    normalized.includes("org") ||
++    normalized.includes("institution") ||
++    normalized.includes("company") ||
++    normalized.includes("agency")
++  ) {
++    return {
++      badge:
++        "bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/25",
++      dot: "bg-blue-500",
++      border: "border-blue-500/30",
++    }
++  }
++
++  if (
++    normalized.includes("loc") ||
++    normalized.includes("place") ||
++    normalized.includes("geo") ||
++    normalized.includes("country") ||
++    normalized.includes("city") ||
++    normalized.includes("sea") ||
++    normalized.includes("gulf") ||
++    normalized.includes("station")
++  ) {
++    return {
++      badge:
++        "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/25",
++      dot: "bg-emerald-500",
++      border: "border-emerald-500/30",
++    }
++  }
++
++  if (
++    normalized.includes("person") ||
++    normalized.includes("author") ||
++    normalized.includes("researcher") ||
++    normalized.includes("scientist")
++  ) {
++    return {
++      badge:
++        "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/25",
++      dot: "bg-amber-500",
++      border: "border-amber-500/30",
++    }
++  }
++
++  if (
++    normalized.includes("concept") ||
++    normalized.includes("topic") ||
++    normalized.includes("theme") ||
++    normalized.includes("property")
++  ) {
++    return {
++      badge:
++        "bg-purple-500/10 text-purple-700 dark:text-purple-300 border-purple-500/25",
++      dot: "bg-purple-500",
++      border: "border-purple-500/30",
++    }
++  }
++
++  if (
++    normalized.includes("data") ||
++    normalized.includes("dataset") ||
++    normalized.includes("table") ||
++    normalized.includes("record")
++  ) {
++    return {
++      badge:
++        "bg-cyan-500/10 text-cyan-700 dark:text-cyan-300 border-cyan-500/25",
++      dot: "bg-cyan-500",
++      border: "border-cyan-500/30",
++    }
++  }
++
++  if (
++    normalized.includes("event") ||
++    normalized.includes("measurement") ||
++    normalized.includes("sample") ||
++    normalized.includes("observation")
++  ) {
++    return {
++      badge:
++        "bg-rose-500/10 text-rose-700 dark:text-rose-300 border-rose-500/25",
++      dot: "bg-rose-500",
++      border: "border-rose-500/30",
++    }
++  }
++
++  return {
++    badge: "bg-muted text-muted-foreground border-border",
++    dot: "bg-muted-foreground",
++    border: "border-border",
++  }
++}
++
++export interface SubgraphNodeData extends Record<string, unknown> {
++  label: string
++  kind: string
++  metadata?: Record<string, unknown>
++}
++
++const H = "!h-1.5 !w-1.5 !border-0 !bg-muted-foreground/40"
++
++/**
++ * Custom node component rendering entity label, kind badge, and attributes preview.
++ */
++export function SubgraphNodeComponent({
++  data,
++}: NodeProps<Node<SubgraphNodeData>>) {
++  const { label, kind, metadata } = data
++  const kindStyles = getKindStyles(kind)
++  const metaEntries = metadata ? Object.entries(metadata) : []
++
++  return (
++    <>
++      <Handle
++        type="target"
++        position={Position.Left}
++        id="t-left"
++        className={H}
++      />
++      <Handle
++        type="target"
++        position={Position.Right}
++        id="t-right"
++        className={H}
++      />
++      <Handle type="target" position={Position.Top} id="t-top" className={H} />
++      <Handle
++        type="target"
++        position={Position.Bottom}
++        id="t-bottom"
++        className={H}
++      />
++
++      <div
++        className={cn(
++          "relative flex flex-col justify-between rounded-lg border bg-card p-3 shadow-xs transition-shadow hover:shadow-md",
++          kindStyles.border
++        )}
++        style={{ width: 200, minHeight: 64 }}
++        data-testid={`subgraph-node-${label}`}
++      >
++        {/* Top: Kind Badge */}
++        <div className="flex items-center justify-between gap-1">
++          <span
++            className={cn(
++              "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] leading-none font-medium",
++              kindStyles.badge
++            )}
++          >
++            <span className={cn("h-1.5 w-1.5 rounded-full", kindStyles.dot)} />
++            <span className="max-w-[140px] truncate">{kind || "Entity"}</span>
++          </span>
++        </div>
++
++        {/* Entity Label */}
++        <div
++          className="mt-1.5 truncate text-xs font-semibold text-foreground"
++          title={label}
++        >
++          {label}
++        </div>
++
++        {/* Attributes Preview (Metadata) */}
++        {metaEntries.length > 0 && (
++          <div className="mt-2 flex flex-col gap-0.5 border-t border-border/60 pt-1 text-[10px] text-muted-foreground">
++            {metaEntries.slice(0, 2).map(([k, v]) => (
++              <div
++                key={k}
++                className="flex items-center justify-between gap-1 truncate"
++              >
++                <span className="font-medium text-muted-foreground/80">
++                  {k}:
++                </span>
++                <span className="max-w-[110px] truncate" title={String(v)}>
++                  {String(v)}
++                </span>
++              </div>
++            ))}
++            {metaEntries.length > 2 && (
++              <span className="text-[9px] text-muted-foreground/70">
++                +{metaEntries.length - 2} more attribute
++                {metaEntries.length - 2 > 1 ? "s" : ""}
++              </span>
++            )}
++          </div>
++        )}
++      </div>
++
++      <Handle
++        type="source"
++        position={Position.Left}
++        id="s-left"
++        className={H}
++      />
++      <Handle
++        type="source"
++        position={Position.Right}
++        id="s-right"
++        className={H}
++      />
++      <Handle type="source" position={Position.Top} id="s-top" className={H} />
++      <Handle
++        type="source"
++        position={Position.Bottom}
++        id="s-bottom"
++        className={H}
++      />
++    </>
++  )
++}
++
++const nodeTypes = {
++  subgraphNode: SubgraphNodeComponent,
++}
++
++export interface SubgraphLayoutResult {
++  nodes: Node<SubgraphNodeData>[]
++  edges: Edge[]
++}
++
++/**
++ * Computes dagre layout positions and directional handles for nodes and edges.
++ */
++export function computeSubgraphLayout(
++  nodes: AnalystSubgraphNode[],
++  edges: AnalystSubgraphEdge[],
++  direction: "LR" | "TB" = "LR"
++): SubgraphLayoutResult {
++  if (!nodes || nodes.length === 0) {
++    return { nodes: [], edges: [] }
++  }
++
++  const initialNodes: Node<SubgraphNodeData>[] = nodes.map((node) => ({
++    id: node.id,
++    type: "subgraphNode",
++    data: {
++      label: node.label,
++      kind: node.kind,
++      metadata: node.metadata,
++    },
++    position: { x: 0, y: 0 },
++  }))
++
++  const nodeIds = new Set(nodes.map((n) => n.id))
++  const validEdges = (edges || []).filter(
++    (e) => nodeIds.has(e.source) && nodeIds.has(e.target)
++  )
++
++  const initialEdges: Edge[] = validEdges.map((e) => ({
++    id: e.id,
++    source: e.source,
++    target: e.target,
++    label: e.label,
++  }))
++
++  const positionedNodes = layoutWithDagre(
++    initialNodes,
++    initialEdges,
++    direction
++  ) as Node<SubgraphNodeData>[]
++
++  const posMap = new Map<string, { x: number; y: number }>()
++  for (const n of positionedNodes) {
++    posMap.set(n.id, n.position)
++  }
++
++  const styledEdges: Edge[] = validEdges.map((edge) => {
++    const sPos = posMap.get(edge.source)
++    const tPos = posMap.get(edge.target)
++    const { sourceHandle, targetHandle } =
++      sPos && tPos
++        ? selectHandles(sPos.x, sPos.y, tPos.x, tPos.y)
++        : { sourceHandle: "s-right", targetHandle: "t-left" }
++
++    return {
++      id: edge.id,
++      source: edge.source,
++      target: edge.target,
++      sourceHandle,
++      targetHandle,
++      label: edge.label,
++      type: "smoothstep",
++      markerEnd: {
++        type: MarkerType.ArrowClosed,
++        width: 14,
++        height: 14,
++        color: "hsl(var(--muted-foreground))",
++      },
++      style: {
++        stroke: "hsl(var(--muted-foreground) / 0.7)",
++        strokeWidth: 1.5,
++      },
++      labelStyle: {
++        fill: "hsl(var(--foreground))",
++        fontSize: 10,
++        fontWeight: 500,
++      },
++      labelBgStyle: {
++        fill: "hsl(var(--background))",
++        fillOpacity: 0.95,
++        stroke: "hsl(var(--border))",
++        strokeWidth: 1,
++        rx: 4,
++        ry: 4,
++      },
++      labelBgPadding: [6, 2],
++    }
++  })
++
++  return { nodes: positionedNodes, edges: styledEdges }
++}
++
++export interface SubgraphFlowViewProps {
++  nodes?: AnalystSubgraphNode[]
++  edges?: AnalystSubgraphEdge[]
++  className?: string
++  direction?: "LR" | "TB"
++}
++
++/**
++ * Interactive React Flow canvas for reasoning subgraphs with responsive container,
++ * controls, background, and empty-state fallback.
++ */
++export function SubgraphFlowView({
++  nodes = [],
++  edges = [],
++  className,
++  direction = "LR",
++}: SubgraphFlowViewProps) {
++  const { nodes: flowNodes, edges: flowEdges } = useMemo(
++    () => computeSubgraphLayout(nodes, edges, direction),
++    [nodes, edges, direction]
++  )
++
++  if (!nodes || nodes.length === 0) {
++    return (
++      <div
++        className={cn(
++          "flex h-[450px] min-h-[400px] w-full flex-col items-center justify-center rounded-lg border border-dashed bg-muted/20 p-8 text-center text-muted-foreground",
++          className
++        )}
++        data-testid="subgraph-flow-empty"
++      >
++        <Network className="mb-2 h-8 w-8 text-muted-foreground/40" />
++        <p className="text-sm font-medium">No Subgraph Available</p>
++        <p className="mt-1 max-w-sm text-xs text-muted-foreground">
++          This reasoning step does not contain any traversed graph entities or
++          relations.
++        </p>
++      </div>
++    )
++  }
++
++  return (
++    <div
++      className={cn(
++        "relative h-[450px] min-h-[400px] w-full overflow-hidden rounded-lg border bg-background/50",
++        className
++      )}
++      data-testid="subgraph-flow-canvas"
++    >
++      <ReactFlow
++        nodes={flowNodes}
++        edges={flowEdges}
++        nodeTypes={nodeTypes}
++        fitView
++        fitViewOptions={{ padding: 0.25 }}
++        proOptions={{ hideAttribution: true }}
++        nodesDraggable={true}
++        nodesConnectable={false}
++        zoomOnScroll={true}
++        minZoom={0.2}
++        maxZoom={2}
++      >
++        <Background gap={16} size={1} className="bg-muted/10" />
++        <Controls
++          showInteractive={false}
++          className="rounded border bg-card text-card-foreground shadow-xs"
++        />
++      </ReactFlow>
++    </div>
++  )
++}
+diff --git a/tests/analyst-subgraph-dom.test.ts b/tests/analyst-subgraph-dom.test.ts
+new file mode 100644
+index 0000000..f952ef9
+--- /dev/null
++++ b/tests/analyst-subgraph-dom.test.ts
+@@ -0,0 +1,390 @@
++import assert from "node:assert/strict"
++import fs from "node:fs"
++import path from "node:path"
++import { test } from "node:test"
++import { execFileSync } from "node:child_process"
++import React from "react"
++
++import type {
++  AnalystSubgraph,
++  AnalystSubgraphEdge,
++  AnalystSubgraphNode,
++} from "../src/features/analyst/types"
++
++const isReactServer = process.execArgv.some((a) => a.includes("react-server"))
++const isChildTest = process.env.CHILD_REACT_DOM_TEST === "1"
++
++if (isChildTest || !isReactServer) {
++  const { renderToStaticMarkup } = await import("react-dom/server")
++
++  // Test 1: SubgraphFlowView empty state
++  test("SubgraphFlowView renders empty state when nodes are empty", async () => {
++    const { SubgraphFlowView } =
++      await import("../src/features/analyst/components/subgraph-preview/subgraph-flow-view")
++
++    const html = renderToStaticMarkup(
++      React.createElement(SubgraphFlowView, {
++        nodes: [],
++        edges: [],
++      })
++    )
++
++    assert.ok(
++      html.includes("No Subgraph Available"),
++      "Must render empty state heading when no nodes exist"
++    )
++    assert.ok(
++      html.includes("does not contain any traversed graph entities"),
++      "Must render descriptive empty state text"
++    )
++    assert.ok(
++      html.includes('data-testid="subgraph-flow-empty"'),
++      "Must include subgraph-flow-empty testid"
++    )
++  })
++
++  // Test 2: SubgraphFlowView with custom nodes and edges
++  test("SubgraphFlowView renders custom nodes with kind badges, metadata preview, and edge elements", async () => {
++    const { SubgraphFlowView } =
++      await import("../src/features/analyst/components/subgraph-preview/subgraph-flow-view")
++
++    const nodes: AnalystSubgraphNode[] = [
++      {
++        id: "n1",
++        label: "Baltic Marine Institute",
++        kind: "Organization",
++        metadata: { country: "Finland", founded: 1982 },
++      },
++      {
++        id: "n2",
++        label: "Gulf of Finland",
++        kind: "Location",
++        metadata: { depth: "55m" },
++      },
++    ]
++
++    const edges: AnalystSubgraphEdge[] = [
++      {
++        id: "e1",
++        source: "n1",
++        target: "n2",
++        label: "monitors",
++      },
++    ]
++
++    const html = renderToStaticMarkup(
++      React.createElement(SubgraphFlowView, {
++        nodes,
++        edges,
++      })
++    )
++
++    assert.ok(
++      html.includes("Baltic Marine Institute"),
++      "Must render source node label"
++    )
++    assert.ok(html.includes("Gulf of Finland"), "Must render target node label")
++    assert.ok(
++      html.includes("Organization"),
++      "Must render Organization kind badge"
++    )
++    assert.ok(html.includes("Location"), "Must render Location kind badge")
++    assert.ok(html.includes("country"), "Must render metadata key in preview")
++    assert.ok(html.includes("Finland"), "Must render metadata value in preview")
++    assert.ok(
++      html.includes('data-testid="subgraph-flow-canvas"'),
++      "Must render graph canvas container"
++    )
++  })
++
++  // Test 3: AnalystSubgraphModal rendering modal with nodes and edges
++  test("AnalystSubgraphModal renders header title, node/edge count badges, legend, and close button", async () => {
++    const { AnalystSubgraphModal } =
++      await import("../src/features/analyst/components/subgraph-preview/analyst-subgraph-modal")
++
++    const subgraph: AnalystSubgraph = {
++      nodes: [
++        {
++          id: "n1",
++          label: "Baltic Marine Institute",
++          kind: "Organization",
++          metadata: { country: "Finland" },
++        },
++        {
++          id: "n2",
++          label: "Gulf of Finland",
++          kind: "Location",
++        },
++      ],
++      edges: [
++        {
++          id: "e1",
++          source: "n1",
++          target: "n2",
++          label: "monitors",
++        },
++      ],
++    }
++
++    const html = renderToStaticMarkup(
++      React.createElement(AnalystSubgraphModal, {
++        open: true,
++        inline: true,
++        subgraph,
++        onOpenChange: () => {},
++      })
++    )
++
++    assert.ok(
++      html.includes("Reasoning Subgraph"),
++      "Must render modal header title"
++    )
++    assert.ok(html.includes("2 nodes"), "Must display node count badge")
++    assert.ok(html.includes("1 edge"), "Must display edge count badge")
++    assert.ok(
++      html.includes(
++        "Interactive visualization of the entities and relations traversed to answer this query."
++      ),
++      "Must render description text"
++    )
++    assert.ok(
++      html.includes("Baltic Marine Institute"),
++      "Must render node in canvas"
++    )
++    assert.ok(
++      html.includes("Organization") && html.includes("Location"),
++      "Must render distinct kinds in footer legend"
++    )
++    assert.ok(html.includes("Close"), "Must render close button in footer")
++  })
++
++  // Test 4: AnalystSubgraphModal handles null and empty subgraph gracefully
++  test("AnalystSubgraphModal handles null or empty subgraph gracefully", async () => {
++    const { AnalystSubgraphModal } =
++      await import("../src/features/analyst/components/subgraph-preview/analyst-subgraph-modal")
++
++    // Case A: null subgraph
++    const nullHtml = renderToStaticMarkup(
++      React.createElement(AnalystSubgraphModal, {
++        open: true,
++        inline: true,
++        subgraph: null,
++        onOpenChange: () => {},
++      })
++    )
++
++    assert.ok(
++      nullHtml.includes("0 nodes"),
++      "Must display 0 nodes for null subgraph"
++    )
++    assert.ok(
++      nullHtml.includes("0 edges"),
++      "Must display 0 edges for null subgraph"
++    )
++    assert.ok(
++      nullHtml.includes("No Subgraph Available"),
++      "Must render empty state canvas when subgraph is null"
++    )
++    assert.ok(
++      nullHtml.includes("No entity kinds"),
++      "Must handle empty legend when no nodes present"
++    )
++
++    // Case B: empty arrays subgraph
++    const emptyHtml = renderToStaticMarkup(
++      React.createElement(AnalystSubgraphModal, {
++        open: true,
++        inline: true,
++        subgraph: { nodes: [], edges: [] },
++        onOpenChange: () => {},
++      })
++    )
++
++    assert.ok(
++      emptyHtml.includes("0 nodes"),
++      "Must display 0 nodes for empty subgraph"
++    )
++    assert.ok(
++      emptyHtml.includes("0 edges"),
++      "Must display 0 edges for empty subgraph"
++    )
++  })
++
++  // Test 5: computeSubgraphLayout layout computation with sample data
++  test("computeSubgraphLayout arranges nodes with dagre and computes directional handles", async () => {
++    const { computeSubgraphLayout } =
++      await import("../src/features/analyst/components/subgraph-preview/subgraph-flow-view")
++
++    const sampleNodes: AnalystSubgraphNode[] = [
++      { id: "inst-1", label: "University of Helsinki", kind: "Organization" },
++      { id: "loc-1", label: "Gulf of Finland", kind: "Location" },
++      {
++        id: "station-1",
++        label: "Tvärminne Zoological Station",
++        kind: "Location",
++      },
++    ]
++
++    const sampleEdges: AnalystSubgraphEdge[] = [
++      {
++        id: "e1",
++        source: "inst-1",
++        target: "loc-1",
++        label: "conductsResearchIn",
++      },
++      {
++        id: "e2",
++        source: "loc-1",
++        target: "station-1",
++        label: "containsStation",
++      },
++    ]
++
++    const { nodes, edges } = computeSubgraphLayout(
++      sampleNodes,
++      sampleEdges,
++      "LR"
++    )
++
++    assert.equal(nodes.length, 3, "Must produce 3 positioned flow nodes")
++    assert.equal(edges.length, 2, "Must produce 2 styled flow edges")
++
++    for (const node of nodes) {
++      assert.ok(
++        typeof node.position.x === "number" && !Number.isNaN(node.position.x),
++        `Node ${node.id} must have numeric X coordinate`
++      )
++      assert.ok(
++        typeof node.position.y === "number" && !Number.isNaN(node.position.y),
++        `Node ${node.id} must have numeric Y coordinate`
++      )
++      assert.equal(node.type, "subgraphNode", "Node type must be subgraphNode")
++    }
++
++    // In LR direction, source node should precede target node on X axis
++    const instNode = nodes.find((n) => n.id === "inst-1")!
++    const locNode = nodes.find((n) => n.id === "loc-1")!
++    const stationNode = nodes.find((n) => n.id === "station-1")!
++
++    assert.ok(
++      instNode.position.x < locNode.position.x,
++      "inst-1 should be to the left of loc-1"
++    )
++    assert.ok(
++      locNode.position.x < stationNode.position.x,
++      "loc-1 should be to the left of station-1"
++    )
++
++    // Verify edge styling and handle assignment
++    const edge1 = edges.find((e) => e.id === "e1")!
++    assert.equal(edge1.type, "smoothstep", "Edge type must be smoothstep")
++    assert.equal(
++      edge1.sourceHandle,
++      "s-right",
++      "LR source handle should be s-right"
++    )
++    assert.equal(
++      edge1.targetHandle,
++      "t-left",
++      "LR target handle should be t-left"
++    )
++    assert.ok(edge1.markerEnd, "Edge must have markerEnd arrow configured")
++
++    // Single-node handling
++    const singleResult = computeSubgraphLayout(
++      [{ id: "solo", label: "Solo Entity", kind: "Concept" }],
++      []
++    )
++    assert.equal(
++      singleResult.nodes.length,
++      1,
++      "Single node graph must produce 1 node"
++    )
++    assert.equal(
++      singleResult.edges.length,
++      0,
++      "Single node graph must produce 0 edges"
++    )
++    assert.ok(typeof singleResult.nodes[0].position.x === "number")
++
++    // Empty graph handling
++    const emptyResult = computeSubgraphLayout([], [])
++    assert.equal(emptyResult.nodes.length, 0)
++    assert.equal(emptyResult.edges.length, 0)
++  })
++}
++
++// Test 6: AnalystShell references and wires AnalystSubgraphModal
++test("AnalystShell imports and embeds AnalystSubgraphModal with props", () => {
++  const shellPath = path.resolve(
++    process.cwd(),
++    "src/features/analyst/components/analyst-shell/analyst-shell.tsx"
++  )
++  const content = fs.readFileSync(shellPath, "utf-8")
++
++  assert.ok(
++    content.includes("AnalystSubgraphModal"),
++    "AnalystShell must import and embed AnalystSubgraphModal"
++  )
++  assert.ok(
++    content.includes('from "../subgraph-preview/analyst-subgraph-modal"'),
++    "AnalystShell must import AnalystSubgraphModal from subgraph-preview folder"
++  )
++  assert.ok(
++    content.includes("open={isSubgraphModalOpen}"),
++    "AnalystShell must bind open prop to isSubgraphModalOpen"
++  )
++  assert.ok(
++    content.includes("onOpenChange={setIsSubgraphModalOpen}"),
++    "AnalystShell must bind onOpenChange to setIsSubgraphModalOpen"
++  )
++  assert.ok(
++    content.includes("subgraph={activeSubgraph}"),
++    "AnalystShell must pass activeSubgraph to subgraph prop"
++  )
++})
++
++if (isReactServer && !isChildTest) {
++  test("Client DOM rendering tests for SubgraphFlowView and AnalystSubgraphModal via tsx runner", () => {
++    const tsxCli = path.resolve(
++      process.cwd(),
++      "node_modules/.pnpm/tsx@4.23.15/node_modules/tsx/dist/cli.mjs"
++    )
++    const fallbackCli = path.resolve(
++      process.cwd(),
++      "node_modules/tsx/dist/cli.mjs"
++    )
++    const cliToUse = fs.existsSync(fallbackCli) ? fallbackCli : tsxCli
++
++    const testFile = path.resolve(
++      process.cwd(),
++      "tests/analyst-subgraph-dom.test.ts"
++    )
++    const childEnv: NodeJS.ProcessEnv = {
++      ...process.env,
++      CHILD_REACT_DOM_TEST: "1",
++    }
++    for (const key of Object.keys(childEnv)) {
++      if (key.startsWith("NODE_TEST_")) {
++        delete childEnv[key]
++      }
++    }
++
++    const output = execFileSync(
++      process.execPath,
++      [cliToUse, "--test", testFile],
++      {
++        encoding: "utf-8",
++        env: childEnv,
++      }
++    )
++    assert.ok(
++      output.includes("pass") || output.includes("ok"),
++      "Child client DOM rendering tests must pass"
++    )
++    assert.ok(
++      !output.includes("fail 1"),
++      "Child client DOM tests must have 0 failures"
++    )
++  })
++}
