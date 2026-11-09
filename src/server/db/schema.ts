@@ -556,3 +556,77 @@ export const datasetSources = pgTable(
     index("dataset_sources_group_key_idx").on(table.group_key),
   ]
 )
+
+export const analystConversations = pgTable("analyst_conversations", {
+  id: generatedId(),
+  ontology_id: uuid("ontology_id").references(() => ontologyDocuments.id, {
+    onDelete: "cascade",
+  }),
+  group_key: text("group_key").notNull().default("shared"),
+  title: text("title").notNull().default("New Analysis"),
+  created_at: created_at(),
+  updated_at: timestamp("updated_at", {
+    withTimezone: true,
+    mode: "string",
+  }).defaultNow(),
+})
+
+export const analystMessages = pgTable("analyst_messages", {
+  id: generatedId(),
+  conversation_id: uuid("conversation_id")
+    .references(() => analystConversations.id, { onDelete: "cascade" })
+    .notNull(),
+  sender: text("sender").notNull(), // 'user' | 'assistant'
+  content: text("content").notNull(),
+  reasoning_trace:
+    jsonb("reasoning_trace").$type<Array<{ step: string; detail: string }>>(),
+  subgraph: jsonb("subgraph").$type<{
+    nodes: Array<{
+      id: string
+      label: string
+      kind: string
+      metadata?: Record<string, unknown>
+    }>
+    edges: Array<{
+      id: string
+      source: string
+      target: string
+      label: string
+    }>
+  }>(),
+  citations: jsonb("citations").$type<
+    Array<{
+      sourceType: "document" | "table"
+      sourceId: string
+      sourceName: string
+      paragraphIndex?: number
+      pageFrom?: number
+      pageTo?: number
+      quoteText?: string
+      tableRowKey?: string
+    }>
+  >(),
+  created_at: created_at(),
+})
+
+export const knowledgeContradictions = pgTable("knowledge_contradictions", {
+  id: generatedId(),
+  ontology_id: uuid("ontology_id").references(() => ontologyDocuments.id, {
+    onDelete: "cascade",
+  }),
+  group_key: text("group_key").notNull().default("shared"),
+  entity_id: text("entity_id").notNull(),
+  entity_label: text("entity_label").notNull(),
+  relation_name: text("relation_name").notNull(),
+  conflict_type: text("conflict_type").notNull(), // 'value_mismatch' | 'temporal_drift' | 'negation'
+  fact_a: jsonb("fact_a").notNull(),
+  fact_b: jsonb("fact_b").notNull(),
+  explanation: text("explanation").notNull(),
+  status: text("status").notNull().default("open"), // 'open' | 'resolved' | 'dismissed'
+  resolution_action: text("resolution_action"),
+  created_at: created_at(),
+  updated_at: timestamp("updated_at", {
+    withTimezone: true,
+    mode: "string",
+  }).defaultNow(),
+})
