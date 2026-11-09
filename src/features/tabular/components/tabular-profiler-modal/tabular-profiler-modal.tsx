@@ -31,7 +31,7 @@ import { useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import type { TabularProfileResult } from "../../types"
 import type { RemoteDbConnectionConfig } from "../../server/actions/remote-database"
-import { formatFileSize } from "./formatters"
+import { formatFileSize, resolveEffectiveProfilerResult } from "./formatters"
 import { TabularSchemaTab } from "./schema-tab"
 import { TabularPreviewTab } from "./preview-tab"
 import { RemoteDatabaseTab } from "./remote-database-tab"
@@ -45,6 +45,7 @@ export interface TabularProfilerModalProps {
   composeCommand?: string
   result?: TabularProfileResult | null
   errorMessage?: string | null
+  datasetId?: string
   onSaveToArchive?: (
     result: TabularProfileResult,
     connectionConfig?: Record<string, unknown> | null,
@@ -53,7 +54,8 @@ export interface TabularProfilerModalProps {
   onMapToKg?: (
     result: TabularProfileResult,
     connectionConfig?: Record<string, unknown> | null,
-    fileFormat?: string
+    fileFormat?: string,
+    datasetId?: string
   ) => void
   ontologyId?: string
   onFileUpload?: (file: File) => void
@@ -69,6 +71,7 @@ export function TabularProfilerModal({
   composeCommand = "bash deploy/scripts/deploy.sh postgres up --profile tabular",
   result,
   errorMessage,
+  datasetId,
   onSaveToArchive,
   onMapToKg,
   ontologyId,
@@ -76,9 +79,15 @@ export function TabularProfilerModal({
   defaultSourceTab = "upload",
 }: TabularProfilerModalProps) {
   const [copied, setCopied] = useState(false)
-  const [sourceTab, setSourceTab] = useState<"upload" | "database">(defaultSourceTab)
-  const [internalResult, setInternalResult] = useState<TabularProfileResult | null>(null)
-  const [connectionConfig, setConnectionConfig] = useState<Record<string, unknown> | null>(null)
+  const [sourceTab, setSourceTab] = useState<"upload" | "database">(
+    defaultSourceTab
+  )
+  const [internalResult, setInternalResult] =
+    useState<TabularProfileResult | null>(null)
+  const [connectionConfig, setConnectionConfig] = useState<Record<
+    string,
+    unknown
+  > | null>(null)
   const [internalFileFormat, setInternalFileFormat] = useState<string>("csv")
   const [isSaving, setIsSaving] = useState(false)
   const [isDismissed, setIsDismissed] = useState(false)
@@ -94,10 +103,14 @@ export function TabularProfilerModal({
   const queryClient = useQueryClient()
 
   // Derived active result: if user clicked "Choose Another Source", dismiss external result
-  const effectiveResult = isDismissed ? internalResult : (result ?? internalResult)
+  const effectiveResult = resolveEffectiveProfilerResult(
+    result,
+    internalResult,
+    isDismissed
+  )
   const activeResult = effectiveResult ?? null
   const fileFormat =
-    !isDismissed && result ? (result.fileType || "csv") : internalFileFormat
+    !isDismissed && result ? result.fileType || "csv" : internalFileFormat
 
   const handleOpenChange = (nextOpen: boolean) => {
     if (!nextOpen) {
@@ -145,9 +158,8 @@ export function TabularProfilerModal({
     if (ontologyId) {
       setIsSaving(true)
       try {
-        const { archiveDatasetSourceAction } = await import(
-          "../../server/actions/archive-dataset-source"
-        )
+        const { archiveDatasetSourceAction } =
+          await import("../../server/actions/archive-dataset-source")
         await archiveDatasetSourceAction({
           ontologyId,
           sourceName: activeResult.fileName,
@@ -177,7 +189,7 @@ export function TabularProfilerModal({
 
   const handleMap = () => {
     if (activeResult && onMapToKg) {
-      onMapToKg(activeResult, connectionConfig, fileFormat)
+      onMapToKg(activeResult, connectionConfig, fileFormat, datasetId)
     }
   }
 
@@ -374,8 +386,9 @@ export function TabularProfilerModal({
               <TabsContent value="keys" className="pt-2">
                 <div className="space-y-3 p-2">
                   <div className="text-xs text-muted-foreground">
-                    Identified candidate unique keys based on non-null uniqueness
-                    across all {activeResult.rowCount.toLocaleString()} rows:
+                    Identified candidate unique keys based on non-null
+                    uniqueness across all{" "}
+                    {activeResult.rowCount.toLocaleString()} rows:
                   </div>
                   {activeResult.candidateKeys.length > 0 ? (
                     <div className="flex flex-wrap gap-2">

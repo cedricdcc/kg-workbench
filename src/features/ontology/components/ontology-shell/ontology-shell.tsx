@@ -192,6 +192,9 @@ export function OntologyShell({
   const [profilerModalOpen, setProfilerModalOpen] = useState(false)
   const [profiledDatasetResult, setProfiledDatasetResult] =
     useState<TabularProfileResult | null>(null)
+  const [inspectedDatasetId, setInspectedDatasetId] = useState<string | null>(
+    null
+  )
   const [isProfilingDataset, setIsProfilingDataset] = useState(false)
 
   const { data: archivedDatasets = [] } = useQuery({
@@ -836,9 +839,11 @@ export function OntologyShell({
                     datasets={archivedDatasets}
                     onOpenUpload={() => {
                       setProfiledDatasetResult(null)
+                      setInspectedDatasetId(null)
                       setProfilerModalOpen(true)
                     }}
                     onInspectProfile={(dataset) => {
+                      setInspectedDatasetId(dataset.id)
                       setProfiledDatasetResult({
                         fileName: dataset.sourceName,
                         fileType: dataset.fileFormat,
@@ -961,26 +966,33 @@ export function OntologyShell({
 
       <TabularProfilerModal
         open={profilerModalOpen}
-        onOpenChange={setProfilerModalOpen}
+        onOpenChange={(open) => {
+          setProfilerModalOpen(open)
+          if (!open) {
+            setProfiledDatasetResult(null)
+            setInspectedDatasetId(null)
+          }
+        }}
+        datasetId={inspectedDatasetId ?? undefined}
         result={profiledDatasetResult}
         ontologyId={currentDocument.id}
         isLoading={isProfilingDataset}
         onFileUpload={handleSidebarFileUpload}
         onSaveToArchive={handleSaveProfileToArchive}
-        onMapToKg={(res, connConfig, format) => {
+        onMapToKg={(res, connConfig, format, mappedDatasetId) => {
+          const effectiveDatasetId = mappedDatasetId || inspectedDatasetId || ""
+          const matchedArchive = effectiveDatasetId
+            ? archivedDatasets.find((d) => d.id === effectiveDatasetId)
+            : null
           setSelectedDatasetForMapping({
-            id: "",
+            id: effectiveDatasetId,
             ontologyId: currentDocument.id,
-            groupKey: "shared",
+            groupKey: matchedArchive?.groupKey || "shared",
             sourceName: res.fileName,
             fileFormat:
               (format as "csv" | "parquet" | "excel" | "postgres" | "mysql") ||
               (res.fileType.toLowerCase() as
-                | "csv"
-                | "parquet"
-                | "excel"
-                | "postgres"
-                | "mysql") ||
+                "csv" | "parquet" | "excel" | "postgres" | "mysql") ||
               "csv",
             rowCount: res.rowCount,
             columnCount: res.columnCount,
@@ -991,48 +1003,54 @@ export function OntologyShell({
               columns: res.columns,
             },
             sampleRows: res.previewRows,
-            mappingSpec: null,
-            connectionConfig: connConfig ?? null,
-            createdAt: new Date().toISOString(),
+            mappingSpec: matchedArchive?.mappingSpec ?? null,
+            connectionConfig:
+              connConfig ?? matchedArchive?.connectionConfig ?? null,
+            createdAt: matchedArchive?.createdAt || new Date().toISOString(),
             updatedAt: new Date().toISOString(),
           })
           setProfilerModalOpen(false)
+          setInspectedDatasetId(null)
+          setProfiledDatasetResult(null)
         }}
       />
 
-      <DatasetMappingModal
-        open={Boolean(selectedDatasetForMapping)}
-        onOpenChange={(open) => {
-          if (!open) setSelectedDatasetForMapping(null)
-        }}
-        ontologyId={currentDocument.id}
-        dataset={selectedDatasetForMapping}
-        existingClasses={classes.map((c) => ({
-          id: c.id,
-          name: c.name,
-          description: c.description,
-          attributes: c.attributes.map((a) => ({
-            name: a.name,
-            dataType: a.data_type,
-          })),
-        }))}
-        existingRelations={relations.map((r) => {
-          const dom = classes.find((c) => c.id === r.domain_class_id)
-          const ran = classes.find((c) => c.id === r.range_class_id)
-          return {
-            id: r.id,
-            name: r.name,
-            domainClassName: dom?.name,
-            rangeClassName: ran?.name,
-          }
-        })}
-        onMappingCommitted={() => {
-          queryClient.invalidateQueries({
-            queryKey: ["dataset-sources", currentDocument.id],
-          })
-          router.refresh()
-        }}
-      />
+      {selectedDatasetForMapping && (
+        <DatasetMappingModal
+          key={`${selectedDatasetForMapping.id || "ephemeral"}:${selectedDatasetForMapping.sourceName}`}
+          open={Boolean(selectedDatasetForMapping)}
+          onOpenChange={(open) => {
+            if (!open) setSelectedDatasetForMapping(null)
+          }}
+          ontologyId={currentDocument.id}
+          dataset={selectedDatasetForMapping}
+          existingClasses={classes.map((c) => ({
+            id: c.id,
+            name: c.name,
+            description: c.description,
+            attributes: c.attributes.map((a) => ({
+              name: a.name,
+              dataType: a.data_type,
+            })),
+          }))}
+          existingRelations={relations.map((r) => {
+            const dom = classes.find((c) => c.id === r.domain_class_id)
+            const ran = classes.find((c) => c.id === r.range_class_id)
+            return {
+              id: r.id,
+              name: r.name,
+              domainClassName: dom?.name,
+              rangeClassName: ran?.name,
+            }
+          })}
+          onMappingCommitted={() => {
+            queryClient.invalidateQueries({
+              queryKey: ["dataset-sources", currentDocument.id],
+            })
+            router.refresh()
+          }}
+        />
+      )}
     </div>
   )
 }

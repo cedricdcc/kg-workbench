@@ -1,3 +1,5 @@
+import type { TabularProfileResult } from "../../types"
+
 export function formatTypeBadge(inferredKgType: string): {
   label: string
   variant: "default" | "secondary" | "destructive" | "outline"
@@ -22,3 +24,14 @@ export function formatFileSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
+export function resolveEffectiveProfilerResult(
+  externalResult: TabularProfileResult | null | undefined,
+  internalResult: TabularProfileResult | null | undefined,
+  isDismissed: boolean
+): TabularProfileResult | null {
+  if (isDismissed) {
+    return internalResult ?? null
+  }
+  // Internal (freshly profiled inside modal) takes precedence over external prop
+  return internalResult ?? externalResult ?? null
+}
