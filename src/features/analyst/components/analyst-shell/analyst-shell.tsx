@@ -2,15 +2,16 @@
 
 import { createContext, useContext, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
+import { useQuery } from "@tanstack/react-query"
 import {
   AlertCircle,
   AlertTriangle,
   CheckCircle2,
-  FileText,
   MessageSquare,
   Network,
   Sparkles,
 } from "lucide-react"
+import { toast } from "sonner"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -21,13 +22,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { routes } from "@/lib/routes"
 import type { SystemServiceDisplay } from "@/features/settings/server/queries/get-system-services"
@@ -37,7 +31,12 @@ import type {
   AnalystSubgraph,
 } from "../../types"
 import { createConversationAction } from "../../server/actions/create-conversation"
+import { sendQueryAction } from "../../server/actions/send-query"
+import { getMessagesQuery } from "../../server/queries/get-messages"
 import { ConversationSidebar } from "../conversation-sidebar/conversation-sidebar"
+import { ChatMessageList } from "../chat-view/chat-message-list"
+import { ChatInputBar } from "../chat-view/chat-input-bar"
+import { CitationInspector } from "../citation-drawer/citation-inspector"
 
 export interface AnalystShellContextValue {
   selectedConversationId: string | null
@@ -90,6 +89,30 @@ export function AnalystShell({
   )
   const [isSubgraphModalOpen, setIsSubgraphModalOpen] = useState(false)
   const [isCreatingQuick, setIsCreatingQuick] = useState(false)
+  const [isSending, setIsSending] = useState(false)
+
+  // Polling / fetching conversation messages
+  const { data: messages = [], refetch: refetchMessages } = useQuery({
+    queryKey: ["analyst-messages", selectedConversationId],
+    queryFn: async () => {
+      if (!selectedConversationId) return []
+      return await getMessagesQuery(selectedConversationId)
+    },
+    enabled: Boolean(selectedConversationId),
+    refetchInterval: (query) => {
+      const list = query.state.data ?? []
+      const lastMessage = list[list.length - 1]
+      if (lastMessage && lastMessage.sender === "user") {
+        return 2000
+      }
+      return false
+    },
+  })
+
+  const isAssistantThinking = useMemo(() => {
+    if (!messages.length) return false
+    return messages[messages.length - 1]?.sender === "user"
+  }, [messages])
 
   const selectedConversation = useMemo(
     () => conversations.find((c) => c.id === selectedConversationId) ?? null,
@@ -151,8 +174,31 @@ export function AnalystShell({
         title: "New Analysis",
       })
       handleConversationCreated(newConv)
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Failed to create new analysis"
+      )
     } finally {
       setIsCreatingQuick(false)
+    }
+  }
+
+  async function handleSendMessage(queryText: string) {
+    if (!selectedConversationId || !ontologyId || isSending) return
+    setIsSending(true)
+    try {
+      await sendQueryAction({
+        conversationId: selectedConversationId,
+        ontologyId,
+        query: queryText,
+      })
+      await refetchMessages()
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Failed to dispatch graph query"
+      )
+    } finally {
+      setIsSending(false)
     }
   }
 
@@ -279,24 +325,19 @@ export function AnalystShell({
                       </div>
                     </div>
 
-                    {/* Chat Content Slot (Task 7 will mount ChatMessageList and ChatInputBar here) */}
-                    <div
-                      className="flex flex-1 flex-col items-center justify-center p-8 text-center"
-                      data-testid="analyst-chat-placeholder"
-                    >
-                      <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
-                        <Sparkles className="h-6 w-6" />
-                      </div>
-                      <h3 className="mb-1 text-sm font-semibold">
-                        Start Knowledge Graph Query
-                      </h3>
-                      <p className="max-w-md text-xs text-muted-foreground">
-                        Ask natural language questions about your ontology and
-                        accepted facts. The analyst will extract multi-hop
-                        paths, verify paragraph citations, and detect semantic
-                        drift.
-                      </p>
-                    </div>
+                    {/* Chat Messages Thread */}
+                    <ChatMessageList
+                      messages={messages}
+                      isLoading={isSending || isAssistantThinking}
+                      onSelectCitation={handleOpenCitation}
+                      onViewSubgraph={handleOpenSubgraph}
+                    />
+
+                    {/* Chat Input Bar */}
+                    <ChatInputBar
+                      onSubmit={handleSendMessage}
+                      isLoading={isSending}
+                    />
                   </div>
                 ) : (
                   <div className="flex flex-1 flex-col items-center justify-center p-8 text-center">
@@ -334,7 +375,7 @@ export function AnalystShell({
                     <div className="flex items-center gap-2">
                       <AlertTriangle className="h-4 w-4 text-amber-500" />
                       <h2 className="text-sm font-semibold">
-                        Knowledge Contradictions & Semantic Drift
+                        Knowledge Contradictions &amp; Semantic Drift
                       </h2>
                     </div>
                     <p className="text-xs text-muted-foreground">
@@ -355,54 +396,12 @@ export function AnalystShell({
         </div>
 
         {/* Citation Drawer / Sheet */}
-        <Sheet
+        <CitationInspector
+          data-testid="analyst-citation-drawer"
+          citation={activeCitation}
           open={isCitationDrawerOpen}
           onOpenChange={setIsCitationDrawerOpen}
-        >
-          <SheetContent
-            side="right"
-            className="w-full sm:max-w-md"
-            data-testid="analyst-citation-drawer"
-          >
-            <SheetHeader>
-              <div className="flex items-center gap-2">
-                <FileText className="h-4 w-4 text-primary" />
-                <SheetTitle className="text-sm">Citation Source</SheetTitle>
-              </div>
-              <SheetDescription className="text-xs">
-                {activeCitation?.sourceType === "table"
-                  ? "Tabular record verification"
-                  : "Unstructured document paragraph verification"}
-              </SheetDescription>
-            </SheetHeader>
-
-            {activeCitation && (
-              <div className="mt-4 space-y-4 text-xs">
-                <div>
-                  <span className="font-medium text-foreground">Source:</span>{" "}
-                  <span className="text-muted-foreground">
-                    {activeCitation.sourceName}
-                  </span>
-                </div>
-                {activeCitation.paragraphIndex !== undefined && (
-                  <div>
-                    <span className="font-medium text-foreground">
-                      Paragraph:
-                    </span>{" "}
-                    <span className="text-muted-foreground">
-                      §{activeCitation.paragraphIndex}
-                    </span>
-                  </div>
-                )}
-                {activeCitation.quoteText && (
-                  <div className="rounded-md border bg-muted/50 p-3 italic">
-                    &ldquo;{activeCitation.quoteText}&rdquo;
-                  </div>
-                )}
-              </div>
-            )}
-          </SheetContent>
-        </Sheet>
+        />
 
         {/* Subgraph Visualizer Modal */}
         <Dialog

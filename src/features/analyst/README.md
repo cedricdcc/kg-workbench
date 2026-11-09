@@ -15,6 +15,16 @@ entry_points:
     purpose: Main client shell layout coordinating conversation sidebar, chat and contradiction tabs, citation drawer, and subgraph modal.
   - path: src/features/analyst/components/conversation-sidebar/conversation-sidebar.tsx
     purpose: Left sidebar listing analyst conversations with search filter, new analysis creation, and deletion.
+  - path: src/features/analyst/components/chat-view/chat-message-list.tsx
+    purpose: Chronological message list view with empty state, auto-scrolling, and thinking indicators.
+  - path: src/features/analyst/components/chat-view/chat-message-item.tsx
+    purpose: Message item renderer for user questions and assistant answers with parsed citation badges, reasoning trace card, and subgraph launcher.
+  - path: src/features/analyst/components/chat-view/chat-input-bar.tsx
+    purpose: Query input bar with suggested question chips, Enter-to-submit keyboard handlers, and loading states.
+  - path: src/features/analyst/components/chat-view/reasoning-trace-card.tsx
+    purpose: Collapsible step-by-step reasoning trace card with execution stage badges and explanations.
+  - path: src/features/analyst/components/citation-drawer/citation-inspector.tsx
+    purpose: Slide-over drawer and card displaying document paragraphs or tabular records with full quote evidence.
 server_entry_points:
   - path: src/features/analyst/server/actions/create-conversation.ts
     purpose: Server action to initialize an analyst conversation.
