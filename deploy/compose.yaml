@@ -81,6 +81,21 @@ services:
     extra_hosts:
       - host.docker.internal:host-gateway
 
+  analyst:
+    container_name: kg-workbench-analyst
+    profiles: ["analyst", "full"]
+    build:
+      context: ../services/analyst
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      WORKBENCH_API_URL: ${WORKBENCH_API_URL:-http://app:3000}
+      APP_PASSWORD: ${APP_PASSWORD:-}
+    ports:
+      - 127.0.0.1:${ANALYST_PORT:-8040}:8000
+    extra_hosts:
+      - host.docker.internal:host-gateway
+
 networks:
   app_web:
     external: true
