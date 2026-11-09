@@ -35,3 +35,21 @@ export function resolveEffectiveProfilerResult(
   // Internal (freshly profiled inside modal) takes precedence over external prop
   return internalResult ?? externalResult ?? null
 }
+
+export function resolveEffectiveFileFormat(
+  externalResult: TabularProfileResult | null | undefined,
+  internalFileFormat: string,
+  isUsingInternal: boolean
+): string {
+  if (isUsingInternal) {
+    return internalFileFormat || "csv"
+  }
+  return externalResult?.fileType || internalFileFormat || "csv"
+}
+
+export function resolveEffectiveDatasetId(
+  datasetId: string | undefined,
+  isUsingInternal: boolean
+): string | undefined {
+  return isUsingInternal ? undefined : datasetId
+}

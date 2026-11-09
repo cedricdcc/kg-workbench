@@ -318,6 +318,7 @@ export function OntologyShell({
       toast.dismiss(loadingToast)
 
       if (resp.status === "completed") {
+        setInspectedDatasetId(null)
         setProfiledDatasetResult(resp.result)
         setProfilerModalOpen(true)
       } else {

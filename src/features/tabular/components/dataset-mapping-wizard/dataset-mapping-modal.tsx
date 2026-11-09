@@ -41,7 +41,9 @@ export function DatasetMappingModal({
   )
 
   // Re-sync wizardState when dataset changes (comparing composite identity of ID + sourceName)
-  const [lastDatasetKey, setLastDatasetKey] = useState<string | null>(null)
+  const [lastDatasetKey, setLastDatasetKey] = useState<string | null>(() =>
+    dataset ? getDatasetCompositeKey(dataset) : null
+  )
   const currentDatasetKey = dataset ? getDatasetCompositeKey(dataset) : null
   if (dataset && currentDatasetKey !== lastDatasetKey) {
     setLastDatasetKey(currentDatasetKey)

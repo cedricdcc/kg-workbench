@@ -4,6 +4,8 @@ import {
   formatTypeBadge,
   formatFileSize,
   resolveEffectiveProfilerResult,
+  resolveEffectiveFileFormat,
+  resolveEffectiveDatasetId,
 } from "../src/features/tabular/components/tabular-profiler-modal/formatters"
 import { shouldContinuePolling } from "../src/features/tabular/hooks/polling"
 import type { TabularProfileResult } from "../src/features/tabular/types"
@@ -72,5 +74,36 @@ test("resolveEffectiveProfilerResult prioritizes fresh internal profiling result
     resolveEffectiveProfilerResult(externalResult, internalResult, true)
       ?.fileName,
     "fresh_inspected.csv"
+  )
+})
+
+test("resolveEffectiveFileFormat and resolveEffectiveDatasetId prevent state leaking when switching to internal source", () => {
+  const externalResult: TabularProfileResult = {
+    fileName: "orders.csv",
+    fileType: "csv",
+    rowCount: 50,
+    columnCount: 4,
+    estimatedSizeBytes: 2048,
+    columns: [],
+    candidateKeys: [],
+    previewRows: [],
+  }
+
+  // Case 1: External inspected source is active (isUsingInternal = false)
+  assert.equal(resolveEffectiveFileFormat(externalResult, "csv", false), "csv")
+  assert.equal(
+    resolveEffectiveDatasetId("uuid-archive-1", false),
+    "uuid-archive-1"
+  )
+
+  // Case 2: User switched to remote database inside modal (isUsingInternal = true)
+  assert.equal(
+    resolveEffectiveFileFormat(externalResult, "postgres", true),
+    "postgres"
+  )
+  assert.equal(
+    resolveEffectiveDatasetId("uuid-archive-1", true),
+    undefined,
+    "DatasetId of previously inspected dataset must be cleared when mapping an internal source"
   )
 })

@@ -31,7 +31,12 @@ import { useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import type { TabularProfileResult } from "../../types"
 import type { RemoteDbConnectionConfig } from "../../server/actions/remote-database"
-import { formatFileSize, resolveEffectiveProfilerResult } from "./formatters"
+import {
+  formatFileSize,
+  resolveEffectiveProfilerResult,
+  resolveEffectiveFileFormat,
+  resolveEffectiveDatasetId,
+} from "./formatters"
 import { TabularSchemaTab } from "./schema-tab"
 import { TabularPreviewTab } from "./preview-tab"
 import { RemoteDatabaseTab } from "./remote-database-tab"
@@ -109,8 +114,12 @@ export function TabularProfilerModal({
     isDismissed
   )
   const activeResult = effectiveResult ?? null
-  const fileFormat =
-    !isDismissed && result ? result.fileType || "csv" : internalFileFormat
+  const isUsingInternal = isDismissed || Boolean(internalResult)
+  const fileFormat = resolveEffectiveFileFormat(
+    result,
+    internalFileFormat,
+    isUsingInternal
+  )
 
   const handleOpenChange = (nextOpen: boolean) => {
     if (!nextOpen) {
@@ -189,7 +198,11 @@ export function TabularProfilerModal({
 
   const handleMap = () => {
     if (activeResult && onMapToKg) {
-      onMapToKg(activeResult, connectionConfig, fileFormat, datasetId)
+      const effectiveDatasetId = resolveEffectiveDatasetId(
+        datasetId,
+        isUsingInternal
+      )
+      onMapToKg(activeResult, connectionConfig, fileFormat, effectiveDatasetId)
     }
   }
 
