@@ -30,6 +30,7 @@ import { ChatMessageList } from "../chat-view/chat-message-list"
 import { ChatInputBar } from "../chat-view/chat-input-bar"
 import { CitationInspector } from "../citation-drawer/citation-inspector"
 import { AnalystSubgraphModal } from "../subgraph-preview/analyst-subgraph-modal"
+import { ContradictionsTab } from "../contradictions-view/contradictions-tab"
 
 export interface AnalystShellContextValue {
   selectedConversationId: string | null
@@ -362,27 +363,7 @@ export function AnalystShell({
                 className="flex min-h-0 flex-1 flex-col overflow-auto p-6"
                 data-testid="analyst-contradictions-view"
               >
-                {/* Contradictions Slot (Task 9 will mount ContradictionsTab here) */}
-                <div className="max-w-4xl space-y-4">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <AlertTriangle className="h-4 w-4 text-amber-500" />
-                      <h2 className="text-sm font-semibold">
-                        Knowledge Contradictions &amp; Semantic Drift
-                      </h2>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      Inspect conflicting facts detected across documents,
-                      extractors, and tabular mappings. Resolve drift by
-                      selecting the authoritative statement.
-                    </p>
-                  </div>
-
-                  <div className="rounded-lg border border-dashed p-8 text-center text-xs text-muted-foreground">
-                    Run drift analysis to verify consistency across accepted
-                    triples.
-                  </div>
-                </div>
+                <ContradictionsTab ontologyId={ontologyId} />
               </div>
             )}
           </main>

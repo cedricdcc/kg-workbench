@@ -15,6 +15,7 @@ const EVENT_WORKER_ROUTING: Record<string, string> = {
   "tabular.db_discover_requested": "tabular",
   "tabular.db_profile_requested": "tabular",
   "analyst.query_requested": "analyst",
+  "analyst.drift_analysis_requested": "analyst",
 }
 
 export function resolveTargetWorker(eventType: string): string {
@@ -26,13 +27,15 @@ export async function publishDomainEvent(
   event: DomainEventInput,
   options?: PublishEventOptions
 ): Promise<PublishedEventResult> {
-  const [createdEvent] = await (tx as unknown as {
-    insert: (table: unknown) => {
-      values: (data: unknown) => {
-        returning: (cols: unknown) => Promise<Array<{ id: string }>>
+  const [createdEvent] = await (
+    tx as unknown as {
+      insert: (table: unknown) => {
+        values: (data: unknown) => {
+          returning: (cols: unknown) => Promise<Array<{ id: string }>>
+        }
       }
     }
-  })
+  )
     .insert(domainEvents)
     .values({
       event_type: event.eventType,
@@ -48,13 +51,15 @@ export async function publishDomainEvent(
     options?.targetWorker || resolveTargetWorker(event.eventType)
   const priority = options?.priority ?? 0
 
-  const [createdJob] = await (tx as unknown as {
-    insert: (table: unknown) => {
-      values: (data: unknown) => {
-        returning: (cols: unknown) => Promise<Array<{ id: string }>>
+  const [createdJob] = await (
+    tx as unknown as {
+      insert: (table: unknown) => {
+        values: (data: unknown) => {
+          returning: (cols: unknown) => Promise<Array<{ id: string }>>
+        }
       }
     }
-  })
+  )
     .insert(jobQueue)
     .values({
       event_id: eventId,

@@ -97,3 +97,9 @@ export interface ResolveContradictionInput {
   status: "resolved" | "dismissed"
   actionNotes?: string
 }
+
+export interface RunDriftAnalysisResult {
+  success: boolean
+  eventId?: string
+  jobId?: string
+}

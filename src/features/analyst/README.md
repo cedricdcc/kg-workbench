@@ -29,6 +29,12 @@ entry_points:
     purpose: Dialog displaying reasoning subgraph overview with node/edge counts, entity kind legend, and interactive canvas.
   - path: src/features/analyst/components/subgraph-preview/subgraph-flow-view.tsx
     purpose: Interactive React Flow graph canvas computing Dagre rankdir layout, directional handle routing, and styled kind badges.
+  - path: src/features/analyst/components/contradictions-view/contradictions-tab.tsx
+    purpose: Main contradictions tab coordinating drift analysis triggers, search, status filtering, and conflict resolution modal.
+  - path: src/features/analyst/components/contradictions-view/contradiction-card.tsx
+    purpose: Card rendering side-by-side statement evidence comparison, conflict type badges, and resolve action.
+  - path: src/features/analyst/components/contradictions-view/resolve-dialog.tsx
+    purpose: Resolution dialog offering Keep Statement A, Keep Statement B, and Dismiss strategies with custom audit notes.
 server_entry_points:
   - path: src/features/analyst/server/actions/create-conversation.ts
     purpose: Server action to initialize an analyst conversation.
@@ -38,6 +44,8 @@ server_entry_points:
     purpose: Server action persisting user queries and enqueuing analyst.query_requested domain events.
   - path: src/features/analyst/server/actions/resolve-contradiction.ts
     purpose: Server action updating contradiction status and resolution actions.
+  - path: src/features/analyst/server/actions/run-drift-analysis.ts
+    purpose: Server action publishing analyst.drift_analysis_requested domain events to trigger drift analysis.
   - path: src/features/analyst/server/queries/get-conversations.ts
     purpose: Queries conversations scoped to ontology and group key.
   - path: src/features/analyst/server/queries/get-messages.ts
