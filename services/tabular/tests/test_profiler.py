@@ -2,7 +2,6 @@ import io
 import pyarrow as pa
 import pyarrow.parquet as pq
 import openpyxl
-import pytest
 
 from tabular.profiler import profile_tabular_data
 
@@ -74,4 +73,45 @@ def test_profile_handles_nulls():
     assert col_map["label"]["nullCount"] == 1
     # neither column is unique candidate because nullCount > 0
     assert col_map["code"]["isUniqueCandidate"] is False
+
+
+def test_profile_csv_non_utf8_encoding():
+    # Windows-1252 bytes containing Tjärnö Marine Laboratory (0xe4 and 0xf6)
+    csv_bytes = (
+        b"code,org,country\n"
+        b"UH,University of Helsinki,Finland\n"
+        b"UGIT,Tj\xe4rn\xf6 Marine Laboratory,Sweden\n"
+    )
+    res = profile_tabular_data(csv_bytes, "organisations.csv", "csv")
+    assert res["rowCount"] == 2
+    assert res["columnCount"] == 3
+    names = [row["org"] for row in res["previewRows"]]
+    assert "Tjärnö Marine Laboratory" in names
+
+
+def test_profile_csv_with_utf8_bom():
+    csv_bytes = b"\xef\xbb\xbfid,name\n1,Alpha\n2,Beta\n"
+    res = profile_tabular_data(csv_bytes, "bom.csv", "csv")
+    assert res["rowCount"] == 2
+    col_names = [c["name"] for c in res["columns"]]
+    assert col_names == ["id", "name"]
+
+
+def test_profile_csv_with_utf16():
+    text = "id,name\n1,Alpha\n2,Beta\n"
+    csv_bytes = text.encode("utf-16")
+    res = profile_tabular_data(csv_bytes, "utf16.csv", "csv")
+    assert res["rowCount"] == 2
+    col_names = [c["name"] for c in res["columns"]]
+    assert col_names == ["id", "name"]
+
+
+def test_profile_csv_malformed_row_fallback():
+    csv_bytes = b"id,name\n1,Alice\nbad_column_extra,1,2,3,4\n2,Bob\n"
+    res = profile_tabular_data(csv_bytes, "malformed.csv", "csv", options={"delimiter": ","})
+    # Gracefully ignores malformed row and returns valid rows
+    assert res["rowCount"] == 2
+    col_names = [c["name"] for c in res["columns"]]
+    assert col_names == ["id", "name"]
+
 

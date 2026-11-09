@@ -62,6 +62,57 @@ def sanitize_value(val: Any) -> Any:
     return val
 
 
+def normalize_text_file_bytes(file_bytes: bytes, explicit_encoding: str | None = None) -> bytes:
+    """Normalize text file bytes (CSV, TSV, TXT) to valid UTF-8, detecting and converting legacy encodings."""
+    if explicit_encoding:
+        try:
+            return file_bytes.decode(explicit_encoding).encode("utf-8")
+        except Exception:
+            pass
+
+    # Check for byte-order marks
+    if file_bytes.startswith(b"\xef\xbb\xbf"):
+        return file_bytes[3:]  # Strip UTF-8 BOM
+    if file_bytes.startswith(b"\xff\xfe") or file_bytes.startswith(b"\xfe\xff"):
+        try:
+            return file_bytes.decode("utf-16").encode("utf-8")
+        except Exception:
+            pass
+
+    # Try standard UTF-8 first
+    try:
+        file_bytes.decode("utf-8")
+        return file_bytes
+    except UnicodeDecodeError:
+        pass
+
+    # Try common legacy encodings in order:
+    # 1. windows-1252 (covers ANSI, CP1252, ISO-8859-1 / Latin-1 common in European/Excel CSVs)
+    # 2. iso-8859-15 (Western European with Euro sign)
+    # 3. cp1250 (Central European)
+    # 4. cp1251 (Cyrillic)
+    # 5. shift-jis (Japanese)
+    # 6. gb18030 (Chinese)
+    candidate_encodings = [
+        "windows-1252",
+        "iso-8859-1",
+        "iso-8859-15",
+        "cp1250",
+        "cp1251",
+        "shift-jis",
+        "gb18030",
+    ]
+    for enc in candidate_encodings:
+        try:
+            text = file_bytes.decode(enc)
+            return text.encode("utf-8")
+        except (UnicodeDecodeError, LookupError):
+            continue
+
+    # Final fallback: replace undecodable byte sequences
+    return file_bytes.decode("utf-8", errors="replace").encode("utf-8")
+
+
 def profile_tabular_data(
     file_bytes: bytes,
     file_name: str,
@@ -71,24 +122,34 @@ def profile_tabular_data(
     con = duckdb.connect(database=":memory:")
     options = options or {}
     clean_type = file_type.lower().replace(".", "").strip()
+    is_text = clean_type in {"csv", "tsv", "txt"}
+
+    if is_text:
+        explicit_enc = options.get("encoding") if isinstance(options.get("encoding"), str) else None
+        bytes_to_write = normalize_text_file_bytes(file_bytes, explicit_encoding=explicit_enc)
+    else:
+        bytes_to_write = file_bytes
 
     temp_path = None
     try:
         with tempfile.NamedTemporaryFile(delete=False, suffix=f".{clean_type}") as tmp:
-            tmp.write(file_bytes)
+            tmp.write(bytes_to_write)
             temp_path = tmp.name
 
-        if clean_type in {"csv", "tsv", "txt"}:
-            delimiter = options.get("delimiter")
-            if delimiter:
+        if is_text:
+            delimiter = options.get("delimiter") or ("\t" if clean_type == "tsv" else None)
+            delim_clause = ", delim=?" if delimiter else ""
+            params = [temp_path, delimiter] if delimiter else [temp_path]
+            try:
                 con.execute(
-                    "CREATE TABLE data_table AS SELECT * FROM read_csv(?, delim=?, auto_detect=true, sample_size=10000)",
-                    [temp_path, delimiter],
+                    f"CREATE TABLE data_table AS SELECT * FROM read_csv(?{delim_clause}, auto_detect=true, sample_size=10000)",
+                    params,
                 )
-            else:
+            except Exception:
+                # Fallback to ignore_errors=true if CSV has minor line-level defects
                 con.execute(
-                    "CREATE TABLE data_table AS SELECT * FROM read_csv(?, auto_detect=true, sample_size=10000)",
-                    [temp_path],
+                    f"CREATE TABLE data_table AS SELECT * FROM read_csv(?{delim_clause}, auto_detect=true, sample_size=10000, ignore_errors=true)",
+                    params,
                 )
         elif clean_type in {"parquet", "pq"}:
             con.execute(
