@@ -1,6 +1,6 @@
 "use client"
 
-import { BookOpen, Network, Settings } from "lucide-react"
+import { BookOpen, Network, Sparkles, Settings } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 
@@ -25,6 +25,11 @@ const navItems = [
     href: routes.knowledgeGraph.root,
     label: "Knowledge Graph",
     icon: BookOpen,
+  },
+  {
+    href: routes.analyst.root,
+    label: "Graph Analyst",
+    icon: Sparkles,
   },
 ]
 

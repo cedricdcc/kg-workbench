@@ -12,6 +12,10 @@ export const routes = {
     root: "/knowledge-graph",
     document: (id: string) => `/knowledge-graph/${id}`,
   },
+  analyst: {
+    root: "/analyst",
+    conversation: (id: string) => `/analyst?c=${encodeURIComponent(id)}`,
+  },
   settings: {
     root: "/settings",
   },
