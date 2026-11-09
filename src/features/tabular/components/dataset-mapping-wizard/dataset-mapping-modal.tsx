@@ -21,6 +21,7 @@ import {
   type DatasetMappingModalProps,
   type WizardState,
   type WizardStep,
+  getDatasetCompositeKey,
   initializeWizardState,
   validateMappingSpecBeforeCommit,
 } from "./types"
@@ -39,10 +40,11 @@ export function DatasetMappingModal({
     initializeWizardState(dataset)
   )
 
-  // Re-sync wizardState when dataset changes
-  const [lastDatasetId, setLastDatasetId] = useState<string | null>(null)
-  if (dataset && dataset.id !== lastDatasetId) {
-    setLastDatasetId(dataset.id)
+  // Re-sync wizardState when dataset changes (comparing composite identity of ID + sourceName)
+  const [lastDatasetKey, setLastDatasetKey] = useState<string | null>(null)
+  const currentDatasetKey = dataset ? getDatasetCompositeKey(dataset) : null
+  if (dataset && currentDatasetKey !== lastDatasetKey) {
+    setLastDatasetKey(currentDatasetKey)
     setWizardState(initializeWizardState(dataset))
     setCurrentStep("entity")
   }

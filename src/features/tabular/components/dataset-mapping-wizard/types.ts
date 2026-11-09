@@ -66,6 +66,15 @@ export interface WizardState {
   privacyConfigs: ColumnPrivacyConfig[]
 }
 
+export function getDatasetCompositeKey(
+  dataset: ArchivedDatasetSource | null
+): string {
+  if (!dataset) return ""
+  const idPart = dataset.id?.trim() ? dataset.id : "ephemeral"
+  const namePart = dataset.sourceName?.trim() || "untitled"
+  return `${idPart}:${namePart}`
+}
+
 export function initializeWizardState(
   dataset: ArchivedDatasetSource | null
 ): WizardState {
