@@ -25,6 +25,10 @@ entry_points:
     purpose: Collapsible step-by-step reasoning trace card with execution stage badges and explanations.
   - path: src/features/analyst/components/citation-drawer/citation-inspector.tsx
     purpose: Slide-over drawer and card displaying document paragraphs or tabular records with full quote evidence.
+  - path: src/features/analyst/components/subgraph-preview/analyst-subgraph-modal.tsx
+    purpose: Dialog displaying reasoning subgraph overview with node/edge counts, entity kind legend, and interactive canvas.
+  - path: src/features/analyst/components/subgraph-preview/subgraph-flow-view.tsx
+    purpose: Interactive React Flow graph canvas computing Dagre rankdir layout, directional handle routing, and styled kind badges.
 server_entry_points:
   - path: src/features/analyst/server/actions/create-conversation.ts
     purpose: Server action to initialize an analyst conversation.
@@ -56,4 +60,5 @@ Graph Intelligence & Natural Language Analyst subsystem integrating with the Net
 3. **Conversation Management (`ConversationSidebar`)**: Enables creating new analyses, searching existing conversations, selecting active threads, and deleting conversation history with cascade deletion.
 4. **Natural Language Query Engine**: Dispatches user queries through transactional outbox domain events (`analyst.query_requested`), picked up by the Python NetworkX analyst daemon for multi-hop path extraction.
 5. **Verifiable Citations**: Traces answers back to specific document paragraphs and tabular dataset rows with inline citation chips and slide-over inspector.
-6. **Contradiction Resolution**: Surfaces conflicting assertions across documents and datasets, categorizing them by conflict type (`value_mismatch`, `temporal_drift`, `negation`) with user resolution options.
+6. **Reasoning Subgraph Visualizer (`subgraph-preview/`)**: Interactive Dagre-directed React Flow graph canvas visualizing the entities, kinds, and relations traversed to answer multi-hop analyst queries with pan/zoom controls, background grid, and entity-kind legends.
+7. **Contradiction Resolution**: Surfaces conflicting assertions across documents and datasets, categorizing them by conflict type (`value_mismatch`, `temporal_drift`, `negation`) with user resolution options.

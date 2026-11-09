@@ -8,20 +8,12 @@ import {
   AlertTriangle,
   CheckCircle2,
   MessageSquare,
-  Network,
   Sparkles,
 } from "lucide-react"
 import { toast } from "sonner"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { routes } from "@/lib/routes"
 import type { SystemServiceDisplay } from "@/features/settings/server/queries/get-system-services"
@@ -37,6 +29,7 @@ import { ConversationSidebar } from "../conversation-sidebar/conversation-sideba
 import { ChatMessageList } from "../chat-view/chat-message-list"
 import { ChatInputBar } from "../chat-view/chat-input-bar"
 import { CitationInspector } from "../citation-drawer/citation-inspector"
+import { AnalystSubgraphModal } from "../subgraph-preview/analyst-subgraph-modal"
 
 export interface AnalystShellContextValue {
   selectedConversationId: string | null
@@ -404,34 +397,11 @@ export function AnalystShell({
         />
 
         {/* Subgraph Visualizer Modal */}
-        <Dialog
+        <AnalystSubgraphModal
           open={isSubgraphModalOpen}
           onOpenChange={setIsSubgraphModalOpen}
-        >
-          <DialogContent
-            className="max-w-3xl"
-            data-testid="analyst-subgraph-modal"
-          >
-            <DialogHeader>
-              <div className="flex items-center gap-2">
-                <Network className="h-4 w-4 text-primary" />
-                <DialogTitle className="text-sm">
-                  Reasoning Subgraph
-                </DialogTitle>
-              </div>
-              <DialogDescription className="text-xs">
-                Entities and relations traversed to answer this query.
-              </DialogDescription>
-            </DialogHeader>
-
-            {activeSubgraph && (
-              <div className="py-6 text-center text-xs text-muted-foreground">
-                Subgraph preview with {activeSubgraph.nodes.length} nodes and{" "}
-                {activeSubgraph.edges.length} edges.
-              </div>
-            )}
-          </DialogContent>
-        </Dialog>
+          subgraph={activeSubgraph}
+        />
       </div>
     </AnalystShellContext.Provider>
   )
