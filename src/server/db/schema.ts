@@ -14,6 +14,12 @@ import {
   uuid,
 } from "drizzle-orm/pg-core"
 
+import type {
+  CompiledOntologyArtifacts,
+  OhiLockfileV2,
+  OntologyUiLayout,
+} from "@/features/ontology/server/linkml/types"
+
 const generatedId = () => uuid("id").defaultRandom().primaryKey()
 const created_at = () =>
   timestamp("created_at", { withTimezone: true, mode: "string" }).defaultNow()
@@ -24,14 +30,27 @@ const created_at = () =>
 export const ontologyDocuments = pgTable("ontology_documents", {
   id: generatedId(),
   name: text("name").notNull(),
-  version: text("version"),
+  version: text("version").default("1.0.0"),
   source_file: text("source_file"),
   created_at: created_at(),
   default_language: text("default_language").notNull().default("en"),
   usecase: text("usecase").notNull().default(""),
   group_key: text("group_key").notNull().default("shared"),
+  linkml_yaml: text("linkml_yaml").notNull().default(""),
+  ohi_yaml: text("ohi_yaml").notNull().default(""),
+  ohi_lockfile: jsonb("ohi_lockfile")
+    .$type<OhiLockfileV2 | null>()
+    .default(null),
+  ui_layout: jsonb("ui_layout")
+    .$type<OntologyUiLayout>()
+    .notNull()
+    .default(sql`'{"classPositions":{},"moduleLayouts":{}}'::jsonb`),
+  compiled_artifacts: jsonb("compiled_artifacts")
+    .$type<CompiledOntologyArtifacts | null>()
+    .default(null),
 })
 
+/** @deprecated Option 2A canonical LinkML store replaces this table. Retained as stub for intermediate compilation. */
 export const ontologyModules = pgTable("ontology_modules", {
   id: generatedId(),
   ontology_id: uuid("ontology_id").notNull(),
@@ -39,6 +58,7 @@ export const ontologyModules = pgTable("ontology_modules", {
   description: text("description").notNull().default(""),
 })
 
+/** @deprecated Option 2A canonical LinkML store replaces this table. Retained as stub for intermediate compilation. */
 export const ontologyClasses = pgTable("ontology_classes", {
   id: generatedId(),
   ontology_id: uuid("ontology_id").notNull(),
@@ -49,6 +69,7 @@ export const ontologyClasses = pgTable("ontology_classes", {
   instance_policy: text("instance_policy").notNull().default("open"),
 })
 
+/** @deprecated Option 2A canonical LinkML store replaces this table. Retained as stub for intermediate compilation. */
 export const ontologyAttributes = pgTable("ontology_attributes", {
   id: generatedId(),
   class_id: uuid("class_id").notNull(),
@@ -58,6 +79,7 @@ export const ontologyAttributes = pgTable("ontology_attributes", {
   description: text("description").notNull().default(""),
 })
 
+/** @deprecated Option 2A canonical LinkML store replaces this table. Retained as stub for intermediate compilation. */
 export const ontologyRelations = pgTable("ontology_relations", {
   id: generatedId(),
   ontology_id: uuid("ontology_id").notNull(),
@@ -121,6 +143,10 @@ export const extractionRuns = pgTable("extraction_runs", {
   internal_provider: text("internal_provider"),
   internal_model_name: text("internal_model_name"),
   external_extractor_url: text("external_extractor_url"),
+  ohi_lockfile_snapshot: jsonb("ohi_lockfile_snapshot")
+    .$type<OhiLockfileV2 | null>()
+    .default(null),
+  ontology_sha256: text("ontology_sha256"),
 })
 
 export const evidenceAnchors = pgTable("evidence_anchors", {
@@ -143,7 +169,7 @@ export const facts = pgTable("facts", {
   subject_text: text("subject_text").notNull(),
   relation_text: text("relation_text").notNull(),
   object_text: text("object_text").notNull(),
-  relation_type_id: uuid("relation_type_id"),
+  relation_type_id: text("relation_type_id"),
   review_status: text("review_status").notNull().default("pending"),
   confidence: real("confidence"),
   primary_anchor_id: uuid("primary_anchor_id"),
@@ -167,7 +193,7 @@ export const documentEntities = pgTable("document_entities", {
   document_id: uuid("document_id").notNull(),
   extraction_run_id: uuid("extraction_run_id"),
   entity_text: text("entity_text").notNull(),
-  class_id: uuid("class_id"),
+  class_id: text("class_id"),
   review_status: text("review_status").notNull().default("pending"),
   created_at: created_at().notNull(),
 })
@@ -175,11 +201,12 @@ export const documentEntities = pgTable("document_entities", {
 export const entityAttributeValues = pgTable("entity_attribute_values", {
   id: generatedId(),
   entity_id: uuid("entity_id").notNull(),
-  attribute_id: uuid("attribute_id").notNull(),
+  attribute_id: text("attribute_id").notNull(),
   value: text("value").notNull(),
   created_at: created_at().notNull(),
 })
 
+/** @deprecated Option 2A canonical LinkML store replaces this table. Retained as stub for intermediate compilation. */
 export const ontologyClassPositions = pgTable(
   "ontology_class_positions",
   {
@@ -192,6 +219,7 @@ export const ontologyClassPositions = pgTable(
   (table) => [primaryKey({ columns: [table.class_id, table.module_id] })]
 )
 
+/** @deprecated Option 2A canonical LinkML store replaces this table. Retained as stub for intermediate compilation. */
 export const ontologyModuleLayout = pgTable("ontology_module_layout", {
   module_id: uuid("module_id").primaryKey(),
   ontology_id: uuid("ontology_id").notNull(),
@@ -201,6 +229,7 @@ export const ontologyModuleLayout = pgTable("ontology_module_layout", {
   height: doublePrecision("height").notNull(),
 })
 
+/** @deprecated Option 2A canonical LinkML store replaces this table. Retained as stub for intermediate compilation. */
 export const ontologyLanguages = pgTable("ontology_languages", {
   id: generatedId(),
   ontology_id: uuid("ontology_id").notNull(),
@@ -208,6 +237,7 @@ export const ontologyLanguages = pgTable("ontology_languages", {
   label: text("label").notNull().default(""),
 })
 
+/** @deprecated Option 2A canonical LinkML store replaces this table. Retained as stub for intermediate compilation. */
 export const ontologyRelationAttributes = pgTable(
   "ontology_relation_attributes",
   {
@@ -228,12 +258,13 @@ export const ontologyCompetencyQuestions = pgTable(
     id: generatedId(),
     ontology_id: uuid("ontology_id").notNull(),
     question: text("question").notNull().default(""),
-    subject_class_id: uuid("subject_class_id"),
-    predicate_relation_id: uuid("predicate_relation_id"),
-    object_class_id: uuid("object_class_id"),
-    subject_example_id: uuid("subject_example_id"),
-    predicate_example_id: uuid("predicate_example_id"),
-    object_example_id: uuid("object_example_id"),
+    module_id: text("module_id"),
+    subject_class_id: text("subject_class_id"),
+    predicate_relation_id: text("predicate_relation_id"),
+    object_class_id: text("object_class_id"),
+    subject_example_id: text("subject_example_id"),
+    predicate_example_id: text("predicate_example_id"),
+    object_example_id: text("object_example_id"),
     sort_order: integer("sort_order").notNull().default(0),
     created_at: created_at().notNull(),
   }
@@ -243,7 +274,7 @@ export const ontologyCompetencyQuestionModules = pgTable(
   "ontology_competency_question_modules",
   {
     cq_id: uuid("cq_id").notNull(),
-    module_id: uuid("module_id").notNull(),
+    module_id: text("module_id").notNull(),
   },
   (table) => [primaryKey({ columns: [table.cq_id, table.module_id] })]
 )
@@ -258,21 +289,12 @@ export const ontologyCqTriples = pgTable(
         onDelete: "cascade",
       }),
     sort_order: integer("sort_order").notNull().default(0),
-    subject_class_id: uuid("subject_class_id").references(
-      () => ontologyClasses.id,
-      { onDelete: "set null" }
-    ),
-    predicate_relation_id: uuid("predicate_relation_id").references(
-      () => ontologyRelations.id,
-      { onDelete: "set null" }
-    ),
-    object_class_id: uuid("object_class_id").references(
-      () => ontologyClasses.id,
-      { onDelete: "set null" }
-    ),
-    subject_example_id: uuid("subject_example_id"),
-    predicate_example_id: uuid("predicate_example_id"),
-    object_example_id: uuid("object_example_id"),
+    subject_class_id: text("subject_class_id"),
+    predicate_relation_id: text("predicate_relation_id"),
+    object_class_id: text("object_class_id"),
+    subject_example_id: text("subject_example_id"),
+    predicate_example_id: text("predicate_example_id"),
+    object_example_id: text("object_example_id"),
     created_at: created_at().notNull(),
   },
   (table) => [index("idx_cq_triples_cq_id").on(table.cq_id)]
@@ -283,12 +305,13 @@ export const factRelationAttributeValues = pgTable(
   {
     id: generatedId(),
     fact_id: uuid("fact_id").notNull(),
-    relation_attribute_id: uuid("relation_attribute_id").notNull(),
+    relation_attribute_id: text("relation_attribute_id").notNull(),
     value: text("value").notNull(),
     created_at: created_at().notNull(),
   }
 )
 
+/** @deprecated Option 2A canonical LinkML store replaces this table. Retained as stub for intermediate compilation. */
 export const ontologyNotes = pgTable("ontology_notes", {
   id: generatedId(),
   ontology_id: uuid("ontology_id").notNull(),
@@ -305,6 +328,7 @@ export const ontologyNotes = pgTable("ontology_notes", {
   target_cq_id: uuid("target_cq_id"),
 })
 
+/** @deprecated Option 2A canonical LinkML store replaces this table. Retained as stub for intermediate compilation. */
 export const ontologyLocalizedTexts = pgTable("ontology_localized_texts", {
   id: generatedId(),
   ontology_id: uuid("ontology_id").notNull(),
@@ -320,6 +344,7 @@ export const ontologyLocalizedTexts = pgTable("ontology_localized_texts", {
   target_cq_id: uuid("target_cq_id"),
 })
 
+/** @deprecated Option 2A canonical LinkML store replaces this table. Retained as stub for intermediate compilation. */
 export const ontologyExamples = pgTable("ontology_examples", {
   id: generatedId(),
   ontology_id: uuid("ontology_id").notNull(),
@@ -341,12 +366,21 @@ export const ontologyExamples = pgTable("ontology_examples", {
 
 export const referenceOntologies = pgTable("reference_ontologies", {
   id: generatedId(),
+  ontology_id: uuid("ontology_id").references(() => ontologyDocuments.id, {
+    onDelete: "cascade",
+  }),
   prefix: text("prefix").notNull(),
   name: text("name").notNull(),
   base_iri: text("base_iri").notNull(),
-  source_registry: text("source_registry").notNull(),
+  source_registry: text("source_registry").notNull().default("ohi"),
   source_id: text("source_id").notNull(),
   version: text("version").default(""),
+  publication_url: text("publication_url"),
+  artifact_url: text("artifact_url"),
+  artifact_format: text("artifact_format").notNull().default("linkml-yaml"),
+  sha256: text("sha256").notNull().default(""),
+  artifact_content: text("artifact_content").notNull().default(""),
+  is_transitive: boolean("is_transitive").notNull().default(false),
   synced_at: timestamp("synced_at", {
     withTimezone: true,
     mode: "string",
@@ -385,6 +419,7 @@ export const referenceOntologyTerms = pgTable("reference_ontology_terms", {
   group_key: text("group_key").notNull().default("shared"),
 })
 
+/** @deprecated Option 2A canonical LinkML store replaces this table. Retained as stub for intermediate compilation. */
 export const ontologyClassDisjointness = pgTable(
   "ontology_class_disjointness",
   {
@@ -401,6 +436,7 @@ export const ontologyClassDisjointness = pgTable(
   ]
 )
 
+/** @deprecated Option 2A canonical LinkML store replaces this table. Retained as stub for intermediate compilation. */
 export const ontologyClassRestrictions = pgTable(
   "ontology_class_restrictions",
   {
@@ -457,6 +493,7 @@ export const userApiKeys = pgTable(
   ]
 )
 
+/** @deprecated Option 2A canonical LinkML store replaces this table. Retained as stub for intermediate compilation. */
 export const registryEndpointSnapshots = pgTable(
   "registry_endpoint_snapshots",
   {

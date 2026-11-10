@@ -1,8 +1,470 @@
 -- Seed: Decommissioning ontology demo data
 -- Development dataset maintained directly in this file.
 
-INSERT INTO ontology_documents (id, name, version, source_file, default_language, usecase, group_key) VALUES
-  ('5008c4d1-7937-535e-8bb5-c47d306b19ec', 'Nuclear Decommissioning Test Ontology', '0.2.0-test', 'decommissioning_ontology_import_large.json', 'en', 'A larger test ontology for importing modular decommissioning concepts, competency questions, examples, translations, notes, relation attributes, and extraction-aligned facts.', 'shared');
+INSERT INTO ontology_documents (id, name, version, source_file, default_language, usecase, group_key, linkml_yaml, ohi_yaml, ohi_lockfile, ui_layout) VALUES
+  ('5008c4d1-7937-535e-8bb5-c47d306b19ec', 'Nuclear Decommissioning Test Ontology', '0.2.0-test', 'decommissioning_ontology_import_large.json', 'en', 'A larger test ontology for importing modular decommissioning concepts, competency questions, examples, translations, notes, relation attributes, and extraction-aligned facts.', 'shared',
+$$id: https://kg-workbench.local/ontology/5008c4d1-7937-535e-8bb5-c47d306b19ec#
+name: Nuclear_Decommissioning_Test_Ontology
+description: A larger test ontology for importing modular decommissioning concepts, competency questions, examples, translations, notes, relation attributes, and extraction-aligned facts.
+in_language: en
+version: 0.2.0-test
+default_range: string
+prefixes:
+  linkml: https://w3id.org/linkml/
+  ont: https://kg-workbench.local/ontology/5008c4d1-7937-535e-8bb5-c47d306b19ec#
+imports:
+  - linkml:types
+subsets:
+  facility_context:
+    description: Models the nuclear facility, reactor units, buildings, systems, and components relevant for decommissioning.
+    annotations:
+      kg_name: Facility and Asset Context
+  regulatory_compliance:
+    description: Models authorities, permits, legal requirements, inspections, and regulatory reports.
+    annotations:
+      kg_name: Regulatory Compliance and Permits
+  decommissioning_planning:
+    description: Models projects, phases, decommissioning steps, work packages, milestones, contractors, and dependencies.
+    annotations:
+      kg_name: Decommissioning Planning and Execution
+  radiological_safety:
+    description: Models radiological inventories, contamination zones, dose constraints, safety measures, and monitoring programs.
+    annotations:
+      kg_name: Radiological Characterization and Safety
+  waste_management:
+    description: Models waste streams, waste packages, clearance measurements, transport campaigns, and disposal facilities.
+    annotations:
+      kg_name: Waste Management and Clearance
+slots:
+  projectTargetsFacility:
+    domain: DecommissioningProject
+    range: Facility
+  facilityHasUnit:
+    domain: Facility
+    range: ReactorUnit
+  componentLocatedInBuilding:
+    domain: Component
+    range: Building
+  legalRequirementConstrainsPermit:
+    domain: LegalRequirement
+    range: Permit
+  permitIssuedByAuthority:
+    domain: Permit
+    range: Authority
+  permitAppliesToProject:
+    domain: Permit
+    range: DecommissioningProject
+  permitApprovesStep:
+    domain: Permit
+    range: DecommissioningStep
+  permitRequiresReport:
+    domain: Permit
+    range: RegulatoryReport
+  reportDocumentsMonitoringProgram:
+    domain: RegulatoryReport
+    range: MonitoringProgram
+  projectHasPhase:
+    domain: DecommissioningProject
+    range: DecommissioningPhase
+  phaseIncludesStep:
+    domain: DecommissioningPhase
+    range: DecommissioningStep
+  stepDependsOnStep:
+    domain: DecommissioningStep
+    range: DecommissioningStep
+  stepHasWorkPackage:
+    domain: DecommissioningStep
+    range: WorkPackage
+  inventoryCharacterizesComponent:
+    domain: RadiologicalInventory
+    range: Component
+  componentLocatedInZone:
+    domain: Component
+    range: ContaminationZone
+  stepRequiresSafetyMeasure:
+    domain: DecommissioningStep
+    range: SafetyMeasure
+  stepSubjectToDoseConstraint:
+    domain: DecommissioningStep
+    range: DoseConstraint
+  monitoringProgramObservesZone:
+    domain: MonitoringProgram
+    range: ContaminationZone
+  stepGeneratesWasteStream:
+    domain: DecommissioningStep
+    range: WasteStream
+  wasteStreamPackedInPackage:
+    domain: WasteStream
+    range: WastePackage
+  packageRequiresClearanceMeasurement:
+    domain: WastePackage
+    range: ClearanceMeasurement
+  clearanceMeasurementSupportsRelease:
+    domain: ClearanceMeasurement
+    range: WastePackage
+  packageTransportedToDisposalFacility:
+    domain: WastePackage
+    range: DisposalFacility
+  transportCampaignMovesPackage:
+    domain: TransportCampaign
+    range: WastePackage
+classes:
+  Facility:
+    description: A licensed nuclear site or installation undergoing preparation, operation, post-operation, or decommissioning.
+    in_subset:
+      - facility_context
+    slots:
+      - facilityHasUnit
+    attributes:
+      facilityIdentifier:
+        range: string
+        required: true
+        annotations:
+          kg_data_type: xsd:string
+      officialName:
+        range: string
+        required: true
+        annotations:
+          kg_data_type: xsd:string
+      location:
+        range: string
+        required: true
+        annotations:
+          kg_data_type: xsd:string
+      operatorName:
+        range: string
+        required: true
+        annotations:
+          kg_data_type: xsd:string
+  ReactorUnit:
+    description: A reactor block or unit that is part of a facility and may be decommissioned as a distinct asset.
+    in_subset:
+      - facility_context
+    attributes:
+      unitCode:
+        range: string
+        required: true
+        annotations:
+          kg_data_type: xsd:string
+      reactorType:
+        range: string
+        required: true
+        annotations:
+          kg_data_type: xsd:string
+  Building:
+    description: A building or physical structure within the facility boundary.
+    in_subset:
+      - facility_context
+    attributes:
+      buildingCode:
+        range: string
+        required: true
+        annotations:
+          kg_data_type: xsd:string
+      buildingName:
+        range: string
+        required: true
+        annotations:
+          kg_data_type: xsd:string
+  System:
+    description: A technical system of the nuclear facility, such as cooling, ventilation, or residual heat removal.
+    in_subset:
+      - facility_context
+  Component:
+    description: A physical plant component that may be characterized, dismantled, packed, or cleared.
+    in_subset:
+      - facility_context
+    slots:
+      - componentLocatedInBuilding
+      - componentLocatedInZone
+    attributes:
+      componentTag:
+        range: string
+        required: true
+        annotations:
+          kg_data_type: xsd:string
+      componentName:
+        range: string
+        required: true
+        annotations:
+          kg_data_type: xsd:string
+  Authority:
+    description: A competent regulatory, supervisory, or inspection authority.
+    in_subset:
+      - regulatory_compliance
+    attributes:
+      authorityName:
+        range: string
+        required: true
+        annotations:
+          kg_data_type: xsd:string
+      jurisdiction:
+        range: string
+        required: true
+        annotations:
+          kg_data_type: xsd:string
+  Permit:
+    description: A legal authorization, license, or approval relevant to decommissioning activities.
+    in_subset:
+      - regulatory_compliance
+    slots:
+      - permitIssuedByAuthority
+      - permitAppliesToProject
+      - permitApprovesStep
+      - permitRequiresReport
+    attributes:
+      permitNumber:
+        range: string
+        required: true
+        annotations:
+          kg_data_type: xsd:string
+      permitTitle:
+        range: string
+        required: true
+        annotations:
+          kg_data_type: xsd:string
+      status:
+        range: string
+        required: true
+        annotations:
+          kg_data_type: xsd:string
+  LegalRequirement:
+    description: A statute, regulation, permit condition, guideline, or binding requirement.
+    in_subset:
+      - regulatory_compliance
+    slots:
+      - legalRequirementConstrainsPermit
+    attributes:
+      legalReference:
+        range: string
+        required: true
+        annotations:
+          kg_data_type: xsd:string
+      requirementText:
+        range: string
+        required: true
+        annotations:
+          kg_data_type: xsd:string
+  RegulatoryReport:
+    description: A report submitted to or requested by the authority.
+    in_subset:
+      - regulatory_compliance
+    slots:
+      - reportDocumentsMonitoringProgram
+    attributes:
+      reportId:
+        range: string
+        required: true
+        annotations:
+          kg_data_type: xsd:string
+      reportType:
+        range: string
+        required: true
+        annotations:
+          kg_data_type: xsd:string
+  Inspection:
+    description: An inspection, audit, or site visit performed by an authority or technical expert organization.
+    in_subset:
+      - regulatory_compliance
+  DecommissioningProject:
+    description: A managed project that plans and executes decommissioning of a nuclear facility or asset.
+    in_subset:
+      - decommissioning_planning
+    slots:
+      - projectTargetsFacility
+      - projectHasPhase
+    attributes:
+      projectId:
+        range: string
+        required: true
+        annotations:
+          kg_data_type: xsd:string
+      projectName:
+        range: string
+        required: true
+        annotations:
+          kg_data_type: xsd:string
+  DecommissioningPhase:
+    description: A high-level phase of decommissioning, such as post-operation, dismantling, or site release.
+    in_subset:
+      - decommissioning_planning
+    slots:
+      - phaseIncludesStep
+    attributes:
+      phaseCode:
+        range: string
+        required: true
+        annotations:
+          kg_data_type: xsd:string
+      phaseName:
+        range: string
+        required: true
+        annotations:
+          kg_data_type: xsd:string
+  DecommissioningStep:
+    description: A concrete dismantling, decontamination, planning, measurement, or release step.
+    in_subset:
+      - decommissioning_planning
+    slots:
+      - stepDependsOnStep
+      - stepHasWorkPackage
+      - stepRequiresSafetyMeasure
+      - stepSubjectToDoseConstraint
+      - stepGeneratesWasteStream
+    attributes:
+      stepId:
+        range: string
+        required: true
+        annotations:
+          kg_data_type: xsd:string
+      stepName:
+        range: string
+        required: true
+        annotations:
+          kg_data_type: xsd:string
+      status:
+        range: string
+        required: true
+        annotations:
+          kg_data_type: xsd:string
+  WorkPackage:
+    description: A package of tasks assigned to a team or contractor.
+    in_subset:
+      - decommissioning_planning
+    attributes:
+      workPackageCode:
+        range: string
+        required: true
+        annotations:
+          kg_data_type: xsd:string
+  Milestone:
+    description: A significant planned or achieved event in the decommissioning schedule.
+    in_subset:
+      - decommissioning_planning
+  Contractor:
+    description: An external or internal organization assigned to perform work packages.
+    in_subset:
+      - decommissioning_planning
+  RadiologicalInventory:
+    description: A record of radionuclides, activity levels, dose rates, and material characterization assumptions.
+    in_subset:
+      - radiological_safety
+    slots:
+      - inventoryCharacterizesComponent
+    attributes:
+      inventoryId:
+        range: string
+        required: true
+        annotations:
+          kg_data_type: xsd:string
+  ContaminationZone:
+    description: A zone with a specific radiological classification or contamination pattern.
+    in_subset:
+      - radiological_safety
+    attributes:
+      zoneId:
+        range: string
+        required: true
+        annotations:
+          kg_data_type: xsd:string
+  DoseConstraint:
+    description: A dose limit, dose constraint, or planning value applied to work activities.
+    in_subset:
+      - radiological_safety
+    attributes:
+      constraintCode:
+        range: string
+        required: true
+        annotations:
+          kg_data_type: xsd:string
+  SafetyMeasure:
+    description: A technical, organizational, or procedural measure reducing hazards or exposure.
+    in_subset:
+      - radiological_safety
+    attributes:
+      measureId:
+        range: string
+        required: true
+        annotations:
+          kg_data_type: xsd:string
+  MonitoringProgram:
+    description: A measurement or surveillance program for dose rates, contamination, effluents, or environmental indicators.
+    in_subset:
+      - radiological_safety
+    slots:
+      - monitoringProgramObservesZone
+    attributes:
+      programId:
+        range: string
+        required: true
+        annotations:
+          kg_data_type: xsd:string
+  WasteStream:
+    description: A stream of generated material or waste with shared origin, category, and treatment path.
+    in_subset:
+      - waste_management
+    slots:
+      - wasteStreamPackedInPackage
+    attributes:
+      streamId:
+        range: string
+        required: true
+        annotations:
+          kg_data_type: xsd:string
+  WastePackage:
+    description: A drum, container, box, or other package for waste storage, transport, clearance, or disposal.
+    in_subset:
+      - waste_management
+    slots:
+      - packageRequiresClearanceMeasurement
+      - packageTransportedToDisposalFacility
+    attributes:
+      packageId:
+        range: string
+        required: true
+        annotations:
+          kg_data_type: xsd:string
+  ClearanceMeasurement:
+    description: A measurement used to support clearance, release, or classification decisions.
+    in_subset:
+      - waste_management
+    slots:
+      - clearanceMeasurementSupportsRelease
+    attributes:
+      measurementId:
+        range: string
+        required: true
+        annotations:
+          kg_data_type: xsd:string
+  TransportCampaign:
+    description: A planned or executed campaign to move waste packages from one location to another.
+    in_subset:
+      - waste_management
+    slots:
+      - transportCampaignMovesPackage
+    attributes:
+      campaignId:
+        range: string
+        required: true
+        annotations:
+          kg_data_type: xsd:string
+  DisposalFacility:
+    description: A storage, disposal, or external treatment facility receiving waste packages.
+    in_subset:
+      - waste_management
+    attributes:
+      disposalFacilityId:
+        range: string
+        required: true
+        annotations:
+          kg_data_type: xsd:string
+$$,
+$$name: Nuclear_Decommissioning_Test_Ontology
+version: 0.2.0-test
+dependencies: []
+$$,
+'{"lock_version":2,"selections":[],"files":[]}'::jsonb,
+'{"classPositions":{},"moduleLayouts":{}}'::jsonb);
 
 INSERT INTO ontology_modules (id, ontology_id, name, description) VALUES
   ('3bd7afc2-74de-5869-a4e2-01dedf0e8116', '5008c4d1-7937-535e-8bb5-c47d306b19ec', 'Facility and Asset Context', 'Models the nuclear facility, reactor units, buildings, systems, and components relevant for decommissioning.'),
@@ -40,63 +502,63 @@ INSERT INTO ontology_classes (id, ontology_id, module_id, name, description, ins
   ('0f3c0943-4dc1-5848-9543-5ec9116985d3', '5008c4d1-7937-535e-8bb5-c47d306b19ec', 'bf6ea74e-b71f-5874-a148-b76376943176', 'DisposalFacility', 'A storage, disposal, or external treatment facility receiving waste packages.', 'open', NULL);
 
 INSERT INTO ontology_attributes (id, class_id, name, data_type, required, description) VALUES
-  ('14ae34bf-eb3e-5e9c-a9c0-5a0e88351ccc', '3e2a3aaf-eb38-5256-af21-7b8ab96c2879', 'facilityIdentifier', 'xsd:string', true, 'Stable operator or regulatory identifier for the facility.'),
-  ('d3d639cb-83a8-55e0-a555-d989ed0f07ef', '3e2a3aaf-eb38-5256-af21-7b8ab96c2879', 'officialName', 'xsd:string', true, 'Official name used in permits and reports.'),
-  ('476f8ebf-b65c-5a75-8759-05101c10db6b', '3e2a3aaf-eb38-5256-af21-7b8ab96c2879', 'location', 'xsd:string', true, 'City, region, or site location.'),
-  ('660c422b-b47e-5674-a5ca-6cae64ff7964', '3e2a3aaf-eb38-5256-af21-7b8ab96c2879', 'operatorName', 'xsd:string', true, 'Legal operator responsible for the facility.'),
+  ('Facility.facilityIdentifier', '3e2a3aaf-eb38-5256-af21-7b8ab96c2879', 'facilityIdentifier', 'xsd:string', true, 'Stable operator or regulatory identifier for the facility.'),
+  ('Facility.officialName', '3e2a3aaf-eb38-5256-af21-7b8ab96c2879', 'officialName', 'xsd:string', true, 'Official name used in permits and reports.'),
+  ('Facility.location', '3e2a3aaf-eb38-5256-af21-7b8ab96c2879', 'location', 'xsd:string', true, 'City, region, or site location.'),
+  ('Facility.operatorName', '3e2a3aaf-eb38-5256-af21-7b8ab96c2879', 'operatorName', 'xsd:string', true, 'Legal operator responsible for the facility.'),
   ('8e9aa843-cf0d-56f5-ba61-0fbbdd6b4322', '3e2a3aaf-eb38-5256-af21-7b8ab96c2879', 'commercialOperationEndDate', 'xsd:dateTime', false, 'Date when commercial power operation ended.'),
-  ('bef8bc4b-5770-5233-95dc-cd0cf7c7d767', '6c82cf35-aa49-598a-a16a-2d0bebc5d1c4', 'unitCode', 'xsd:string', true, 'Short block or unit identifier.'),
-  ('89aa2d69-3746-52be-951c-864ec1761895', '6c82cf35-aa49-598a-a16a-2d0bebc5d1c4', 'reactorType', 'xsd:string', true, 'Reactor technology, e.g. PWR or BWR.'),
-  ('b94769b7-4bc1-5e4e-9657-ed11ac983a78', '6c82cf35-aa49-598a-a16a-2d0bebc5d1c4', 'thermalPowerMW', 'xsd:decimal', false, 'Nominal thermal power in MW.'),
-  ('263268db-4da8-58d0-ae3f-8b0b1aaf45c2', '6c82cf35-aa49-598a-a16a-2d0bebc5d1c4', 'isFuelFree', 'xsd:boolean', true, 'Whether nuclear fuel has been removed from the unit.'),
-  ('d4b1eae5-69fe-5f2b-8224-b55b6130f531', 'f2460ef8-feb4-5c6d-b017-61a9e5811cc6', 'buildingCode', 'xsd:string', true, 'Site-specific building code.'),
-  ('081b2a5c-fd1d-5cdb-8ee5-f239af61fedc', 'f2460ef8-feb4-5c6d-b017-61a9e5811cc6', 'buildingName', 'xsd:string', true, 'Human-readable building name.'),
-  ('74afb16b-e588-5686-a5ca-2c9d2ae6cb14', 'f2460ef8-feb4-5c6d-b017-61a9e5811cc6', 'isRadiologicalArea', 'xsd:boolean', true, 'Whether the building is classified as radiological area.'),
+  ('ReactorUnit.unitCode', '6c82cf35-aa49-598a-a16a-2d0bebc5d1c4', 'unitCode', 'xsd:string', true, 'Short block or unit identifier.'),
+  ('ReactorUnit.reactorType', '6c82cf35-aa49-598a-a16a-2d0bebc5d1c4', 'reactorType', 'xsd:string', true, 'Reactor technology, e.g. PWR or BWR.'),
+  ('ReactorUnit.thermalPowerMW', '6c82cf35-aa49-598a-a16a-2d0bebc5d1c4', 'thermalPowerMW', 'xsd:decimal', false, 'Nominal thermal power in MW.'),
+  ('ReactorUnit.isFuelFree', '6c82cf35-aa49-598a-a16a-2d0bebc5d1c4', 'isFuelFree', 'xsd:boolean', true, 'Whether nuclear fuel has been removed from the unit.'),
+  ('Building.buildingCode', 'f2460ef8-feb4-5c6d-b017-61a9e5811cc6', 'buildingCode', 'xsd:string', true, 'Site-specific building code.'),
+  ('Building.buildingName', 'f2460ef8-feb4-5c6d-b017-61a9e5811cc6', 'buildingName', 'xsd:string', true, 'Human-readable building name.'),
+  ('Building.isRadiologicalArea', 'f2460ef8-feb4-5c6d-b017-61a9e5811cc6', 'isRadiologicalArea', 'xsd:boolean', true, 'Whether the building is classified as radiological area.'),
   ('c88e1bf4-58cb-5396-bdb0-542f2e428e96', '75681f6e-683d-5ecd-8ab3-669ddd30c480', 'systemCode', 'xsd:string', true, 'System code from plant documentation.'),
   ('e192d177-7dde-5647-9afa-366888c46365', '75681f6e-683d-5ecd-8ab3-669ddd30c480', 'systemName', 'xsd:string', true, 'System display name.'),
   ('50a552fe-bf6d-5f8e-ac05-719b6001391a', '75681f6e-683d-5ecd-8ab3-669ddd30c480', 'safetyClass', 'xsd:string', false, 'Safety classification used by the operator.'),
-  ('5cf825f1-c50c-5c9a-afd7-e15a63a84056', '76795edf-00dd-5dbb-8414-45bdcd0835a3', 'componentTag', 'xsd:string', true, 'Unique component tag or equipment identifier.'),
-  ('3fffdcda-ab1d-5638-b304-b15c60b03518', '76795edf-00dd-5dbb-8414-45bdcd0835a3', 'componentName', 'xsd:string', true, 'Component name.'),
-  ('651285b7-4bcc-543a-90d8-080c0bd9cf08', '76795edf-00dd-5dbb-8414-45bdcd0835a3', 'material', 'xsd:string', false, 'Dominant material composition.'),
-  ('2bb72def-95fb-5b3b-9182-ead00dab348d', '76795edf-00dd-5dbb-8414-45bdcd0835a3', 'estimatedMassTonnes', 'xsd:decimal', false, 'Estimated component mass in tonnes.'),
-  ('f09a22ab-d756-5680-9210-2946a73736fb', '76795edf-00dd-5dbb-8414-45bdcd0835a3', 'isActivated', 'xsd:boolean', false, 'Whether activation rather than only contamination is expected.'),
-  ('d305286b-26e9-53e2-b014-48d5b23cb0c6', '46841259-c359-5058-855c-674da16d1496', 'authorityName', 'xsd:string', true, 'Official authority name.'),
-  ('9ca1a2ed-acef-5581-918e-88144720ed7c', '46841259-c359-5058-855c-674da16d1496', 'jurisdiction', 'xsd:string', true, 'Jurisdiction or region covered by the authority.'),
+  ('Component.componentTag', '76795edf-00dd-5dbb-8414-45bdcd0835a3', 'componentTag', 'xsd:string', true, 'Unique component tag or equipment identifier.'),
+  ('Component.componentName', '76795edf-00dd-5dbb-8414-45bdcd0835a3', 'componentName', 'xsd:string', true, 'Component name.'),
+  ('Component.material', '76795edf-00dd-5dbb-8414-45bdcd0835a3', 'material', 'xsd:string', false, 'Dominant material composition.'),
+  ('Component.estimatedMassTonnes', '76795edf-00dd-5dbb-8414-45bdcd0835a3', 'estimatedMassTonnes', 'xsd:decimal', false, 'Estimated component mass in tonnes.'),
+  ('Component.isActivated', '76795edf-00dd-5dbb-8414-45bdcd0835a3', 'isActivated', 'xsd:boolean', false, 'Whether activation rather than only contamination is expected.'),
+  ('Authority.authorityName', '46841259-c359-5058-855c-674da16d1496', 'authorityName', 'xsd:string', true, 'Official authority name.'),
+  ('Authority.jurisdiction', '46841259-c359-5058-855c-674da16d1496', 'jurisdiction', 'xsd:string', true, 'Jurisdiction or region covered by the authority.'),
   ('c5d06269-c3f2-527a-ab27-a031c569eec8', '46841259-c359-5058-855c-674da16d1496', 'contactUnit', 'xsd:string', false, 'Responsible department or contact unit.'),
-  ('839eb530-6f90-5e81-b495-66c164d0c63b', 'c2fc8d67-ac69-54d1-a565-2ff9152aecb4', 'permitNumber', 'xsd:string', true, 'Permit or license number.'),
-  ('1b64df36-9ae8-5039-abba-16ef8a44207f', 'c2fc8d67-ac69-54d1-a565-2ff9152aecb4', 'permitTitle', 'xsd:string', true, 'Official permit title.'),
-  ('fbdffa05-b19b-52e8-a3db-6b3140a99f3e', 'c2fc8d67-ac69-54d1-a565-2ff9152aecb4', 'issueDate', 'xsd:dateTime', true, 'Date when the permit was issued.'),
-  ('31156022-e92c-59a5-9097-9d3186197060', 'c2fc8d67-ac69-54d1-a565-2ff9152aecb4', 'status', 'xsd:string', true, 'Permit status, e.g. issued, pending, amended.'),
-  ('b9678cd1-e849-5593-8adf-eaed7fe47aa9', 'c2fc8d67-ac69-54d1-a565-2ff9152aecb4', 'legalBasis', 'xsd:string', true, 'Primary legal basis cited by the permit.'),
-  ('5ff20117-2199-5204-9998-1df2ff7d5b1c', 'a50ef267-32fc-56c7-8d35-b6f19a6e6197', 'legalReference', 'xsd:string', true, 'Citation of the legal source.'),
-  ('653ea9c8-0aa4-58a3-af4a-7b33571656a4', 'a50ef267-32fc-56c7-8d35-b6f19a6e6197', 'requirementText', 'xsd:string', true, 'Short normative requirement statement.'),
-  ('adc0d4a9-a3eb-50d7-b0d7-f13ad4b35d08', 'a50ef267-32fc-56c7-8d35-b6f19a6e6197', 'isBinding', 'xsd:boolean', true, 'Whether the requirement is legally binding.'),
+  ('Permit.permitNumber', 'c2fc8d67-ac69-54d1-a565-2ff9152aecb4', 'permitNumber', 'xsd:string', true, 'Permit or license number.'),
+  ('Permit.permitTitle', 'c2fc8d67-ac69-54d1-a565-2ff9152aecb4', 'permitTitle', 'xsd:string', true, 'Official permit title.'),
+  ('Permit.issueDate', 'c2fc8d67-ac69-54d1-a565-2ff9152aecb4', 'issueDate', 'xsd:dateTime', true, 'Date when the permit was issued.'),
+  ('Permit.status', 'c2fc8d67-ac69-54d1-a565-2ff9152aecb4', 'status', 'xsd:string', true, 'Permit status, e.g. issued, pending, amended.'),
+  ('Permit.legalBasis', 'c2fc8d67-ac69-54d1-a565-2ff9152aecb4', 'legalBasis', 'xsd:string', true, 'Primary legal basis cited by the permit.'),
+  ('LegalRequirement.legalReference', 'a50ef267-32fc-56c7-8d35-b6f19a6e6197', 'legalReference', 'xsd:string', true, 'Citation of the legal source.'),
+  ('LegalRequirement.requirementText', 'a50ef267-32fc-56c7-8d35-b6f19a6e6197', 'requirementText', 'xsd:string', true, 'Short normative requirement statement.'),
+  ('LegalRequirement.isBinding', 'a50ef267-32fc-56c7-8d35-b6f19a6e6197', 'isBinding', 'xsd:boolean', true, 'Whether the requirement is legally binding.'),
   ('0cb66460-6e32-5277-bdc2-3dbb0eb65d08', 'a50ef267-32fc-56c7-8d35-b6f19a6e6197', 'effectiveDate', 'xsd:dateTime', false, 'Effective date of the requirement.'),
-  ('5ed10b3d-91f8-5ed8-84f0-b873534d4b40', 'e70ebc34-fcd0-57a6-82c2-659c867ddd6a', 'reportId', 'xsd:string', true, 'Stable report identifier.'),
-  ('0443a327-22e0-5b93-b6f4-9701cc9d18d4', 'e70ebc34-fcd0-57a6-82c2-659c867ddd6a', 'reportType', 'xsd:string', true, 'Type of report, e.g. monitoring, milestone, inspection response.'),
-  ('cfd62631-15de-5186-92ba-29eb810f412f', 'e70ebc34-fcd0-57a6-82c2-659c867ddd6a', 'submissionDate', 'xsd:dateTime', false, 'Submission date.'),
-  ('b1c1ed4b-92a9-5a89-ac3c-470d45adabf4', 'e70ebc34-fcd0-57a6-82c2-659c867ddd6a', 'isConfidential', 'xsd:boolean', false, 'Whether the report is confidential.'),
+  ('RegulatoryReport.reportId', 'e70ebc34-fcd0-57a6-82c2-659c867ddd6a', 'reportId', 'xsd:string', true, 'Stable report identifier.'),
+  ('RegulatoryReport.reportType', 'e70ebc34-fcd0-57a6-82c2-659c867ddd6a', 'reportType', 'xsd:string', true, 'Type of report, e.g. monitoring, milestone, inspection response.'),
+  ('RegulatoryReport.submissionDate', 'e70ebc34-fcd0-57a6-82c2-659c867ddd6a', 'submissionDate', 'xsd:dateTime', false, 'Submission date.'),
+  ('RegulatoryReport.isConfidential', 'e70ebc34-fcd0-57a6-82c2-659c867ddd6a', 'isConfidential', 'xsd:boolean', false, 'Whether the report is confidential.'),
   ('d52ebf74-49c9-5f53-874d-feb6e116a745', 'ea0c0846-cb50-5d90-bc38-046d6bc5ccb4', 'inspectionId', 'xsd:string', true, 'Inspection identifier.'),
   ('029f8e79-ca16-5a77-9212-512650790c5a', 'ea0c0846-cb50-5d90-bc38-046d6bc5ccb4', 'inspectionDate', 'xsd:dateTime', true, 'Date of the inspection.'),
   ('8ec02b8d-c3a0-5ab7-b86f-e15a976d4ae4', 'ea0c0846-cb50-5d90-bc38-046d6bc5ccb4', 'outcome', 'xsd:string', true, 'Inspection result or status.'),
-  ('38bda69d-801a-560d-be9e-756c97e7c071', '1b7b3382-15e7-5666-b974-0c3051dde5a7', 'projectId', 'xsd:string', true, 'Project identifier.'),
-  ('423326a5-9de5-5774-a3f1-0146ea31e6d4', '1b7b3382-15e7-5666-b974-0c3051dde5a7', 'projectName', 'xsd:string', true, 'Project display name.'),
-  ('e861dc87-837c-56ec-a7a0-6e0858ef2a3b', '1b7b3382-15e7-5666-b974-0c3051dde5a7', 'plannedStartDate', 'xsd:dateTime', true, 'Planned project start date.'),
+  ('DecommissioningProject.projectId', '1b7b3382-15e7-5666-b974-0c3051dde5a7', 'projectId', 'xsd:string', true, 'Project identifier.'),
+  ('DecommissioningProject.projectName', '1b7b3382-15e7-5666-b974-0c3051dde5a7', 'projectName', 'xsd:string', true, 'Project display name.'),
+  ('DecommissioningProject.plannedStartDate', '1b7b3382-15e7-5666-b974-0c3051dde5a7', 'plannedStartDate', 'xsd:dateTime', true, 'Planned project start date.'),
   ('e4e98021-55d9-5694-804f-da095f5fdf9b', '1b7b3382-15e7-5666-b974-0c3051dde5a7', 'plannedEndDate', 'xsd:dateTime', false, 'Planned project completion date.'),
-  ('352a0be6-7660-53cd-a720-32bce0cb3a4a', '1b7b3382-15e7-5666-b974-0c3051dde5a7', 'responsibleOrganization', 'xsd:string', true, 'Organization responsible for delivery.'),
-  ('0631839e-0bff-5eae-baf3-02805fc391c5', '8d9c2a60-bb63-5e48-86c7-270778ef8808', 'phaseCode', 'xsd:string', true, 'Phase code.'),
-  ('598b21e5-c177-59f9-a3bf-b945b888ac21', '8d9c2a60-bb63-5e48-86c7-270778ef8808', 'phaseName', 'xsd:string', true, 'Phase name.'),
-  ('c2fa997b-c365-55a3-af43-04a3f82698c3', '8d9c2a60-bb63-5e48-86c7-270778ef8808', 'sequenceNumber', 'xsd:decimal', true, 'Order of the phase.'),
-  ('3f4c9384-da12-50ab-9501-ddc27efec3be', '8d9c2a60-bb63-5e48-86c7-270778ef8808', 'isActive', 'xsd:boolean', false, 'Whether the phase is currently active.'),
-  ('0803fce0-5f0d-5ddd-ada8-d1162d352c79', '2bfffb55-23d0-557a-878a-41ecf19028ac', 'stepId', 'xsd:string', true, 'Step identifier.'),
-  ('7e3e5d05-8c2b-59ed-8952-c7cd9c6a54f8', '2bfffb55-23d0-557a-878a-41ecf19028ac', 'stepName', 'xsd:string', true, 'Step name.'),
-  ('8ac7ca42-6a6b-56f0-b202-a0fe5fb1cf16', '2bfffb55-23d0-557a-878a-41ecf19028ac', 'status', 'xsd:string', true, 'Current step status.'),
-  ('b294615b-3fa1-5545-b49c-9a0cf2d8cd06', '2bfffb55-23d0-557a-878a-41ecf19028ac', 'riskLevel', 'xsd:string', true, 'Risk level, e.g. low, medium, high.'),
+  ('DecommissioningProject.responsibleOrganization', '1b7b3382-15e7-5666-b974-0c3051dde5a7', 'responsibleOrganization', 'xsd:string', true, 'Organization responsible for delivery.'),
+  ('DecommissioningPhase.phaseCode', '8d9c2a60-bb63-5e48-86c7-270778ef8808', 'phaseCode', 'xsd:string', true, 'Phase code.'),
+  ('DecommissioningPhase.phaseName', '8d9c2a60-bb63-5e48-86c7-270778ef8808', 'phaseName', 'xsd:string', true, 'Phase name.'),
+  ('DecommissioningPhase.sequenceNumber', '8d9c2a60-bb63-5e48-86c7-270778ef8808', 'sequenceNumber', 'xsd:decimal', true, 'Order of the phase.'),
+  ('DecommissioningPhase.isActive', '8d9c2a60-bb63-5e48-86c7-270778ef8808', 'isActive', 'xsd:boolean', false, 'Whether the phase is currently active.'),
+  ('DecommissioningStep.stepId', '2bfffb55-23d0-557a-878a-41ecf19028ac', 'stepId', 'xsd:string', true, 'Step identifier.'),
+  ('DecommissioningStep.stepName', '2bfffb55-23d0-557a-878a-41ecf19028ac', 'stepName', 'xsd:string', true, 'Step name.'),
+  ('DecommissioningStep.status', '2bfffb55-23d0-557a-878a-41ecf19028ac', 'status', 'xsd:string', true, 'Current step status.'),
+  ('DecommissioningStep.riskLevel', '2bfffb55-23d0-557a-878a-41ecf19028ac', 'riskLevel', 'xsd:string', true, 'Risk level, e.g. low, medium, high.'),
   ('9443a6e3-fb86-5248-ad35-b3f252fbd833', '2bfffb55-23d0-557a-878a-41ecf19028ac', 'plannedStartDate', 'xsd:dateTime', false, 'Planned step start date.'),
   ('4af92a63-ae38-5ccd-a1f8-e90c6d4c31e1', '2bfffb55-23d0-557a-878a-41ecf19028ac', 'plannedEndDate', 'xsd:dateTime', false, 'Planned step end date.'),
-  ('e3bf629b-3fd2-5391-b2cf-238e634e8df2', 'b36771c8-1af4-53b2-9b44-252834a1409a', 'workPackageCode', 'xsd:string', true, 'Work package code.'),
-  ('cd441fc8-9c9d-5bfe-96e4-8559cc20f926', 'b36771c8-1af4-53b2-9b44-252834a1409a', 'workDescription', 'xsd:string', true, 'Work package description.'),
-  ('9b51af5f-2f8b-543e-9739-436308e3a94e', 'b36771c8-1af4-53b2-9b44-252834a1409a', 'isSafetyRelevant', 'xsd:boolean', true, 'Whether the package is safety relevant.'),
+  ('WorkPackage.workPackageCode', 'b36771c8-1af4-53b2-9b44-252834a1409a', 'workPackageCode', 'xsd:string', true, 'Work package code.'),
+  ('WorkPackage.workDescription', 'b36771c8-1af4-53b2-9b44-252834a1409a', 'workDescription', 'xsd:string', true, 'Work package description.'),
+  ('WorkPackage.isSafetyRelevant', 'b36771c8-1af4-53b2-9b44-252834a1409a', 'isSafetyRelevant', 'xsd:boolean', true, 'Whether the package is safety relevant.'),
   ('29f53f28-7ae9-5087-9be7-f062b7ea50dd', 'b36771c8-1af4-53b2-9b44-252834a1409a', 'estimatedBudgetEUR', 'xsd:decimal', false, 'Estimated budget in euros.'),
   ('6f84378f-4578-5d51-bbb7-eae5bfceb583', '63217ec6-ffa7-57e9-9e0e-11676daebeee', 'milestoneCode', 'xsd:string', true, 'Milestone code.'),
   ('a450a8a3-8cb9-521a-81aa-c7c1a087d8ff', '63217ec6-ffa7-57e9-9e0e-11676daebeee', 'milestoneName', 'xsd:string', true, 'Milestone name.'),
@@ -104,45 +566,45 @@ INSERT INTO ontology_attributes (id, class_id, name, data_type, required, descri
   ('1ce9535c-11d1-5bfe-b78d-5b0bb991b58c', '21ee7dbe-ac36-501c-9b52-2b0f042236aa', 'contractorName', 'xsd:string', true, 'Contractor legal or operating name.'),
   ('6b0edb9a-70d1-5576-970b-b93d49dbd1bd', '21ee7dbe-ac36-501c-9b52-2b0f042236aa', 'qualificationLevel', 'xsd:string', true, 'Qualification level or qualification category.'),
   ('4da9864c-c4d3-5edc-8394-5f2141628776', '21ee7dbe-ac36-501c-9b52-2b0f042236aa', 'isCertified', 'xsd:boolean', false, 'Whether the contractor has required certification.'),
-  ('baaf67ba-3d80-54a2-9998-cadb36a8ea9f', '428c9d1c-c5ce-5762-b33a-f8b80aab982b', 'inventoryId', 'xsd:string', true, 'Inventory identifier.'),
-  ('ad94efc2-ac93-5b96-b406-75f3ca8e46ca', '428c9d1c-c5ce-5762-b33a-f8b80aab982b', 'referenceDate', 'xsd:dateTime', true, 'Reference date for the inventory values.'),
-  ('168b7572-ea87-50ed-9b0b-f88e287fd6d9', '428c9d1c-c5ce-5762-b33a-f8b80aab982b', 'dominantNuclide', 'xsd:string', false, 'Dominant radionuclide.'),
-  ('28170630-cd1c-58cd-aec4-37a074774b90', '428c9d1c-c5ce-5762-b33a-f8b80aab982b', 'totalActivityGBq', 'xsd:decimal', false, 'Estimated total activity in GBq.'),
-  ('fc8035b9-1fbb-5625-9937-3744b7b76f15', '428c9d1c-c5ce-5762-b33a-f8b80aab982b', 'uncertaintyPercent', 'xsd:decimal', false, 'Uncertainty as percentage.'),
-  ('7ef65d26-4c19-5960-8e64-8a3b7811420e', '7201ad86-bb79-5eb4-b018-af35c1b2148b', 'zoneId', 'xsd:string', true, 'Zone identifier.'),
-  ('d6692470-2d14-518b-aeb8-eda4cd47ec8e', '7201ad86-bb79-5eb4-b018-af35c1b2148b', 'radiologicalCategory', 'xsd:string', true, 'Radiological zone category.'),
+  ('RadiologicalInventory.inventoryId', '428c9d1c-c5ce-5762-b33a-f8b80aab982b', 'inventoryId', 'xsd:string', true, 'Inventory identifier.'),
+  ('RadiologicalInventory.referenceDate', '428c9d1c-c5ce-5762-b33a-f8b80aab982b', 'referenceDate', 'xsd:dateTime', true, 'Reference date for the inventory values.'),
+  ('RadiologicalInventory.dominantNuclide', '428c9d1c-c5ce-5762-b33a-f8b80aab982b', 'dominantNuclide', 'xsd:string', false, 'Dominant radionuclide.'),
+  ('RadiologicalInventory.totalActivityGBq', '428c9d1c-c5ce-5762-b33a-f8b80aab982b', 'totalActivityGBq', 'xsd:decimal', false, 'Estimated total activity in GBq.'),
+  ('RadiologicalInventory.uncertaintyPercent', '428c9d1c-c5ce-5762-b33a-f8b80aab982b', 'uncertaintyPercent', 'xsd:decimal', false, 'Uncertainty as percentage.'),
+  ('ContaminationZone.zoneId', '7201ad86-bb79-5eb4-b018-af35c1b2148b', 'zoneId', 'xsd:string', true, 'Zone identifier.'),
+  ('ContaminationZone.radiologicalCategory', '7201ad86-bb79-5eb4-b018-af35c1b2148b', 'radiologicalCategory', 'xsd:string', true, 'Radiological zone category.'),
   ('d23b0d29-aecf-58df-b530-949920667b7b', '7201ad86-bb79-5eb4-b018-af35c1b2148b', 'surfaceContaminationBqCm2', 'xsd:decimal', false, 'Surface contamination in Bq/cm2.'),
-  ('cf8b2d20-5aa4-5d41-a9f2-6ed1c53cdb63', '923c8270-f76e-52eb-ae3b-6e37aeeccc73', 'constraintCode', 'xsd:string', true, 'Dose constraint code.'),
-  ('73004d3f-2400-55c1-b754-fcfe193c3618', '923c8270-f76e-52eb-ae3b-6e37aeeccc73', 'annualDoseLimitMSv', 'xsd:decimal', true, 'Dose limit in mSv per year.'),
-  ('dfb0676e-d345-5615-a9b4-0392805a31b2', '923c8270-f76e-52eb-ae3b-6e37aeeccc73', 'personGroup', 'xsd:string', true, 'Affected person group.'),
+  ('DoseConstraint.constraintCode', '923c8270-f76e-52eb-ae3b-6e37aeeccc73', 'constraintCode', 'xsd:string', true, 'Dose constraint code.'),
+  ('DoseConstraint.annualDoseLimitMSv', '923c8270-f76e-52eb-ae3b-6e37aeeccc73', 'annualDoseLimitMSv', 'xsd:decimal', true, 'Dose limit in mSv per year.'),
+  ('DoseConstraint.personGroup', '923c8270-f76e-52eb-ae3b-6e37aeeccc73', 'personGroup', 'xsd:string', true, 'Affected person group.'),
   ('5237d706-b22d-50b8-bc86-ae151028032b', '923c8270-f76e-52eb-ae3b-6e37aeeccc73', 'legalBasis', 'xsd:string', false, 'Legal or internal basis for the constraint.'),
-  ('fe483765-6d99-542a-82ab-34d6a19dbe89', '1c29c23e-23ee-584f-a79d-e1f68296230c', 'measureId', 'xsd:string', true, 'Measure identifier.'),
-  ('ea89238a-819a-5129-8faf-efef4dbe5def', '1c29c23e-23ee-584f-a79d-e1f68296230c', 'measureName', 'xsd:string', true, 'Measure name.'),
-  ('e7066126-fa33-5ac6-9c73-43b3854131a7', '1c29c23e-23ee-584f-a79d-e1f68296230c', 'measureType', 'xsd:string', true, 'Technical, organizational, or procedural type.'),
-  ('87e15b69-c2d4-5725-bf25-b45fde95f13b', '1c29c23e-23ee-584f-a79d-e1f68296230c', 'isMandatory', 'xsd:boolean', true, 'Whether the measure is mandatory.'),
-  ('cde47cc3-6c6c-5485-9757-b2ff8d8c15ab', 'e8f56056-f866-5ffa-82ea-376bd580709d', 'programId', 'xsd:string', true, 'Monitoring program identifier.'),
-  ('76accc8d-2db0-5e24-a9c6-740173ea2256', 'e8f56056-f866-5ffa-82ea-376bd580709d', 'frequency', 'xsd:string', true, 'Measurement frequency.'),
+  ('SafetyMeasure.measureId', '1c29c23e-23ee-584f-a79d-e1f68296230c', 'measureId', 'xsd:string', true, 'Measure identifier.'),
+  ('SafetyMeasure.measureName', '1c29c23e-23ee-584f-a79d-e1f68296230c', 'measureName', 'xsd:string', true, 'Measure name.'),
+  ('SafetyMeasure.measureType', '1c29c23e-23ee-584f-a79d-e1f68296230c', 'measureType', 'xsd:string', true, 'Technical, organizational, or procedural type.'),
+  ('SafetyMeasure.isMandatory', '1c29c23e-23ee-584f-a79d-e1f68296230c', 'isMandatory', 'xsd:boolean', true, 'Whether the measure is mandatory.'),
+  ('MonitoringProgram.programId', 'e8f56056-f866-5ffa-82ea-376bd580709d', 'programId', 'xsd:string', true, 'Monitoring program identifier.'),
+  ('MonitoringProgram.frequency', 'e8f56056-f866-5ffa-82ea-376bd580709d', 'frequency', 'xsd:string', true, 'Measurement frequency.'),
   ('76bf9a68-f701-5b38-ba9f-d128c6322607', 'e8f56056-f866-5ffa-82ea-376bd580709d', 'startDate', 'xsd:dateTime', false, 'Program start date.'),
-  ('df6def15-1609-556f-9681-c041f81cef56', 'e8f56056-f866-5ffa-82ea-376bd580709d', 'responsibleTeam', 'xsd:string', false, 'Team responsible for the program.'),
-  ('1eaf4695-2240-507d-a025-25650250a88c', '27ba0ba9-a15d-50f9-b1a2-4b429ac598e0', 'streamId', 'xsd:string', true, 'Waste stream identifier.'),
-  ('c8063e0d-edc2-515c-9e7f-353ad915d945', '27ba0ba9-a15d-50f9-b1a2-4b429ac598e0', 'wasteCategory', 'xsd:string', true, 'Waste category, e.g. activated metal, contaminated concrete.'),
-  ('8d6fc7b9-c2c3-5163-8c9a-7c3c51e4ecf9', '27ba0ba9-a15d-50f9-b1a2-4b429ac598e0', 'estimatedMassTonnes', 'xsd:decimal', false, 'Estimated mass in tonnes.'),
-  ('04b324ac-a2ba-5e14-a39a-18a3d5e6b349', '27ba0ba9-a15d-50f9-b1a2-4b429ac598e0', 'requiresConditioning', 'xsd:boolean', true, 'Whether conditioning is required.'),
-  ('01ca3fcf-33b7-5e09-8c3e-f9c7a0e78a49', 'b61f3f1b-9dcd-5032-aca0-c952d62b6afb', 'packageId', 'xsd:string', true, 'Waste package identifier.'),
-  ('7e438afb-52aa-5f8e-9447-d781925200e7', 'b61f3f1b-9dcd-5032-aca0-c952d62b6afb', 'packageType', 'xsd:string', true, 'Package type.'),
-  ('88c702fb-d20e-5cf3-aea0-a78ccb8d81c0', 'b61f3f1b-9dcd-5032-aca0-c952d62b6afb', 'grossMassTonnes', 'xsd:decimal', false, 'Gross mass in tonnes.'),
-  ('309309d4-3707-5249-bef2-8b76e5fb90a3', 'b61f3f1b-9dcd-5032-aca0-c952d62b6afb', 'isConditioned', 'xsd:boolean', true, 'Whether the package has been conditioned.'),
-  ('fa1e4f87-e1be-5770-b221-0793565f15c0', '7612a51f-8fd8-541b-809a-a336270e61b6', 'measurementId', 'xsd:string', true, 'Measurement identifier.'),
-  ('d2e99e74-c227-5a5b-977a-f704d9d0c190', '7612a51f-8fd8-541b-809a-a336270e61b6', 'measurementDate', 'xsd:dateTime', true, 'Date of the measurement.'),
-  ('4058d132-c22a-5ac5-9eef-417144e002f6', '7612a51f-8fd8-541b-809a-a336270e61b6', 'method', 'xsd:string', true, 'Measurement method.'),
-  ('7295e353-fad6-5e3b-88e8-82d9ce8f220b', '7612a51f-8fd8-541b-809a-a336270e61b6', 'passed', 'xsd:boolean', true, 'Whether the measured object passed the criterion.'),
-  ('ed5cf819-deac-5a7f-a1c0-0d254228eb54', '952be9c5-e4a1-5f94-91f2-a93f526dcd18', 'campaignId', 'xsd:string', true, 'Transport campaign identifier.'),
+  ('MonitoringProgram.responsibleTeam', 'e8f56056-f866-5ffa-82ea-376bd580709d', 'responsibleTeam', 'xsd:string', false, 'Team responsible for the program.'),
+  ('WasteStream.streamId', '27ba0ba9-a15d-50f9-b1a2-4b429ac598e0', 'streamId', 'xsd:string', true, 'Waste stream identifier.'),
+  ('WasteStream.wasteCategory', '27ba0ba9-a15d-50f9-b1a2-4b429ac598e0', 'wasteCategory', 'xsd:string', true, 'Waste category, e.g. activated metal, contaminated concrete.'),
+  ('WasteStream.estimatedMassTonnes', '27ba0ba9-a15d-50f9-b1a2-4b429ac598e0', 'estimatedMassTonnes', 'xsd:decimal', false, 'Estimated mass in tonnes.'),
+  ('WasteStream.requiresConditioning', '27ba0ba9-a15d-50f9-b1a2-4b429ac598e0', 'requiresConditioning', 'xsd:boolean', true, 'Whether conditioning is required.'),
+  ('WastePackage.packageId', 'b61f3f1b-9dcd-5032-aca0-c952d62b6afb', 'packageId', 'xsd:string', true, 'Waste package identifier.'),
+  ('WastePackage.packageType', 'b61f3f1b-9dcd-5032-aca0-c952d62b6afb', 'packageType', 'xsd:string', true, 'Package type.'),
+  ('WastePackage.grossMassTonnes', 'b61f3f1b-9dcd-5032-aca0-c952d62b6afb', 'grossMassTonnes', 'xsd:decimal', false, 'Gross mass in tonnes.'),
+  ('WastePackage.isConditioned', 'b61f3f1b-9dcd-5032-aca0-c952d62b6afb', 'isConditioned', 'xsd:boolean', true, 'Whether the package has been conditioned.'),
+  ('ClearanceMeasurement.measurementId', '7612a51f-8fd8-541b-809a-a336270e61b6', 'measurementId', 'xsd:string', true, 'Measurement identifier.'),
+  ('ClearanceMeasurement.measurementDate', '7612a51f-8fd8-541b-809a-a336270e61b6', 'measurementDate', 'xsd:dateTime', true, 'Date of the measurement.'),
+  ('ClearanceMeasurement.method', '7612a51f-8fd8-541b-809a-a336270e61b6', 'method', 'xsd:string', true, 'Measurement method.'),
+  ('ClearanceMeasurement.passed', '7612a51f-8fd8-541b-809a-a336270e61b6', 'passed', 'xsd:boolean', true, 'Whether the measured object passed the criterion.'),
+  ('TransportCampaign.campaignId', '952be9c5-e4a1-5f94-91f2-a93f526dcd18', 'campaignId', 'xsd:string', true, 'Transport campaign identifier.'),
   ('7db7163a-3605-5f80-8d2d-2a800e361bf4', '952be9c5-e4a1-5f94-91f2-a93f526dcd18', 'plannedTransportDate', 'xsd:dateTime', false, 'Planned transport date.'),
-  ('ef9b4980-99cc-5d92-9233-591d84b9b2b4', '952be9c5-e4a1-5f94-91f2-a93f526dcd18', 'transportMode', 'xsd:string', true, 'Transport mode, e.g. road, rail.'),
-  ('22d9d289-52ab-5d75-8483-6ce84db3eea0', '952be9c5-e4a1-5f94-91f2-a93f526dcd18', 'isApproved', 'xsd:boolean', true, 'Whether the campaign has transport approval.'),
-  ('ad6800be-8e86-5a19-a1e2-ababb684cc31', '0f3c0943-4dc1-5848-9543-5ec9116985d3', 'disposalFacilityId', 'xsd:string', true, 'Disposal facility identifier.'),
-  ('ea4fb9c3-d5d2-5a0e-9a2f-461b945ce29f', '0f3c0943-4dc1-5848-9543-5ec9116985d3', 'disposalFacilityName', 'xsd:string', true, 'Facility name.'),
-  ('67c9d1d7-87ef-5881-a6e3-a7996015141b', '0f3c0943-4dc1-5848-9543-5ec9116985d3', 'country', 'xsd:string', true, 'Country where the facility is located.'),
+  ('TransportCampaign.transportMode', '952be9c5-e4a1-5f94-91f2-a93f526dcd18', 'transportMode', 'xsd:string', true, 'Transport mode, e.g. road, rail.'),
+  ('TransportCampaign.isApproved', '952be9c5-e4a1-5f94-91f2-a93f526dcd18', 'isApproved', 'xsd:boolean', true, 'Whether the campaign has transport approval.'),
+  ('DisposalFacility.disposalFacilityId', '0f3c0943-4dc1-5848-9543-5ec9116985d3', 'disposalFacilityId', 'xsd:string', true, 'Disposal facility identifier.'),
+  ('DisposalFacility.disposalFacilityName', '0f3c0943-4dc1-5848-9543-5ec9116985d3', 'disposalFacilityName', 'xsd:string', true, 'Facility name.'),
+  ('DisposalFacility.country', '0f3c0943-4dc1-5848-9543-5ec9116985d3', 'country', 'xsd:string', true, 'Country where the facility is located.'),
   ('ddf696fa-bd7e-5d9e-a09b-4f602f2be1bb', '0f3c0943-4dc1-5848-9543-5ec9116985d3', 'licenseValidUntil', 'xsd:dateTime', false, 'Date until license is valid.');
 
 INSERT INTO ontology_relations (id, ontology_id, name, domain_class_id, range_class_id, description, inverse_name, cardinality, instance_policy) VALUES
@@ -250,37 +712,37 @@ INSERT INTO ontology_examples (id, ontology_id, value, subject_label, predicate_
   ('da0ce9f6-344d-5c21-aa35-d5814a3da385', '5008c4d1-7937-535e-8bb5-c47d306b19ec', 'Package WP-AM-001 requires clearance measurement CM-AM-001.', 'WP-AM-001', 'packageRequiresClearanceMeasurement', 'CM-AM-001', true, 24, NULL, NULL, '568ad8cf-27e6-5e90-9063-78c47e9f59e1', NULL, NULL);
 
 INSERT INTO ontology_competency_questions (id, ontology_id, question, subject_class_id, predicate_relation_id, object_class_id, subject_example_id, predicate_example_id, object_example_id, sort_order) VALUES
-  ('93ab5459-e23e-5b58-be2a-ee308c17ccca', '5008c4d1-7937-535e-8bb5-c47d306b19ec', 'Which facility is targeted by the KBR Unit A decommissioning project?', '1b7b3382-15e7-5666-b974-0c3051dde5a7', '854c60a4-6ca4-5abb-a258-46766667a32a', '3e2a3aaf-eb38-5256-af21-7b8ab96c2879', 'd7c3e900-24b6-5112-b996-aed4cea502b4', 'be9deaae-85a2-5900-9507-95f1c0354995', 'df8f885d-7c83-5d04-b210-6e6f63f06801', 1),
-  ('ea7165cf-9144-5052-a230-21e8839d7a47', '5008c4d1-7937-535e-8bb5-c47d306b19ec', 'Which authority issued the decommissioning permit KBR-DEC-2026-01?', 'c2fc8d67-ac69-54d1-a565-2ff9152aecb4', '27e1b12c-da36-5bc1-a4d7-6898bacf1821', '46841259-c359-5058-855c-674da16d1496', '89fa6f1f-2ff6-51db-9089-3fbf68bd2ac9', '212777a0-4c54-546a-b7ee-7900ca0c8e1a', '02584b28-a294-52b3-98cb-3afe2524da53', 2),
-  ('a4147063-0fe2-5e6b-99d0-52d953959d6c', '5008c4d1-7937-535e-8bb5-c47d306b19ec', 'Which legal requirement constrains the decommissioning permit?', 'a50ef267-32fc-56c7-8d35-b6f19a6e6197', '8931145e-427c-5327-afb4-7c8f3f1b7c96', 'c2fc8d67-ac69-54d1-a565-2ff9152aecb4', 'e737b800-1190-5c27-b02f-972509f0b83f', NULL, '89fa6f1f-2ff6-51db-9089-3fbf68bd2ac9', 3),
-  ('d3d98606-fe3b-542c-93a3-50a6e59e0d82', '5008c4d1-7937-535e-8bb5-c47d306b19ec', 'Which decommissioning steps are included in the reactor internals segmentation phase?', '8d9c2a60-bb63-5e48-86c7-270778ef8808', '0001711b-8e46-5c8c-af84-2f87b048a1a8', '2bfffb55-23d0-557a-878a-41ecf19028ac', '297b184e-40f2-5766-8152-411b45918fc8', NULL, '1cd56543-004f-5855-9f9b-5e2cb726f66d', 4),
-  ('a4b95712-c180-5194-8443-c2a7fae2b1a4', '5008c4d1-7937-535e-8bb5-c47d306b19ec', 'Which planned step depends on completed fuel removal verification?', '2bfffb55-23d0-557a-878a-41ecf19028ac', 'c8fe4abb-537f-5200-b4da-716ca888481c', '2bfffb55-23d0-557a-878a-41ecf19028ac', '1cd56543-004f-5855-9f9b-5e2cb726f66d', '9dca386a-be94-54c3-8816-e29b1c7e80d6', 'f610b3ca-ce1d-5466-b5d8-9e82fd889a91', 5),
-  ('1c5f2167-b99e-5f3f-b75d-4044cbfe9c31', '5008c4d1-7937-535e-8bb5-c47d306b19ec', 'Which component is characterized by the RPV radiological inventory?', '428c9d1c-c5ce-5762-b33a-f8b80aab982b', 'd126440a-d54e-54a9-bb41-9efb30252446', '76795edf-00dd-5dbb-8414-45bdcd0835a3', '74425d0b-eafb-515e-a56a-fc6bd5ccd12f', '8cb57191-a9ba-5196-ac9c-15ef39139a36', '33a2d645-f691-51f7-a415-d2773f8c730b', 6),
-  ('e1f348da-a978-5a9d-b7eb-76a228521270', '5008c4d1-7937-535e-8bb5-c47d306b19ec', 'Which safety measure is required for underwater segmentation of RPV internals?', '2bfffb55-23d0-557a-878a-41ecf19028ac', '69f37eaf-1c45-5bab-818c-d6ceb2ce35b0', '1c29c23e-23ee-584f-a79d-e1f68296230c', '1cd56543-004f-5855-9f9b-5e2cb726f66d', NULL, 'd7011fd8-2c14-5b95-b703-4874363797ae', 7),
-  ('f875042b-b7ad-5eb2-a6df-db02252da32f', '5008c4d1-7937-535e-8bb5-c47d306b19ec', 'Which waste stream is generated by underwater segmentation of RPV internals?', '2bfffb55-23d0-557a-878a-41ecf19028ac', 'f65be3b9-4d1d-5d1c-8cd5-a1ef0e9ae31e', '27ba0ba9-a15d-50f9-b1a2-4b429ac598e0', '1cd56543-004f-5855-9f9b-5e2cb726f66d', 'baa8908f-ac9c-5423-8fc2-0fc0deba24d0', 'ada0baee-65ab-5fe9-9adc-b2b2e646dc94', 8),
-  ('b0a79f92-9daf-5c85-9a8d-d81e014855ba', '5008c4d1-7937-535e-8bb5-c47d306b19ec', 'Which clearance measurement is required for waste package WP-AM-001?', 'b61f3f1b-9dcd-5032-aca0-c952d62b6afb', '568ad8cf-27e6-5e90-9063-78c47e9f59e1', '7612a51f-8fd8-541b-809a-a336270e61b6', '22c7fff7-2682-57b4-9dea-a1bcd11ab070', 'da0ce9f6-344d-5c21-aa35-d5814a3da385', '2b5d64fa-1276-5d07-b081-5c458785ea16', 9),
-  ('c378d554-3af8-54e9-89c4-4b38102f451b', '5008c4d1-7937-535e-8bb5-c47d306b19ec', 'Which monitoring program observes the reactor cavity contamination zone RC-1?', 'e8f56056-f866-5ffa-82ea-376bd580709d', 'bdc8ec1f-02fa-5c62-aa05-d4a7788400d0', '7201ad86-bb79-5eb4-b018-af35c1b2148b', 'f45ac1b9-ec42-576e-9e7c-6a9507bdc363', NULL, 'a0d187e0-4ed9-528c-9692-c26894f3cef7', 10),
-  ('c6940acf-af68-5567-8c53-db2682f11ff8', '5008c4d1-7937-535e-8bb5-c47d306b19ec', 'Which regulatory report documents the monitoring program MP-RC1?', 'e70ebc34-fcd0-57a6-82c2-659c867ddd6a', '17f09d49-50bd-5bc9-86db-141abffc52b7', 'e8f56056-f866-5ffa-82ea-376bd580709d', NULL, NULL, 'f45ac1b9-ec42-576e-9e7c-6a9507bdc363', 11),
-  ('3952ad91-119f-5532-8e2b-e46b50498d78', '5008c4d1-7937-535e-8bb5-c47d306b19ec', 'Which disposal facility receives waste package WP-AM-001?', 'b61f3f1b-9dcd-5032-aca0-c952d62b6afb', 'e76f7ab7-0062-585a-9829-5cb53b82c10a', '0f3c0943-4dc1-5848-9543-5ec9116985d3', '22c7fff7-2682-57b4-9dea-a1bcd11ab070', NULL, '7f658e17-d2b8-5821-97d2-9596da3360c9', 12);
+  ('93ab5459-e23e-5b58-be2a-ee308c17ccca', '5008c4d1-7937-535e-8bb5-c47d306b19ec', 'Which facility is targeted by the KBR Unit A decommissioning project?', 'DecommissioningProject', 'projectTargetsFacility', 'Facility', 'd7c3e900-24b6-5112-b996-aed4cea502b4', 'be9deaae-85a2-5900-9507-95f1c0354995', 'df8f885d-7c83-5d04-b210-6e6f63f06801', 1),
+  ('ea7165cf-9144-5052-a230-21e8839d7a47', '5008c4d1-7937-535e-8bb5-c47d306b19ec', 'Which authority issued the decommissioning permit KBR-DEC-2026-01?', 'Permit', 'permitIssuedByAuthority', 'Authority', '89fa6f1f-2ff6-51db-9089-3fbf68bd2ac9', '212777a0-4c54-546a-b7ee-7900ca0c8e1a', '02584b28-a294-52b3-98cb-3afe2524da53', 2),
+  ('a4147063-0fe2-5e6b-99d0-52d953959d6c', '5008c4d1-7937-535e-8bb5-c47d306b19ec', 'Which legal requirement constrains the decommissioning permit?', 'LegalRequirement', 'legalRequirementConstrainsPermit', 'Permit', 'e737b800-1190-5c27-b02f-972509f0b83f', NULL, '89fa6f1f-2ff6-51db-9089-3fbf68bd2ac9', 3),
+  ('d3d98606-fe3b-542c-93a3-50a6e59e0d82', '5008c4d1-7937-535e-8bb5-c47d306b19ec', 'Which decommissioning steps are included in the reactor internals segmentation phase?', 'DecommissioningPhase', 'phaseIncludesStep', 'DecommissioningStep', '297b184e-40f2-5766-8152-411b45918fc8', NULL, '1cd56543-004f-5855-9f9b-5e2cb726f66d', 4),
+  ('a4b95712-c180-5194-8443-c2a7fae2b1a4', '5008c4d1-7937-535e-8bb5-c47d306b19ec', 'Which planned step depends on completed fuel removal verification?', 'DecommissioningStep', 'stepDependsOnStep', 'DecommissioningStep', '1cd56543-004f-5855-9f9b-5e2cb726f66d', '9dca386a-be94-54c3-8816-e29b1c7e80d6', 'f610b3ca-ce1d-5466-b5d8-9e82fd889a91', 5),
+  ('1c5f2167-b99e-5f3f-b75d-4044cbfe9c31', '5008c4d1-7937-535e-8bb5-c47d306b19ec', 'Which component is characterized by the RPV radiological inventory?', 'RadiologicalInventory', 'inventoryCharacterizesComponent', 'Component', '74425d0b-eafb-515e-a56a-fc6bd5ccd12f', '8cb57191-a9ba-5196-ac9c-15ef39139a36', '33a2d645-f691-51f7-a415-d2773f8c730b', 6),
+  ('e1f348da-a978-5a9d-b7eb-76a228521270', '5008c4d1-7937-535e-8bb5-c47d306b19ec', 'Which safety measure is required for underwater segmentation of RPV internals?', 'DecommissioningStep', 'stepRequiresSafetyMeasure', 'SafetyMeasure', '1cd56543-004f-5855-9f9b-5e2cb726f66d', NULL, 'd7011fd8-2c14-5b95-b703-4874363797ae', 7),
+  ('f875042b-b7ad-5eb2-a6df-db02252da32f', '5008c4d1-7937-535e-8bb5-c47d306b19ec', 'Which waste stream is generated by underwater segmentation of RPV internals?', 'DecommissioningStep', 'stepGeneratesWasteStream', 'WasteStream', '1cd56543-004f-5855-9f9b-5e2cb726f66d', 'baa8908f-ac9c-5423-8fc2-0fc0deba24d0', 'ada0baee-65ab-5fe9-9adc-b2b2e646dc94', 8),
+  ('b0a79f92-9daf-5c85-9a8d-d81e014855ba', '5008c4d1-7937-535e-8bb5-c47d306b19ec', 'Which clearance measurement is required for waste package WP-AM-001?', 'WastePackage', 'packageRequiresClearanceMeasurement', 'ClearanceMeasurement', '22c7fff7-2682-57b4-9dea-a1bcd11ab070', 'da0ce9f6-344d-5c21-aa35-d5814a3da385', '2b5d64fa-1276-5d07-b081-5c458785ea16', 9),
+  ('c378d554-3af8-54e9-89c4-4b38102f451b', '5008c4d1-7937-535e-8bb5-c47d306b19ec', 'Which monitoring program observes the reactor cavity contamination zone RC-1?', 'MonitoringProgram', 'monitoringProgramObservesZone', 'ContaminationZone', 'f45ac1b9-ec42-576e-9e7c-6a9507bdc363', NULL, 'a0d187e0-4ed9-528c-9692-c26894f3cef7', 10),
+  ('c6940acf-af68-5567-8c53-db2682f11ff8', '5008c4d1-7937-535e-8bb5-c47d306b19ec', 'Which regulatory report documents the monitoring program MP-RC1?', 'RegulatoryReport', 'reportDocumentsMonitoringProgram', 'MonitoringProgram', NULL, NULL, 'f45ac1b9-ec42-576e-9e7c-6a9507bdc363', 11),
+  ('3952ad91-119f-5532-8e2b-e46b50498d78', '5008c4d1-7937-535e-8bb5-c47d306b19ec', 'Which disposal facility receives waste package WP-AM-001?', 'WastePackage', 'packageTransportedToDisposalFacility', 'DisposalFacility', '22c7fff7-2682-57b4-9dea-a1bcd11ab070', NULL, '7f658e17-d2b8-5821-97d2-9596da3360c9', 12);
 
 INSERT INTO ontology_competency_question_modules (cq_id, module_id) VALUES
-  ('93ab5459-e23e-5b58-be2a-ee308c17ccca', 'bdef88a3-b77a-599a-ab5f-b489e0b058b2'),
-  ('93ab5459-e23e-5b58-be2a-ee308c17ccca', '3bd7afc2-74de-5869-a4e2-01dedf0e8116'),
-  ('ea7165cf-9144-5052-a230-21e8839d7a47', '27c354b5-0ea6-5c28-afcf-67fc750cedf6'),
-  ('a4147063-0fe2-5e6b-99d0-52d953959d6c', '27c354b5-0ea6-5c28-afcf-67fc750cedf6'),
-  ('d3d98606-fe3b-542c-93a3-50a6e59e0d82', 'bdef88a3-b77a-599a-ab5f-b489e0b058b2'),
-  ('a4b95712-c180-5194-8443-c2a7fae2b1a4', 'bdef88a3-b77a-599a-ab5f-b489e0b058b2'),
-  ('1c5f2167-b99e-5f3f-b75d-4044cbfe9c31', '7c464371-19ad-5e07-8e4e-0fb7f2ab95f3'),
-  ('1c5f2167-b99e-5f3f-b75d-4044cbfe9c31', '3bd7afc2-74de-5869-a4e2-01dedf0e8116'),
-  ('e1f348da-a978-5a9d-b7eb-76a228521270', 'bdef88a3-b77a-599a-ab5f-b489e0b058b2'),
-  ('e1f348da-a978-5a9d-b7eb-76a228521270', '7c464371-19ad-5e07-8e4e-0fb7f2ab95f3'),
-  ('f875042b-b7ad-5eb2-a6df-db02252da32f', 'bdef88a3-b77a-599a-ab5f-b489e0b058b2'),
-  ('f875042b-b7ad-5eb2-a6df-db02252da32f', 'bf6ea74e-b71f-5874-a148-b76376943176'),
-  ('b0a79f92-9daf-5c85-9a8d-d81e014855ba', 'bf6ea74e-b71f-5874-a148-b76376943176'),
-  ('c378d554-3af8-54e9-89c4-4b38102f451b', '7c464371-19ad-5e07-8e4e-0fb7f2ab95f3'),
-  ('c6940acf-af68-5567-8c53-db2682f11ff8', '27c354b5-0ea6-5c28-afcf-67fc750cedf6'),
-  ('c6940acf-af68-5567-8c53-db2682f11ff8', '7c464371-19ad-5e07-8e4e-0fb7f2ab95f3'),
-  ('3952ad91-119f-5532-8e2b-e46b50498d78', 'bf6ea74e-b71f-5874-a148-b76376943176');
+  ('93ab5459-e23e-5b58-be2a-ee308c17ccca', 'decommissioning_planning'),
+  ('93ab5459-e23e-5b58-be2a-ee308c17ccca', 'facility_context'),
+  ('ea7165cf-9144-5052-a230-21e8839d7a47', 'regulatory_compliance'),
+  ('a4147063-0fe2-5e6b-99d0-52d953959d6c', 'regulatory_compliance'),
+  ('d3d98606-fe3b-542c-93a3-50a6e59e0d82', 'decommissioning_planning'),
+  ('a4b95712-c180-5194-8443-c2a7fae2b1a4', 'decommissioning_planning'),
+  ('1c5f2167-b99e-5f3f-b75d-4044cbfe9c31', 'radiological_safety'),
+  ('1c5f2167-b99e-5f3f-b75d-4044cbfe9c31', 'facility_context'),
+  ('e1f348da-a978-5a9d-b7eb-76a228521270', 'decommissioning_planning'),
+  ('e1f348da-a978-5a9d-b7eb-76a228521270', 'radiological_safety'),
+  ('f875042b-b7ad-5eb2-a6df-db02252da32f', 'decommissioning_planning'),
+  ('f875042b-b7ad-5eb2-a6df-db02252da32f', 'waste_management'),
+  ('b0a79f92-9daf-5c85-9a8d-d81e014855ba', 'waste_management'),
+  ('c378d554-3af8-54e9-89c4-4b38102f451b', 'radiological_safety'),
+  ('c6940acf-af68-5567-8c53-db2682f11ff8', 'regulatory_compliance'),
+  ('c6940acf-af68-5567-8c53-db2682f11ff8', 'radiological_safety'),
+  ('3952ad91-119f-5532-8e2b-e46b50498d78', 'waste_management');
 
 INSERT INTO ontology_notes (id, ontology_id, body, author_name, sort_order, target_ontology_id, target_module_id, target_class_id, target_relation_id, target_attribute_id, target_relation_attribute_id, target_cq_id) VALUES
   ('881ac507-3949-5e8a-a43e-13516204aef5', '5008c4d1-7937-535e-8bb5-c47d306b19ec', 'This ontology is intentionally broad and cross-module to test import, graph rendering, extraction alignment, provenance, and relation metadata handling.', 'ChatGPT', 1, '5008c4d1-7937-535e-8bb5-c47d306b19ec', NULL, NULL, NULL, NULL, NULL, NULL),
@@ -431,115 +893,115 @@ INSERT INTO extraction_runs (id, document_id, ontology_id, status, started_at, c
   ('fd61693c-3f7e-5597-980b-1e69fdb768a0', '95838bcc-6871-5b9c-af53-baeb9a8a535d', '5008c4d1-7937-535e-8bb5-c47d306b19ec', 'completed', '2026-10-15T08:00:00Z', '2026-10-15T08:02:00Z', 'shared');
 
 INSERT INTO document_entities (id, document_id, extraction_run_id, entity_text, class_id, review_status) VALUES
-  ('ea5135b8-f0d9-5538-be96-f4c97b133251', '95838bcc-6871-5b9c-af53-baeb9a8a535d', 'fd61693c-3f7e-5597-980b-1e69fdb768a0', 'Kernkraftwerk Beispielrhein (KBR)', '3e2a3aaf-eb38-5256-af21-7b8ab96c2879', 'pending'),
-  ('605c6207-ee25-5e33-b7d3-aada4fd9c81b', '95838bcc-6871-5b9c-af53-baeb9a8a535d', 'fd61693c-3f7e-5597-980b-1e69fdb768a0', 'Reactor Unit A', '6c82cf35-aa49-598a-a16a-2d0bebc5d1c4', 'pending'),
-  ('1027fffa-39cc-5d6c-89a7-636f26134e32', '95838bcc-6871-5b9c-af53-baeb9a8a535d', 'fd61693c-3f7e-5597-980b-1e69fdb768a0', 'RPV internals of Unit A', '76795edf-00dd-5dbb-8414-45bdcd0835a3', 'pending'),
-  ('d88a8aae-8d09-5388-8d99-124511424f09', '95838bcc-6871-5b9c-af53-baeb9a8a535d', 'fd61693c-3f7e-5597-980b-1e69fdb768a0', 'reactor building RB-A', 'f2460ef8-feb4-5c6d-b017-61a9e5811cc6', 'pending'),
-  ('89697a05-e78d-5f9c-b7d9-0beac16be3b0', '95838bcc-6871-5b9c-af53-baeb9a8a535d', 'fd61693c-3f7e-5597-980b-1e69fdb768a0', 'KBR Unit A Decommissioning Project', '1b7b3382-15e7-5666-b974-0c3051dde5a7', 'pending'),
-  ('ebbd4c9d-03a4-5a36-b1a7-fd7a70cc1ded', '95838bcc-6871-5b9c-af53-baeb9a8a535d', 'fd61693c-3f7e-5597-980b-1e69fdb768a0', 'Nuclear Supervisory Authority NRW', '46841259-c359-5058-855c-674da16d1496', 'pending'),
-  ('1481f9c3-b650-52ed-815c-27373a818d20', '95838bcc-6871-5b9c-af53-baeb9a8a535d', 'fd61693c-3f7e-5597-980b-1e69fdb768a0', 'Permit KBR-DEC-2026-01', 'c2fc8d67-ac69-54d1-a565-2ff9152aecb4', 'pending'),
-  ('91100fea-db32-57fc-9ede-5f416f1b322f', '95838bcc-6871-5b9c-af53-baeb9a8a535d', 'fd61693c-3f7e-5597-980b-1e69fdb768a0', 'AtG §7(3)', 'a50ef267-32fc-56c7-8d35-b6f19a6e6197', 'pending'),
-  ('33b7fbe1-85b6-55a7-9944-c11b4f8204a8', '95838bcc-6871-5b9c-af53-baeb9a8a535d', 'fd61693c-3f7e-5597-980b-1e69fdb768a0', 'Report REP-MP-RC1-Q3-2026', 'e70ebc34-fcd0-57a6-82c2-659c867ddd6a', 'pending'),
-  ('7dcfe1ee-a338-5775-9ae5-e336261bdec1', '95838bcc-6871-5b9c-af53-baeb9a8a535d', 'fd61693c-3f7e-5597-980b-1e69fdb768a0', 'Phase P2 Reactor Internals Segmentation', '8d9c2a60-bb63-5e48-86c7-270778ef8808', 'pending'),
-  ('92bff7ee-4832-5cd6-add8-9995269f3630', '95838bcc-6871-5b9c-af53-baeb9a8a535d', 'fd61693c-3f7e-5597-980b-1e69fdb768a0', 'Step ST-010 Fuel removal verification', '2bfffb55-23d0-557a-878a-41ecf19028ac', 'pending'),
-  ('dd60a0cd-0942-5b13-9c09-9a392abcaec5', '95838bcc-6871-5b9c-af53-baeb9a8a535d', 'fd61693c-3f7e-5597-980b-1e69fdb768a0', 'Step ST-240 Underwater segmentation of RPV internals', '2bfffb55-23d0-557a-878a-41ecf19028ac', 'pending'),
-  ('4541cf68-6a81-52b5-8ab8-76820d6be6cb', '95838bcc-6871-5b9c-af53-baeb9a8a535d', 'fd61693c-3f7e-5597-980b-1e69fdb768a0', 'Work package WP-240-CUT', 'b36771c8-1af4-53b2-9b44-252834a1409a', 'pending'),
-  ('f7295603-6af8-549f-b101-5d8e1625f062', '95838bcc-6871-5b9c-af53-baeb9a8a535d', 'fd61693c-3f7e-5597-980b-1e69fdb768a0', 'Inventory INV-RPV-A-2026', '428c9d1c-c5ce-5762-b33a-f8b80aab982b', 'pending'),
-  ('eeebfa24-2d04-507a-a4c6-b854d92d454e', '95838bcc-6871-5b9c-af53-baeb9a8a535d', 'fd61693c-3f7e-5597-980b-1e69fdb768a0', 'Zone RC-1 Reactor cavity wet work area', '7201ad86-bb79-5eb4-b018-af35c1b2148b', 'pending'),
-  ('544ddd92-c905-5567-a53d-e9fd845e0797', '95838bcc-6871-5b9c-af53-baeb9a8a535d', 'fd61693c-3f7e-5597-980b-1e69fdb768a0', 'Safety measure SM-UNDERWATER-CUTTING', '1c29c23e-23ee-584f-a79d-e1f68296230c', 'pending'),
-  ('94db59ab-2f06-5623-a34c-2649dfb3068c', '95838bcc-6871-5b9c-af53-baeb9a8a535d', 'fd61693c-3f7e-5597-980b-1e69fdb768a0', 'dose constraint DC-WORKER-20', '923c8270-f76e-52eb-ae3b-6e37aeeccc73', 'pending'),
-  ('cfb1d293-8055-5e66-ac89-14f874a4ddf2', '95838bcc-6871-5b9c-af53-baeb9a8a535d', 'fd61693c-3f7e-5597-980b-1e69fdb768a0', 'Monitoring program MP-RC1', 'e8f56056-f866-5ffa-82ea-376bd580709d', 'pending'),
-  ('630ecc97-8ab2-5f89-ace1-438370ce0586', '95838bcc-6871-5b9c-af53-baeb9a8a535d', 'fd61693c-3f7e-5597-980b-1e69fdb768a0', 'Waste stream WS-AM-240 activated metal from RPV internals segmentation', '27ba0ba9-a15d-50f9-b1a2-4b429ac598e0', 'pending'),
-  ('1a97e4ab-8a2a-50e7-ad8b-c886b8d925a5', '95838bcc-6871-5b9c-af53-baeb9a8a535d', 'fd61693c-3f7e-5597-980b-1e69fdb768a0', 'Waste package WP-AM-001', 'b61f3f1b-9dcd-5032-aca0-c952d62b6afb', 'pending'),
-  ('b82a9caf-6b08-587b-9271-badb053ac106', '95838bcc-6871-5b9c-af53-baeb9a8a535d', 'fd61693c-3f7e-5597-980b-1e69fdb768a0', 'Clearance measurement CM-AM-001', '7612a51f-8fd8-541b-809a-a336270e61b6', 'pending'),
-  ('9cbc6ab6-c3f1-51c0-b66f-9a896173b72b', '95838bcc-6871-5b9c-af53-baeb9a8a535d', 'fd61693c-3f7e-5597-980b-1e69fdb768a0', 'Central interim storage facility ZL-Beta in Germany', '0f3c0943-4dc1-5848-9543-5ec9116985d3', 'pending'),
-  ('0c918b47-cfdf-5210-9fc7-52780af2b2ea', '95838bcc-6871-5b9c-af53-baeb9a8a535d', 'fd61693c-3f7e-5597-980b-1e69fdb768a0', 'Transport campaign TC-AM-2026-01', '952be9c5-e4a1-5f94-91f2-a93f526dcd18', 'pending');
+  ('ea5135b8-f0d9-5538-be96-f4c97b133251', '95838bcc-6871-5b9c-af53-baeb9a8a535d', 'fd61693c-3f7e-5597-980b-1e69fdb768a0', 'Kernkraftwerk Beispielrhein (KBR)', 'Facility', 'pending'),
+  ('605c6207-ee25-5e33-b7d3-aada4fd9c81b', '95838bcc-6871-5b9c-af53-baeb9a8a535d', 'fd61693c-3f7e-5597-980b-1e69fdb768a0', 'Reactor Unit A', 'ReactorUnit', 'pending'),
+  ('1027fffa-39cc-5d6c-89a7-636f26134e32', '95838bcc-6871-5b9c-af53-baeb9a8a535d', 'fd61693c-3f7e-5597-980b-1e69fdb768a0', 'RPV internals of Unit A', 'Component', 'pending'),
+  ('d88a8aae-8d09-5388-8d99-124511424f09', '95838bcc-6871-5b9c-af53-baeb9a8a535d', 'fd61693c-3f7e-5597-980b-1e69fdb768a0', 'reactor building RB-A', 'Building', 'pending'),
+  ('89697a05-e78d-5f9c-b7d9-0beac16be3b0', '95838bcc-6871-5b9c-af53-baeb9a8a535d', 'fd61693c-3f7e-5597-980b-1e69fdb768a0', 'KBR Unit A Decommissioning Project', 'DecommissioningProject', 'pending'),
+  ('ebbd4c9d-03a4-5a36-b1a7-fd7a70cc1ded', '95838bcc-6871-5b9c-af53-baeb9a8a535d', 'fd61693c-3f7e-5597-980b-1e69fdb768a0', 'Nuclear Supervisory Authority NRW', 'Authority', 'pending'),
+  ('1481f9c3-b650-52ed-815c-27373a818d20', '95838bcc-6871-5b9c-af53-baeb9a8a535d', 'fd61693c-3f7e-5597-980b-1e69fdb768a0', 'Permit KBR-DEC-2026-01', 'Permit', 'pending'),
+  ('91100fea-db32-57fc-9ede-5f416f1b322f', '95838bcc-6871-5b9c-af53-baeb9a8a535d', 'fd61693c-3f7e-5597-980b-1e69fdb768a0', 'AtG §7(3)', 'LegalRequirement', 'pending'),
+  ('33b7fbe1-85b6-55a7-9944-c11b4f8204a8', '95838bcc-6871-5b9c-af53-baeb9a8a535d', 'fd61693c-3f7e-5597-980b-1e69fdb768a0', 'Report REP-MP-RC1-Q3-2026', 'RegulatoryReport', 'pending'),
+  ('7dcfe1ee-a338-5775-9ae5-e336261bdec1', '95838bcc-6871-5b9c-af53-baeb9a8a535d', 'fd61693c-3f7e-5597-980b-1e69fdb768a0', 'Phase P2 Reactor Internals Segmentation', 'DecommissioningPhase', 'pending'),
+  ('92bff7ee-4832-5cd6-add8-9995269f3630', '95838bcc-6871-5b9c-af53-baeb9a8a535d', 'fd61693c-3f7e-5597-980b-1e69fdb768a0', 'Step ST-010 Fuel removal verification', 'DecommissioningStep', 'pending'),
+  ('dd60a0cd-0942-5b13-9c09-9a392abcaec5', '95838bcc-6871-5b9c-af53-baeb9a8a535d', 'fd61693c-3f7e-5597-980b-1e69fdb768a0', 'Step ST-240 Underwater segmentation of RPV internals', 'DecommissioningStep', 'pending'),
+  ('4541cf68-6a81-52b5-8ab8-76820d6be6cb', '95838bcc-6871-5b9c-af53-baeb9a8a535d', 'fd61693c-3f7e-5597-980b-1e69fdb768a0', 'Work package WP-240-CUT', 'WorkPackage', 'pending'),
+  ('f7295603-6af8-549f-b101-5d8e1625f062', '95838bcc-6871-5b9c-af53-baeb9a8a535d', 'fd61693c-3f7e-5597-980b-1e69fdb768a0', 'Inventory INV-RPV-A-2026', 'RadiologicalInventory', 'pending'),
+  ('eeebfa24-2d04-507a-a4c6-b854d92d454e', '95838bcc-6871-5b9c-af53-baeb9a8a535d', 'fd61693c-3f7e-5597-980b-1e69fdb768a0', 'Zone RC-1 Reactor cavity wet work area', 'ContaminationZone', 'pending'),
+  ('544ddd92-c905-5567-a53d-e9fd845e0797', '95838bcc-6871-5b9c-af53-baeb9a8a535d', 'fd61693c-3f7e-5597-980b-1e69fdb768a0', 'Safety measure SM-UNDERWATER-CUTTING', 'SafetyMeasure', 'pending'),
+  ('94db59ab-2f06-5623-a34c-2649dfb3068c', '95838bcc-6871-5b9c-af53-baeb9a8a535d', 'fd61693c-3f7e-5597-980b-1e69fdb768a0', 'dose constraint DC-WORKER-20', 'DoseConstraint', 'pending'),
+  ('cfb1d293-8055-5e66-ac89-14f874a4ddf2', '95838bcc-6871-5b9c-af53-baeb9a8a535d', 'fd61693c-3f7e-5597-980b-1e69fdb768a0', 'Monitoring program MP-RC1', 'MonitoringProgram', 'pending'),
+  ('630ecc97-8ab2-5f89-ace1-438370ce0586', '95838bcc-6871-5b9c-af53-baeb9a8a535d', 'fd61693c-3f7e-5597-980b-1e69fdb768a0', 'Waste stream WS-AM-240 activated metal from RPV internals segmentation', 'WasteStream', 'pending'),
+  ('1a97e4ab-8a2a-50e7-ad8b-c886b8d925a5', '95838bcc-6871-5b9c-af53-baeb9a8a535d', 'fd61693c-3f7e-5597-980b-1e69fdb768a0', 'Waste package WP-AM-001', 'WastePackage', 'pending'),
+  ('b82a9caf-6b08-587b-9271-badb053ac106', '95838bcc-6871-5b9c-af53-baeb9a8a535d', 'fd61693c-3f7e-5597-980b-1e69fdb768a0', 'Clearance measurement CM-AM-001', 'ClearanceMeasurement', 'pending'),
+  ('9cbc6ab6-c3f1-51c0-b66f-9a896173b72b', '95838bcc-6871-5b9c-af53-baeb9a8a535d', 'fd61693c-3f7e-5597-980b-1e69fdb768a0', 'Central interim storage facility ZL-Beta in Germany', 'DisposalFacility', 'pending'),
+  ('0c918b47-cfdf-5210-9fc7-52780af2b2ea', '95838bcc-6871-5b9c-af53-baeb9a8a535d', 'fd61693c-3f7e-5597-980b-1e69fdb768a0', 'Transport campaign TC-AM-2026-01', 'TransportCampaign', 'pending');
 
 INSERT INTO entity_attribute_values (id, entity_id, attribute_id, value) VALUES
-  ('257b4aa0-2549-5167-9b0e-e4f5be7fd9b5', 'ea5135b8-f0d9-5538-be96-f4c97b133251', '14ae34bf-eb3e-5e9c-a9c0-5a0e88351ccc', 'KBR'),
-  ('a5218ad7-45b4-50cb-a1e4-27901965e074', 'ea5135b8-f0d9-5538-be96-f4c97b133251', 'd3d639cb-83a8-55e0-a555-d989ed0f07ef', 'Kernkraftwerk Beispielrhein'),
-  ('ace06b02-34ec-554f-9367-c60252e2e800', 'ea5135b8-f0d9-5538-be96-f4c97b133251', '476f8ebf-b65c-5a75-8759-05101c10db6b', 'North Rhine-Westphalia, Germany'),
-  ('ca1099ad-b409-5a0d-86a4-49033d3e9c0c', 'ea5135b8-f0d9-5538-be96-f4c97b133251', '660c422b-b47e-5674-a5ca-6cae64ff7964', 'BeispielEnergie GmbH'),
-  ('bb27a36a-b87d-5b3b-be74-1f9923de90d0', '605c6207-ee25-5e33-b7d3-aada4fd9c81b', 'bef8bc4b-5770-5233-95dc-cd0cf7c7d767', 'A'),
-  ('af89d437-af20-53bd-a9ef-89f4fdb1a41a', '605c6207-ee25-5e33-b7d3-aada4fd9c81b', '89aa2d69-3746-52be-951c-864ec1761895', 'PWR'),
-  ('08474033-5a3d-5325-ba84-4360e3771ebc', '605c6207-ee25-5e33-b7d3-aada4fd9c81b', 'b94769b7-4bc1-5e4e-9657-ed11ac983a78', '3800'),
-  ('6ed97ae9-d73e-5c3c-90a4-bf1cc7159c1c', '605c6207-ee25-5e33-b7d3-aada4fd9c81b', '263268db-4da8-58d0-ae3f-8b0b1aaf45c2', 'true'),
-  ('851fdda4-1ce5-5348-a663-68f95634c49e', '1027fffa-39cc-5d6c-89a7-636f26134e32', '5cf825f1-c50c-5c9a-afd7-e15a63a84056', 'RPV-INT-A'),
-  ('cf1f810e-40e5-54ae-97a1-a48a4d797cb2', '1027fffa-39cc-5d6c-89a7-636f26134e32', '3fffdcda-ab1d-5638-b304-b15c60b03518', 'RPV internals'),
-  ('90c568a9-29e8-5010-92e0-7da1eaa26aa9', '1027fffa-39cc-5d6c-89a7-636f26134e32', '651285b7-4bcc-543a-90d8-080c0bd9cf08', 'activated stainless steel'),
-  ('a074a6e8-c74b-5da5-b8c0-da9c1f73771e', '1027fffa-39cc-5d6c-89a7-636f26134e32', '2bb72def-95fb-5b3b-9182-ead00dab348d', '42'),
-  ('9be7a947-bc24-59a1-9e50-12d2bf534411', '1027fffa-39cc-5d6c-89a7-636f26134e32', 'f09a22ab-d756-5680-9210-2946a73736fb', 'true'),
-  ('96da87fa-e3e1-51a0-8937-7cc54c559422', 'd88a8aae-8d09-5388-8d99-124511424f09', 'd4b1eae5-69fe-5f2b-8224-b55b6130f531', 'RB-A'),
-  ('00259cfe-12eb-5695-9a73-82243ca738b2', 'd88a8aae-8d09-5388-8d99-124511424f09', '081b2a5c-fd1d-5cdb-8ee5-f239af61fedc', 'Reactor Building A'),
-  ('5fb7f7e5-8a9a-5f19-b796-3182bac55d8b', 'd88a8aae-8d09-5388-8d99-124511424f09', '74afb16b-e588-5686-a5ca-2c9d2ae6cb14', 'true'),
-  ('f3388180-eec6-54d4-92c9-b7123e185432', '89697a05-e78d-5f9c-b7d9-0beac16be3b0', '38bda69d-801a-560d-be9e-756c97e7c071', 'KBR-A-DEC'),
-  ('18bc79f9-df37-594a-b244-f311011c64d0', '89697a05-e78d-5f9c-b7d9-0beac16be3b0', '423326a5-9de5-5774-a3f1-0146ea31e6d4', 'KBR Unit A Decommissioning Project'),
-  ('ff53887c-bf7b-5b35-88ab-cabb7a7ad4b8', '89697a05-e78d-5f9c-b7d9-0beac16be3b0', 'e861dc87-837c-56ec-a7a0-6e0858ef2a3b', '2026-05-01'),
-  ('45f40416-26bf-5480-a57a-ed06dd18fbf0', '89697a05-e78d-5f9c-b7d9-0beac16be3b0', '352a0be6-7660-53cd-a720-32bce0cb3a4a', 'BeispielEnergie Decommissioning Division'),
-  ('069b75d2-39a0-57e9-8fd4-d1b55fa0fe22', 'ebbd4c9d-03a4-5a36-b1a7-fd7a70cc1ded', 'd305286b-26e9-53e2-b014-48d5b23cb0c6', 'Nuclear Supervisory Authority NRW'),
-  ('88f875a6-daac-50fe-9eee-46ad1e8c2679', 'ebbd4c9d-03a4-5a36-b1a7-fd7a70cc1ded', '9ca1a2ed-acef-5581-918e-88144720ed7c', 'North Rhine-Westphalia'),
-  ('098bd380-f688-51f4-b259-611e0637e09f', '1481f9c3-b650-52ed-815c-27373a818d20', '839eb530-6f90-5e81-b495-66c164d0c63b', 'KBR-DEC-2026-01'),
-  ('d4bcbdc5-9f6f-590a-a5a0-c65cada5c462', '1481f9c3-b650-52ed-815c-27373a818d20', '1b64df36-9ae8-5039-abba-16ef8a44207f', 'Decommissioning and Dismantling Permit for KBR Unit A'),
-  ('a9f1aba9-4764-5740-8d87-33bc4adfaae3', '1481f9c3-b650-52ed-815c-27373a818d20', 'fbdffa05-b19b-52e8-a3db-6b3140a99f3e', '2026-03-18'),
-  ('e704b47b-12f3-5c09-ae8a-413075c68b4e', '1481f9c3-b650-52ed-815c-27373a818d20', '31156022-e92c-59a5-9097-9d3186197060', 'issued'),
-  ('c8916063-527b-5c4c-b958-4592aa06f1bf', '1481f9c3-b650-52ed-815c-27373a818d20', 'b9678cd1-e849-5593-8adf-eaed7fe47aa9', 'AtG §7(3)'),
-  ('98121965-2b77-5c75-8ef2-3ad2849d643f', '91100fea-db32-57fc-9ede-5f416f1b322f', '5ff20117-2199-5204-9998-1df2ff7d5b1c', 'AtG §7(3)'),
-  ('c827929d-c317-5361-b08c-3e1126dee45a', '91100fea-db32-57fc-9ede-5f416f1b322f', '653ea9c8-0aa4-58a3-af4a-7b33571656a4', 'authorization of decommissioning and dismantling of the licensed installation'),
-  ('3309b2f7-e251-5175-a5fd-7f9b8fd23ac4', '91100fea-db32-57fc-9ede-5f416f1b322f', 'adc0d4a9-a3eb-50d7-b0d7-f13ad4b35d08', 'true'),
-  ('a08671c3-c3c3-5306-9744-b3285675f471', '33b7fbe1-85b6-55a7-9944-c11b4f8204a8', '5ed10b3d-91f8-5ed8-84f0-b873534d4b40', 'REP-MP-RC1-Q3-2026'),
-  ('a560ee8f-8d9e-5ccf-a9b9-325a8b4394ef', '33b7fbe1-85b6-55a7-9944-c11b4f8204a8', '0443a327-22e0-5b93-b6f4-9701cc9d18d4', 'quarterly monitoring report'),
-  ('21e08131-091b-54d5-a291-d3ed706acdfc', '33b7fbe1-85b6-55a7-9944-c11b4f8204a8', 'cfd62631-15de-5186-92ba-29eb810f412f', '2026-10-15'),
-  ('9f850ed6-e9e6-5031-9c01-ac2a86dafe70', '33b7fbe1-85b6-55a7-9944-c11b4f8204a8', 'b1c1ed4b-92a9-5a89-ac3c-470d45adabf4', 'false'),
-  ('62448afd-f30c-5563-9cd5-dc84cbcc6c3b', '7dcfe1ee-a338-5775-9ae5-e336261bdec1', '0631839e-0bff-5eae-baf3-02805fc391c5', 'P2'),
-  ('8d1c2256-4155-5b2b-be31-eac7f0c93232', '7dcfe1ee-a338-5775-9ae5-e336261bdec1', '598b21e5-c177-59f9-a3bf-b945b888ac21', 'Reactor Internals Segmentation'),
-  ('c09d6e56-33a7-508d-97b0-ce97c7e238cb', '7dcfe1ee-a338-5775-9ae5-e336261bdec1', 'c2fa997b-c365-55a3-af43-04a3f82698c3', '2'),
-  ('e594a3e6-35ba-5678-bacd-363beab0b2a9', '7dcfe1ee-a338-5775-9ae5-e336261bdec1', '3f4c9384-da12-50ab-9501-ddc27efec3be', 'false'),
-  ('86a7da33-0d11-56e5-a9c3-99dbac0079e7', '92bff7ee-4832-5cd6-add8-9995269f3630', '0803fce0-5f0d-5ddd-ada8-d1162d352c79', 'ST-010'),
-  ('2d66b3b4-d99f-5bf3-b4e6-33493368fba6', '92bff7ee-4832-5cd6-add8-9995269f3630', '7e3e5d05-8c2b-59ed-8952-c7cd9c6a54f8', 'Fuel removal verification'),
-  ('f17697df-d0bb-53dc-8790-d222626701ef', '92bff7ee-4832-5cd6-add8-9995269f3630', '8ac7ca42-6a6b-56f0-b202-a0fe5fb1cf16', 'completed'),
-  ('d2243db4-9bef-5b77-abe6-35eb40792e28', '92bff7ee-4832-5cd6-add8-9995269f3630', 'b294615b-3fa1-5545-b49c-9a0cf2d8cd06', 'medium'),
-  ('2ca6b2f6-005d-50ba-9360-162e6b7591b5', 'dd60a0cd-0942-5b13-9c09-9a392abcaec5', '0803fce0-5f0d-5ddd-ada8-d1162d352c79', 'ST-240'),
-  ('ca933bf2-3ab7-5596-b09b-ba2f49a9eb4b', 'dd60a0cd-0942-5b13-9c09-9a392abcaec5', '7e3e5d05-8c2b-59ed-8952-c7cd9c6a54f8', 'Underwater segmentation of RPV internals'),
-  ('63416a26-c408-5017-9459-6a23fb5d6c6d', 'dd60a0cd-0942-5b13-9c09-9a392abcaec5', '8ac7ca42-6a6b-56f0-b202-a0fe5fb1cf16', 'planned'),
-  ('d4ee3e72-241e-59dd-8c56-854931ffbe53', 'dd60a0cd-0942-5b13-9c09-9a392abcaec5', 'b294615b-3fa1-5545-b49c-9a0cf2d8cd06', 'high'),
-  ('d6dfdd69-cb58-5e8e-ada6-b2fc29eb5f79', '4541cf68-6a81-52b5-8ab8-76820d6be6cb', 'e3bf629b-3fd2-5391-b2cf-238e634e8df2', 'WP-240-CUT'),
-  ('41b076b0-72a0-5141-a7ed-f05681c54ff4', '4541cf68-6a81-52b5-8ab8-76820d6be6cb', 'cd441fc8-9c9d-5bfe-96e4-8559cc20f926', 'shielded underwater cutting, filtration deployment, segment handling, and transfer to shielded boxes'),
-  ('6a8b7ad8-b849-56f0-977a-54fcd1af43fc', '4541cf68-6a81-52b5-8ab8-76820d6be6cb', '9b51af5f-2f8b-543e-9739-436308e3a94e', 'true'),
-  ('b49d7660-1625-5d9f-9441-2f04aaea7cea', 'f7295603-6af8-549f-b101-5d8e1625f062', 'baaf67ba-3d80-54a2-9998-cadb36a8ea9f', 'INV-RPV-A-2026'),
-  ('85551e6f-c3a1-5fdf-b0fb-c08edab76036', 'f7295603-6af8-549f-b101-5d8e1625f062', 'ad94efc2-ac93-5b96-b406-75f3ca8e46ca', '2026-01-31'),
-  ('bb7369bb-90e7-54b4-a10f-4097b805213f', 'f7295603-6af8-549f-b101-5d8e1625f062', '168b7572-ea87-50ed-9b0b-f88e287fd6d9', 'Co-60'),
-  ('67f46b1d-f075-5e3a-a83a-ee86792f5336', 'f7295603-6af8-549f-b101-5d8e1625f062', '28170630-cd1c-58cd-aec4-37a074774b90', '780'),
-  ('77e6c81a-4f80-5c2d-bbda-6c0749964cd7', 'f7295603-6af8-549f-b101-5d8e1625f062', 'fc8035b9-1fbb-5625-9937-3744b7b76f15', '18'),
-  ('9e415342-4caa-5daf-a463-7393599bee48', 'eeebfa24-2d04-507a-a4c6-b854d92d454e', '7ef65d26-4c19-5960-8e64-8a3b7811420e', 'RC-1'),
-  ('1efb2c1a-85b7-56bc-8721-deefe72fefdb', 'eeebfa24-2d04-507a-a4c6-b854d92d454e', 'd6692470-2d14-518b-aeb8-eda4cd47ec8e', 'high contamination zone'),
-  ('8588b04f-1003-5c0b-a19b-6419be1b8c06', '544ddd92-c905-5567-a53d-e9fd845e0797', 'fe483765-6d99-542a-82ab-34d6a19dbe89', 'SM-UNDERWATER-CUTTING'),
-  ('676f4b9e-fe41-5cc1-bcfe-3c5033ac3da0', '544ddd92-c905-5567-a53d-e9fd845e0797', 'ea89238a-819a-5129-8faf-efef4dbe5def', 'underwater cutting with local filtration and shielded tooling'),
-  ('be23e265-fc13-58cf-ad36-8b65af4f072f', '544ddd92-c905-5567-a53d-e9fd845e0797', 'e7066126-fa33-5ac6-9c73-43b3854131a7', 'technical'),
-  ('d78e066f-b625-51ac-aa3f-b13ef3d6a00a', '544ddd92-c905-5567-a53d-e9fd845e0797', '87e15b69-c2d4-5725-bf25-b45fde95f13b', 'true'),
-  ('bc022e66-6430-5551-86fd-2af31d3616f4', '94db59ab-2f06-5623-a34c-2649dfb3068c', 'cf8b2d20-5aa4-5d41-a9f2-6ed1c53cdb63', 'DC-WORKER-20'),
-  ('21630b35-1a5d-590c-aefe-37e78ccab6c6', '94db59ab-2f06-5623-a34c-2649dfb3068c', '73004d3f-2400-55c1-b754-fcfe193c3618', '20'),
-  ('74c1fc06-d6fe-57b8-9d9f-dd0ca257619a', '94db59ab-2f06-5623-a34c-2649dfb3068c', 'dfb0676e-d345-5615-a9b4-0392805a31b2', 'affected work group'),
-  ('261f57b1-6b6c-5286-863b-d569ba37f2ed', 'cfb1d293-8055-5e66-ac89-14f874a4ddf2', 'cde47cc3-6c6c-5485-9757-b2ff8d8c15ab', 'MP-RC1'),
-  ('f654447c-03cd-5fe4-b3fd-c2437a496f3d', 'cfb1d293-8055-5e66-ac89-14f874a4ddf2', '76accc8d-2db0-5e24-a9c6-740173ea2256', 'continuous dose rate monitoring and daily contamination checks'),
-  ('81ef5add-9bc4-56b6-bb35-c843498a79dc', 'cfb1d293-8055-5e66-ac89-14f874a4ddf2', 'df6def15-1609-556f-9681-c041f81cef56', 'Radiation Protection Team'),
-  ('1e81ae70-3a50-53fc-9964-a7659f017ae6', '630ecc97-8ab2-5f89-ace1-438370ce0586', '1eaf4695-2240-507d-a025-25650250a88c', 'WS-AM-240'),
-  ('b7dbdb7b-a1c3-571c-8e08-6668407ab429', '630ecc97-8ab2-5f89-ace1-438370ce0586', 'c8063e0d-edc2-515c-9e7f-353ad915d945', 'activated metal'),
-  ('eda18e68-0fd1-5d5e-abdd-47412c017a55', '630ecc97-8ab2-5f89-ace1-438370ce0586', '8d6fc7b9-c2c3-5163-8c9a-7c3c51e4ecf9', '42'),
-  ('de5e418c-6165-5b75-9ed9-5deab6b6eaff', '630ecc97-8ab2-5f89-ace1-438370ce0586', '04b324ac-a2ba-5e14-a39a-18a3d5e6b349', 'true'),
-  ('5392eeaf-421b-5de4-bc22-52a8779fb4be', '1a97e4ab-8a2a-50e7-ad8b-c886b8d925a5', '01ca3fcf-33b7-5e09-8c3e-f9c7a0e78a49', 'WP-AM-001'),
-  ('07abeaca-2f31-5adc-a9bd-2edb54823006', '1a97e4ab-8a2a-50e7-ad8b-c886b8d925a5', '7e438afb-52aa-5f8e-9447-d781925200e7', 'shielded box'),
-  ('5e87c283-b0df-599f-b39c-93f3800fdce6', '1a97e4ab-8a2a-50e7-ad8b-c886b8d925a5', '88c702fb-d20e-5cf3-aea0-a78ccb8d81c0', '8.5'),
-  ('82f08b90-d287-5540-a4ee-6bf125297be4', '1a97e4ab-8a2a-50e7-ad8b-c886b8d925a5', '309309d4-3707-5249-bef2-8b76e5fb90a3', 'true'),
-  ('d9ce1f4d-b23c-5c3c-a900-9588c9db7301', 'b82a9caf-6b08-587b-9271-badb053ac106', 'fa1e4f87-e1be-5770-b221-0793565f15c0', 'CM-AM-001'),
-  ('d89ffc4b-e52e-541e-9f5d-6991cfec1528', 'b82a9caf-6b08-587b-9271-badb053ac106', 'd2e99e74-c227-5a5b-977a-f704d9d0c190', '2026-08-14'),
-  ('1759b913-eb35-5888-85ee-e8bb2b2bcb18', 'b82a9caf-6b08-587b-9271-badb053ac106', '4058d132-c22a-5ac5-9eef-417144e002f6', 'gamma spectrometry'),
-  ('4d893665-f393-58e0-a674-74e5a1228cbb', 'b82a9caf-6b08-587b-9271-badb053ac106', '7295e353-fad6-5e3b-88e8-82d9ce8f220b', 'false'),
-  ('1a6d6e99-d452-5061-8a58-9b5126e2577b', '9cbc6ab6-c3f1-51c0-b66f-9a896173b72b', 'ad6800be-8e86-5a19-a1e2-ababb684cc31', 'ZL-Beta'),
-  ('1c820abe-905b-5d8d-8e43-5f32471b27a9', '9cbc6ab6-c3f1-51c0-b66f-9a896173b72b', 'ea4fb9c3-d5d2-5a0e-9a2f-461b945ce29f', 'Central interim storage facility ZL-Beta'),
-  ('21649fe7-71e4-5785-b528-de5cec0f3f65', '9cbc6ab6-c3f1-51c0-b66f-9a896173b72b', '67c9d1d7-87ef-5881-a6e3-a7996015141b', 'Germany'),
-  ('fba326b5-aa0c-5c87-aa1c-53f5e818ab03', '0c918b47-cfdf-5210-9fc7-52780af2b2ea', 'ed5cf819-deac-5a7f-a1c0-0d254228eb54', 'TC-AM-2026-01'),
-  ('ce65b526-afd0-5ee9-bbd6-ae8370390771', '0c918b47-cfdf-5210-9fc7-52780af2b2ea', 'ef9b4980-99cc-5d92-9233-591d84b9b2b4', 'road'),
-  ('c00eb4d2-8023-525b-810d-9f9b65fc0630', '0c918b47-cfdf-5210-9fc7-52780af2b2ea', '22d9d289-52ab-5d75-8483-6ce84db3eea0', 'true');
+  ('257b4aa0-2549-5167-9b0e-e4f5be7fd9b5', 'ea5135b8-f0d9-5538-be96-f4c97b133251', 'Facility.facilityIdentifier', 'KBR'),
+  ('a5218ad7-45b4-50cb-a1e4-27901965e074', 'ea5135b8-f0d9-5538-be96-f4c97b133251', 'Facility.officialName', 'Kernkraftwerk Beispielrhein'),
+  ('ace06b02-34ec-554f-9367-c60252e2e800', 'ea5135b8-f0d9-5538-be96-f4c97b133251', 'Facility.location', 'North Rhine-Westphalia, Germany'),
+  ('ca1099ad-b409-5a0d-86a4-49033d3e9c0c', 'ea5135b8-f0d9-5538-be96-f4c97b133251', 'Facility.operatorName', 'BeispielEnergie GmbH'),
+  ('bb27a36a-b87d-5b3b-be74-1f9923de90d0', '605c6207-ee25-5e33-b7d3-aada4fd9c81b', 'ReactorUnit.unitCode', 'A'),
+  ('af89d437-af20-53bd-a9ef-89f4fdb1a41a', '605c6207-ee25-5e33-b7d3-aada4fd9c81b', 'ReactorUnit.reactorType', 'PWR'),
+  ('08474033-5a3d-5325-ba84-4360e3771ebc', '605c6207-ee25-5e33-b7d3-aada4fd9c81b', 'ReactorUnit.thermalPowerMW', '3800'),
+  ('6ed97ae9-d73e-5c3c-90a4-bf1cc7159c1c', '605c6207-ee25-5e33-b7d3-aada4fd9c81b', 'ReactorUnit.isFuelFree', 'true'),
+  ('851fdda4-1ce5-5348-a663-68f95634c49e', '1027fffa-39cc-5d6c-89a7-636f26134e32', 'Component.componentTag', 'RPV-INT-A'),
+  ('cf1f810e-40e5-54ae-97a1-a48a4d797cb2', '1027fffa-39cc-5d6c-89a7-636f26134e32', 'Component.componentName', 'RPV internals'),
+  ('90c568a9-29e8-5010-92e0-7da1eaa26aa9', '1027fffa-39cc-5d6c-89a7-636f26134e32', 'Component.material', 'activated stainless steel'),
+  ('a074a6e8-c74b-5da5-b8c0-da9c1f73771e', '1027fffa-39cc-5d6c-89a7-636f26134e32', 'Component.estimatedMassTonnes', '42'),
+  ('9be7a947-bc24-59a1-9e50-12d2bf534411', '1027fffa-39cc-5d6c-89a7-636f26134e32', 'Component.isActivated', 'true'),
+  ('96da87fa-e3e1-51a0-8937-7cc54c559422', 'd88a8aae-8d09-5388-8d99-124511424f09', 'Building.buildingCode', 'RB-A'),
+  ('00259cfe-12eb-5695-9a73-82243ca738b2', 'd88a8aae-8d09-5388-8d99-124511424f09', 'Building.buildingName', 'Reactor Building A'),
+  ('5fb7f7e5-8a9a-5f19-b796-3182bac55d8b', 'd88a8aae-8d09-5388-8d99-124511424f09', 'Building.isRadiologicalArea', 'true'),
+  ('f3388180-eec6-54d4-92c9-b7123e185432', '89697a05-e78d-5f9c-b7d9-0beac16be3b0', 'DecommissioningProject.projectId', 'KBR-A-DEC'),
+  ('18bc79f9-df37-594a-b244-f311011c64d0', '89697a05-e78d-5f9c-b7d9-0beac16be3b0', 'DecommissioningProject.projectName', 'KBR Unit A Decommissioning Project'),
+  ('ff53887c-bf7b-5b35-88ab-cabb7a7ad4b8', '89697a05-e78d-5f9c-b7d9-0beac16be3b0', 'DecommissioningProject.plannedStartDate', '2026-05-01'),
+  ('45f40416-26bf-5480-a57a-ed06dd18fbf0', '89697a05-e78d-5f9c-b7d9-0beac16be3b0', 'DecommissioningProject.responsibleOrganization', 'BeispielEnergie Decommissioning Division'),
+  ('069b75d2-39a0-57e9-8fd4-d1b55fa0fe22', 'ebbd4c9d-03a4-5a36-b1a7-fd7a70cc1ded', 'Authority.authorityName', 'Nuclear Supervisory Authority NRW'),
+  ('88f875a6-daac-50fe-9eee-46ad1e8c2679', 'ebbd4c9d-03a4-5a36-b1a7-fd7a70cc1ded', 'Authority.jurisdiction', 'North Rhine-Westphalia'),
+  ('098bd380-f688-51f4-b259-611e0637e09f', '1481f9c3-b650-52ed-815c-27373a818d20', 'Permit.permitNumber', 'KBR-DEC-2026-01'),
+  ('d4bcbdc5-9f6f-590a-a5a0-c65cada5c462', '1481f9c3-b650-52ed-815c-27373a818d20', 'Permit.permitTitle', 'Decommissioning and Dismantling Permit for KBR Unit A'),
+  ('a9f1aba9-4764-5740-8d87-33bc4adfaae3', '1481f9c3-b650-52ed-815c-27373a818d20', 'Permit.issueDate', '2026-03-18'),
+  ('e704b47b-12f3-5c09-ae8a-413075c68b4e', '1481f9c3-b650-52ed-815c-27373a818d20', 'Permit.status', 'issued'),
+  ('c8916063-527b-5c4c-b958-4592aa06f1bf', '1481f9c3-b650-52ed-815c-27373a818d20', 'Permit.legalBasis', 'AtG §7(3)'),
+  ('98121965-2b77-5c75-8ef2-3ad2849d643f', '91100fea-db32-57fc-9ede-5f416f1b322f', 'LegalRequirement.legalReference', 'AtG §7(3)'),
+  ('c827929d-c317-5361-b08c-3e1126dee45a', '91100fea-db32-57fc-9ede-5f416f1b322f', 'LegalRequirement.requirementText', 'authorization of decommissioning and dismantling of the licensed installation'),
+  ('3309b2f7-e251-5175-a5fd-7f9b8fd23ac4', '91100fea-db32-57fc-9ede-5f416f1b322f', 'LegalRequirement.isBinding', 'true'),
+  ('a08671c3-c3c3-5306-9744-b3285675f471', '33b7fbe1-85b6-55a7-9944-c11b4f8204a8', 'RegulatoryReport.reportId', 'REP-MP-RC1-Q3-2026'),
+  ('a560ee8f-8d9e-5ccf-a9b9-325a8b4394ef', '33b7fbe1-85b6-55a7-9944-c11b4f8204a8', 'RegulatoryReport.reportType', 'quarterly monitoring report'),
+  ('21e08131-091b-54d5-a291-d3ed706acdfc', '33b7fbe1-85b6-55a7-9944-c11b4f8204a8', 'RegulatoryReport.submissionDate', '2026-10-15'),
+  ('9f850ed6-e9e6-5031-9c01-ac2a86dafe70', '33b7fbe1-85b6-55a7-9944-c11b4f8204a8', 'RegulatoryReport.isConfidential', 'false'),
+  ('62448afd-f30c-5563-9cd5-dc84cbcc6c3b', '7dcfe1ee-a338-5775-9ae5-e336261bdec1', 'DecommissioningPhase.phaseCode', 'P2'),
+  ('8d1c2256-4155-5b2b-be31-eac7f0c93232', '7dcfe1ee-a338-5775-9ae5-e336261bdec1', 'DecommissioningPhase.phaseName', 'Reactor Internals Segmentation'),
+  ('c09d6e56-33a7-508d-97b0-ce97c7e238cb', '7dcfe1ee-a338-5775-9ae5-e336261bdec1', 'DecommissioningPhase.sequenceNumber', '2'),
+  ('e594a3e6-35ba-5678-bacd-363beab0b2a9', '7dcfe1ee-a338-5775-9ae5-e336261bdec1', 'DecommissioningPhase.isActive', 'false'),
+  ('86a7da33-0d11-56e5-a9c3-99dbac0079e7', '92bff7ee-4832-5cd6-add8-9995269f3630', 'DecommissioningStep.stepId', 'ST-010'),
+  ('2d66b3b4-d99f-5bf3-b4e6-33493368fba6', '92bff7ee-4832-5cd6-add8-9995269f3630', 'DecommissioningStep.stepName', 'Fuel removal verification'),
+  ('f17697df-d0bb-53dc-8790-d222626701ef', '92bff7ee-4832-5cd6-add8-9995269f3630', 'DecommissioningStep.status', 'completed'),
+  ('d2243db4-9bef-5b77-abe6-35eb40792e28', '92bff7ee-4832-5cd6-add8-9995269f3630', 'DecommissioningStep.riskLevel', 'medium'),
+  ('2ca6b2f6-005d-50ba-9360-162e6b7591b5', 'dd60a0cd-0942-5b13-9c09-9a392abcaec5', 'DecommissioningStep.stepId', 'ST-240'),
+  ('ca933bf2-3ab7-5596-b09b-ba2f49a9eb4b', 'dd60a0cd-0942-5b13-9c09-9a392abcaec5', 'DecommissioningStep.stepName', 'Underwater segmentation of RPV internals'),
+  ('63416a26-c408-5017-9459-6a23fb5d6c6d', 'dd60a0cd-0942-5b13-9c09-9a392abcaec5', 'DecommissioningStep.status', 'planned'),
+  ('d4ee3e72-241e-59dd-8c56-854931ffbe53', 'dd60a0cd-0942-5b13-9c09-9a392abcaec5', 'DecommissioningStep.riskLevel', 'high'),
+  ('d6dfdd69-cb58-5e8e-ada6-b2fc29eb5f79', '4541cf68-6a81-52b5-8ab8-76820d6be6cb', 'WorkPackage.workPackageCode', 'WP-240-CUT'),
+  ('41b076b0-72a0-5141-a7ed-f05681c54ff4', '4541cf68-6a81-52b5-8ab8-76820d6be6cb', 'WorkPackage.workDescription', 'shielded underwater cutting, filtration deployment, segment handling, and transfer to shielded boxes'),
+  ('6a8b7ad8-b849-56f0-977a-54fcd1af43fc', '4541cf68-6a81-52b5-8ab8-76820d6be6cb', 'WorkPackage.isSafetyRelevant', 'true'),
+  ('b49d7660-1625-5d9f-9441-2f04aaea7cea', 'f7295603-6af8-549f-b101-5d8e1625f062', 'RadiologicalInventory.inventoryId', 'INV-RPV-A-2026'),
+  ('85551e6f-c3a1-5fdf-b0fb-c08edab76036', 'f7295603-6af8-549f-b101-5d8e1625f062', 'RadiologicalInventory.referenceDate', '2026-01-31'),
+  ('bb7369bb-90e7-54b4-a10f-4097b805213f', 'f7295603-6af8-549f-b101-5d8e1625f062', 'RadiologicalInventory.dominantNuclide', 'Co-60'),
+  ('67f46b1d-f075-5e3a-a83a-ee86792f5336', 'f7295603-6af8-549f-b101-5d8e1625f062', 'RadiologicalInventory.totalActivityGBq', '780'),
+  ('77e6c81a-4f80-5c2d-bbda-6c0749964cd7', 'f7295603-6af8-549f-b101-5d8e1625f062', 'RadiologicalInventory.uncertaintyPercent', '18'),
+  ('9e415342-4caa-5daf-a463-7393599bee48', 'eeebfa24-2d04-507a-a4c6-b854d92d454e', 'ContaminationZone.zoneId', 'RC-1'),
+  ('1efb2c1a-85b7-56bc-8721-deefe72fefdb', 'eeebfa24-2d04-507a-a4c6-b854d92d454e', 'ContaminationZone.radiologicalCategory', 'high contamination zone'),
+  ('8588b04f-1003-5c0b-a19b-6419be1b8c06', '544ddd92-c905-5567-a53d-e9fd845e0797', 'SafetyMeasure.measureId', 'SM-UNDERWATER-CUTTING'),
+  ('676f4b9e-fe41-5cc1-bcfe-3c5033ac3da0', '544ddd92-c905-5567-a53d-e9fd845e0797', 'SafetyMeasure.measureName', 'underwater cutting with local filtration and shielded tooling'),
+  ('be23e265-fc13-58cf-ad36-8b65af4f072f', '544ddd92-c905-5567-a53d-e9fd845e0797', 'SafetyMeasure.measureType', 'technical'),
+  ('d78e066f-b625-51ac-aa3f-b13ef3d6a00a', '544ddd92-c905-5567-a53d-e9fd845e0797', 'SafetyMeasure.isMandatory', 'true'),
+  ('bc022e66-6430-5551-86fd-2af31d3616f4', '94db59ab-2f06-5623-a34c-2649dfb3068c', 'DoseConstraint.constraintCode', 'DC-WORKER-20'),
+  ('21630b35-1a5d-590c-aefe-37e78ccab6c6', '94db59ab-2f06-5623-a34c-2649dfb3068c', 'DoseConstraint.annualDoseLimitMSv', '20'),
+  ('74c1fc06-d6fe-57b8-9d9f-dd0ca257619a', '94db59ab-2f06-5623-a34c-2649dfb3068c', 'DoseConstraint.personGroup', 'affected work group'),
+  ('261f57b1-6b6c-5286-863b-d569ba37f2ed', 'cfb1d293-8055-5e66-ac89-14f874a4ddf2', 'MonitoringProgram.programId', 'MP-RC1'),
+  ('f654447c-03cd-5fe4-b3fd-c2437a496f3d', 'cfb1d293-8055-5e66-ac89-14f874a4ddf2', 'MonitoringProgram.frequency', 'continuous dose rate monitoring and daily contamination checks'),
+  ('81ef5add-9bc4-56b6-bb35-c843498a79dc', 'cfb1d293-8055-5e66-ac89-14f874a4ddf2', 'MonitoringProgram.responsibleTeam', 'Radiation Protection Team'),
+  ('1e81ae70-3a50-53fc-9964-a7659f017ae6', '630ecc97-8ab2-5f89-ace1-438370ce0586', 'WasteStream.streamId', 'WS-AM-240'),
+  ('b7dbdb7b-a1c3-571c-8e08-6668407ab429', '630ecc97-8ab2-5f89-ace1-438370ce0586', 'WasteStream.wasteCategory', 'activated metal'),
+  ('eda18e68-0fd1-5d5e-abdd-47412c017a55', '630ecc97-8ab2-5f89-ace1-438370ce0586', 'WasteStream.estimatedMassTonnes', '42'),
+  ('de5e418c-6165-5b75-9ed9-5deab6b6eaff', '630ecc97-8ab2-5f89-ace1-438370ce0586', 'WasteStream.requiresConditioning', 'true'),
+  ('5392eeaf-421b-5de4-bc22-52a8779fb4be', '1a97e4ab-8a2a-50e7-ad8b-c886b8d925a5', 'WastePackage.packageId', 'WP-AM-001'),
+  ('07abeaca-2f31-5adc-a9bd-2edb54823006', '1a97e4ab-8a2a-50e7-ad8b-c886b8d925a5', 'WastePackage.packageType', 'shielded box'),
+  ('5e87c283-b0df-599f-b39c-93f3800fdce6', '1a97e4ab-8a2a-50e7-ad8b-c886b8d925a5', 'WastePackage.grossMassTonnes', '8.5'),
+  ('82f08b90-d287-5540-a4ee-6bf125297be4', '1a97e4ab-8a2a-50e7-ad8b-c886b8d925a5', 'WastePackage.isConditioned', 'true'),
+  ('d9ce1f4d-b23c-5c3c-a900-9588c9db7301', 'b82a9caf-6b08-587b-9271-badb053ac106', 'ClearanceMeasurement.measurementId', 'CM-AM-001'),
+  ('d89ffc4b-e52e-541e-9f5d-6991cfec1528', 'b82a9caf-6b08-587b-9271-badb053ac106', 'ClearanceMeasurement.measurementDate', '2026-08-14'),
+  ('1759b913-eb35-5888-85ee-e8bb2b2bcb18', 'b82a9caf-6b08-587b-9271-badb053ac106', 'ClearanceMeasurement.method', 'gamma spectrometry'),
+  ('4d893665-f393-58e0-a674-74e5a1228cbb', 'b82a9caf-6b08-587b-9271-badb053ac106', 'ClearanceMeasurement.passed', 'false'),
+  ('1a6d6e99-d452-5061-8a58-9b5126e2577b', '9cbc6ab6-c3f1-51c0-b66f-9a896173b72b', 'DisposalFacility.disposalFacilityId', 'ZL-Beta'),
+  ('1c820abe-905b-5d8d-8e43-5f32471b27a9', '9cbc6ab6-c3f1-51c0-b66f-9a896173b72b', 'DisposalFacility.disposalFacilityName', 'Central interim storage facility ZL-Beta'),
+  ('21649fe7-71e4-5785-b528-de5cec0f3f65', '9cbc6ab6-c3f1-51c0-b66f-9a896173b72b', 'DisposalFacility.country', 'Germany'),
+  ('fba326b5-aa0c-5c87-aa1c-53f5e818ab03', '0c918b47-cfdf-5210-9fc7-52780af2b2ea', 'TransportCampaign.campaignId', 'TC-AM-2026-01'),
+  ('ce65b526-afd0-5ee9-bbd6-ae8370390771', '0c918b47-cfdf-5210-9fc7-52780af2b2ea', 'TransportCampaign.transportMode', 'road'),
+  ('c00eb4d2-8023-525b-810d-9f9b65fc0630', '0c918b47-cfdf-5210-9fc7-52780af2b2ea', 'TransportCampaign.isApproved', 'true');
 
 INSERT INTO evidence_anchors (id, document_id, section_id, paragraph_id, quote_text, context_text, page_from, page_to) VALUES
   ('f4dfe74b-b3e7-5b5c-b02c-eda856e185cd', '95838bcc-6871-5b9c-af53-baeb9a8a535d', '581d24ac-85b9-5894-9b96-f8fba5773f4c', '6d35244a-0f81-5cd5-b98d-4dcacdfc2d51', 'The KBR Unit A Decommissioning Project targets the Kernkraftwerk Beispielrhein facility', '1. Facility Overview', 1, 1),
@@ -568,30 +1030,30 @@ INSERT INTO evidence_anchors (id, document_id, section_id, paragraph_id, quote_t
   ('05a5052a-edf6-57c7-be51-d747e9239e54', '95838bcc-6871-5b9c-af53-baeb9a8a535d', '1f763abd-819e-5fd0-a5d3-a0e54f0fd9da', 'fbf145c3-0160-534c-b9ee-a6af0beed984', 'Transport campaign TC-AM-2026-01 moves WP-AM-001 by road after route approval', '12. Clearance, Transport, and Disposal', 12, 12);
 
 INSERT INTO facts (id, extraction_run_id, document_id, subject_text, relation_text, object_text, subject_entity_id, object_entity_id, relation_type_id, confidence, review_status, is_cross_chapter, primary_anchor_id) VALUES
-  ('8a4a7224-e995-5cd3-b6db-ce352bc7fc3a', 'fd61693c-3f7e-5597-980b-1e69fdb768a0', '95838bcc-6871-5b9c-af53-baeb9a8a535d', 'KBR Unit A Decommissioning Project', 'targets', 'Kernkraftwerk Beispielrhein (KBR)', '89697a05-e78d-5f9c-b7d9-0beac16be3b0', 'ea5135b8-f0d9-5538-be96-f4c97b133251', '854c60a4-6ca4-5abb-a258-46766667a32a', 0.98, 'pending', false, 'f4dfe74b-b3e7-5b5c-b02c-eda856e185cd'),
-  ('45d29bfb-3fb0-50cc-b5b0-b1782141524b', 'fd61693c-3f7e-5597-980b-1e69fdb768a0', '95838bcc-6871-5b9c-af53-baeb9a8a535d', 'Kernkraftwerk Beispielrhein (KBR)', 'has unit', 'Reactor Unit A', 'ea5135b8-f0d9-5538-be96-f4c97b133251', '605c6207-ee25-5e33-b7d3-aada4fd9c81b', 'bfe7ae7a-f550-5926-85f1-e917ab432a8c', 0.9, 'pending', false, '0b488541-f6f0-5861-a312-2545ce4d3141'),
-  ('d137c753-02af-5bd6-bd72-4cf95388c139', 'fd61693c-3f7e-5597-980b-1e69fdb768a0', '95838bcc-6871-5b9c-af53-baeb9a8a535d', 'RPV internals of Unit A', 'located in building', 'reactor building RB-A', '1027fffa-39cc-5d6c-89a7-636f26134e32', 'd88a8aae-8d09-5388-8d99-124511424f09', 'cdffacc4-00f7-5f0a-8c8f-cb86448bfa4a', 0.88, 'pending', false, 'f4885786-8caa-5f94-b478-fb72c698a366'),
-  ('0e97a6e7-0e0d-599d-a629-398330edebde', 'fd61693c-3f7e-5597-980b-1e69fdb768a0', '95838bcc-6871-5b9c-af53-baeb9a8a535d', 'AtG §7(3)', 'constrains', 'Permit KBR-DEC-2026-01', '91100fea-db32-57fc-9ede-5f416f1b322f', '1481f9c3-b650-52ed-815c-27373a818d20', '8931145e-427c-5327-afb4-7c8f3f1b7c96', 0.92, 'pending', true, 'f156378c-6981-568b-9b44-3f5ea8b25139'),
-  ('2dc83868-1fc8-572c-a706-a4a92e1ac7a9', 'fd61693c-3f7e-5597-980b-1e69fdb768a0', '95838bcc-6871-5b9c-af53-baeb9a8a535d', 'Permit KBR-DEC-2026-01', 'issued by', 'Nuclear Supervisory Authority NRW', '1481f9c3-b650-52ed-815c-27373a818d20', 'ebbd4c9d-03a4-5a36-b1a7-fd7a70cc1ded', '27e1b12c-da36-5bc1-a4d7-6898bacf1821', 0.99, 'pending', false, 'cfc429e2-d66c-592d-8eb4-101d3a59c925'),
-  ('e2b4b2b5-9f4c-5cec-b668-09619cadf9fa', 'fd61693c-3f7e-5597-980b-1e69fdb768a0', '95838bcc-6871-5b9c-af53-baeb9a8a535d', 'Permit KBR-DEC-2026-01', 'applies to', 'KBR Unit A Decommissioning Project', '1481f9c3-b650-52ed-815c-27373a818d20', '89697a05-e78d-5f9c-b7d9-0beac16be3b0', 'db7a62c5-9f49-514c-9c0f-e046e2a4aa6c', 0.95, 'pending', false, 'daf7e32d-5bc5-5db9-bab0-bf8a88f64ca6'),
-  ('baf13178-50e2-581a-8fcc-5bee9948574b', 'fd61693c-3f7e-5597-980b-1e69fdb768a0', '95838bcc-6871-5b9c-af53-baeb9a8a535d', 'Permit KBR-DEC-2026-01', 'approves', 'Step ST-240 Underwater segmentation of RPV internals', '1481f9c3-b650-52ed-815c-27373a818d20', 'dd60a0cd-0942-5b13-9c09-9a392abcaec5', '2a4fc66a-9322-5b28-870e-d2d30d8fe26e', 0.93, 'pending', true, 'c4804059-b5de-54ed-8117-ee96b92a05ed'),
-  ('622b5619-6be6-5083-a687-542165c5db95', 'fd61693c-3f7e-5597-980b-1e69fdb768a0', '95838bcc-6871-5b9c-af53-baeb9a8a535d', 'Permit KBR-DEC-2026-01', 'requires', 'Report REP-MP-RC1-Q3-2026', '1481f9c3-b650-52ed-815c-27373a818d20', '33b7fbe1-85b6-55a7-9944-c11b4f8204a8', '306499fa-f324-59bd-8e39-68f595e5e0f4', 0.9, 'pending', false, '7b4d68e2-f1b5-5578-96e0-01e4168b491e'),
-  ('30f6e29c-134d-5723-853e-4711d8381d50', 'fd61693c-3f7e-5597-980b-1e69fdb768a0', '95838bcc-6871-5b9c-af53-baeb9a8a535d', 'Report REP-MP-RC1-Q3-2026', 'documents', 'Monitoring program MP-RC1', '33b7fbe1-85b6-55a7-9944-c11b4f8204a8', 'cfb1d293-8055-5e66-ac89-14f874a4ddf2', '17f09d49-50bd-5bc9-86db-141abffc52b7', 0.96, 'pending', true, 'c3285099-f4cc-5f69-9c1b-ce0318bc8ef9'),
-  ('6827803b-a29c-5f6a-bc52-8d5c67c7e5d3', 'fd61693c-3f7e-5597-980b-1e69fdb768a0', '95838bcc-6871-5b9c-af53-baeb9a8a535d', 'KBR Unit A Decommissioning Project', 'has phase', 'Phase P2 Reactor Internals Segmentation', '89697a05-e78d-5f9c-b7d9-0beac16be3b0', '7dcfe1ee-a338-5775-9ae5-e336261bdec1', '3e378e3c-0e7c-5f5a-be6e-174594ef3056', 0.91, 'pending', false, 'aa2e0652-0efe-553e-bfac-b1d70bdd12c6'),
-  ('bc9d1c59-5bf5-507e-aa05-839d3a741d08', 'fd61693c-3f7e-5597-980b-1e69fdb768a0', '95838bcc-6871-5b9c-af53-baeb9a8a535d', 'Phase P2 Reactor Internals Segmentation', 'includes', 'Step ST-240 Underwater segmentation of RPV internals', '7dcfe1ee-a338-5775-9ae5-e336261bdec1', 'dd60a0cd-0942-5b13-9c09-9a392abcaec5', '0001711b-8e46-5c8c-af84-2f87b048a1a8', 0.97, 'pending', false, '075a7ed7-0321-5b34-8614-8a5cb07b1566'),
-  ('751b4643-c90b-59bc-aa97-e6b3ee245b6d', 'fd61693c-3f7e-5597-980b-1e69fdb768a0', '95838bcc-6871-5b9c-af53-baeb9a8a535d', 'Step ST-240 Underwater segmentation of RPV internals', 'depends on', 'Step ST-010 Fuel removal verification', 'dd60a0cd-0942-5b13-9c09-9a392abcaec5', '92bff7ee-4832-5cd6-add8-9995269f3630', 'c8fe4abb-537f-5200-b4da-716ca888481c', 0.98, 'pending', false, 'c80d72a5-9565-5668-b062-c853c631c4ab'),
-  ('38fff81d-ab1e-5eed-954b-56dd227f536e', 'fd61693c-3f7e-5597-980b-1e69fdb768a0', '95838bcc-6871-5b9c-af53-baeb9a8a535d', 'Step ST-240 Underwater segmentation of RPV internals', 'has work package', 'Work package WP-240-CUT', 'dd60a0cd-0942-5b13-9c09-9a392abcaec5', '4541cf68-6a81-52b5-8ab8-76820d6be6cb', '8e1ff1df-b5e1-5431-b3df-2ad0ae69de05', 0.93, 'pending', false, '43ea22a7-6da2-54a4-b3d1-fbe770b8d100'),
-  ('c7fd3176-0dea-553b-8919-4946218216ac', 'fd61693c-3f7e-5597-980b-1e69fdb768a0', '95838bcc-6871-5b9c-af53-baeb9a8a535d', 'Inventory INV-RPV-A-2026', 'characterizes', 'RPV internals of Unit A', 'f7295603-6af8-549f-b101-5d8e1625f062', '1027fffa-39cc-5d6c-89a7-636f26134e32', 'd126440a-d54e-54a9-bb41-9efb30252446', 0.99, 'pending', false, '5aca7b78-2fc4-5863-85e2-7478279112e4'),
-  ('7ab3c694-fcfb-538d-bd15-100d7a1a0363', 'fd61693c-3f7e-5597-980b-1e69fdb768a0', '95838bcc-6871-5b9c-af53-baeb9a8a535d', 'RPV internals of Unit A', 'located in zone', 'Zone RC-1 Reactor cavity wet work area', '1027fffa-39cc-5d6c-89a7-636f26134e32', 'eeebfa24-2d04-507a-a4c6-b854d92d454e', '3fcd444a-67bc-5da8-ad07-27e1eea64196', 0.94, 'pending', false, 'd33e2691-044b-55fd-b6cf-7a35aa1b635c'),
-  ('0b4ecb89-0041-5dab-9519-75a91119f599', 'fd61693c-3f7e-5597-980b-1e69fdb768a0', '95838bcc-6871-5b9c-af53-baeb9a8a535d', 'Step ST-240 Underwater segmentation of RPV internals', 'requires', 'Safety measure SM-UNDERWATER-CUTTING', 'dd60a0cd-0942-5b13-9c09-9a392abcaec5', '544ddd92-c905-5567-a53d-e9fd845e0797', '69f37eaf-1c45-5bab-818c-d6ceb2ce35b0', 0.98, 'pending', false, '9698dd69-17ba-5d33-9d67-cc1a3578fe38'),
-  ('3e29b006-8112-598b-8143-94e0705a0b24', 'fd61693c-3f7e-5597-980b-1e69fdb768a0', '95838bcc-6871-5b9c-af53-baeb9a8a535d', 'Step ST-240 Underwater segmentation of RPV internals', 'subject to', 'dose constraint DC-WORKER-20', 'dd60a0cd-0942-5b13-9c09-9a392abcaec5', '94db59ab-2f06-5623-a34c-2649dfb3068c', '586b56c8-ec70-5684-8662-cb15bb710427', 0.94, 'pending', true, '4f501f12-9cbb-53b9-915f-b2b688b5d022'),
-  ('135cc4e9-4998-5ae3-a9ed-c4e13cc347e5', 'fd61693c-3f7e-5597-980b-1e69fdb768a0', '95838bcc-6871-5b9c-af53-baeb9a8a535d', 'Monitoring program MP-RC1', 'observes', 'Zone RC-1 Reactor cavity wet work area', 'cfb1d293-8055-5e66-ac89-14f874a4ddf2', 'eeebfa24-2d04-507a-a4c6-b854d92d454e', 'bdc8ec1f-02fa-5c62-aa05-d4a7788400d0', 0.99, 'pending', false, 'ef96de39-c158-5b5c-aff6-c776b00c6414'),
-  ('706a3a3f-76d2-562f-b116-e578285a69b3', 'fd61693c-3f7e-5597-980b-1e69fdb768a0', '95838bcc-6871-5b9c-af53-baeb9a8a535d', 'Step ST-240 Underwater segmentation of RPV internals', 'generates', 'Waste stream WS-AM-240 activated metal from RPV internals segmentation', 'dd60a0cd-0942-5b13-9c09-9a392abcaec5', '630ecc97-8ab2-5f89-ace1-438370ce0586', 'f65be3b9-4d1d-5d1c-8cd5-a1ef0e9ae31e', 0.99, 'pending', false, 'd1b915d0-225e-5354-8997-e9e2072e52b9'),
-  ('2641c00d-0193-5336-a06f-05ed50a400cc', 'fd61693c-3f7e-5597-980b-1e69fdb768a0', '95838bcc-6871-5b9c-af53-baeb9a8a535d', 'Waste stream WS-AM-240 activated metal from RPV internals segmentation', 'packed in', 'Waste package WP-AM-001', '630ecc97-8ab2-5f89-ace1-438370ce0586', '1a97e4ab-8a2a-50e7-ad8b-c886b8d925a5', 'd88160bf-cd69-57fe-b1cc-bc065ba72a74', 0.97, 'pending', false, '451cae67-00ab-5dc9-aeda-7a03db2fbc11'),
-  ('c95eb4f3-3b9b-5106-a3aa-5243de144b5e', 'fd61693c-3f7e-5597-980b-1e69fdb768a0', '95838bcc-6871-5b9c-af53-baeb9a8a535d', 'Waste package WP-AM-001', 'requires', 'Clearance measurement CM-AM-001', '1a97e4ab-8a2a-50e7-ad8b-c886b8d925a5', 'b82a9caf-6b08-587b-9271-badb053ac106', '568ad8cf-27e6-5e90-9063-78c47e9f59e1', 0.99, 'pending', false, 'f7b7bf5d-68a3-597d-8037-fdaffca4e259'),
-  ('3f9b3a96-9a57-5124-bf5c-93ad9024e5b8', 'fd61693c-3f7e-5597-980b-1e69fdb768a0', '95838bcc-6871-5b9c-af53-baeb9a8a535d', 'Clearance measurement CM-AM-001', 'supports release', 'Waste package WP-AM-001', 'b82a9caf-6b08-587b-9271-badb053ac106', '1a97e4ab-8a2a-50e7-ad8b-c886b8d925a5', '6411c4f6-42e1-5556-8c17-74783465df6e', 0.83, 'pending', false, 'ccca18bd-0604-5933-85e8-834f19df58bb'),
-  ('adcafea1-c077-5b6f-9634-54c37069f2f5', 'fd61693c-3f7e-5597-980b-1e69fdb768a0', '95838bcc-6871-5b9c-af53-baeb9a8a535d', 'Waste package WP-AM-001', 'transported to', 'Central interim storage facility ZL-Beta in Germany', '1a97e4ab-8a2a-50e7-ad8b-c886b8d925a5', '9cbc6ab6-c3f1-51c0-b66f-9a896173b72b', 'e76f7ab7-0062-585a-9829-5cb53b82c10a', 0.95, 'pending', false, 'eab2d154-777d-51bb-b50d-14fed29435eb'),
-  ('8cda3674-31dc-5046-8deb-7aaeb2384544', 'fd61693c-3f7e-5597-980b-1e69fdb768a0', '95838bcc-6871-5b9c-af53-baeb9a8a535d', 'Transport campaign TC-AM-2026-01', 'moves', 'Waste package WP-AM-001', '0c918b47-cfdf-5210-9fc7-52780af2b2ea', '1a97e4ab-8a2a-50e7-ad8b-c886b8d925a5', 'db8f18d2-4c83-52b2-a716-eef20a09ad48', 0.95, 'pending', false, '05a5052a-edf6-57c7-be51-d747e9239e54');
+  ('8a4a7224-e995-5cd3-b6db-ce352bc7fc3a', 'fd61693c-3f7e-5597-980b-1e69fdb768a0', '95838bcc-6871-5b9c-af53-baeb9a8a535d', 'KBR Unit A Decommissioning Project', 'targets', 'Kernkraftwerk Beispielrhein (KBR)', '89697a05-e78d-5f9c-b7d9-0beac16be3b0', 'ea5135b8-f0d9-5538-be96-f4c97b133251', 'projectTargetsFacility', 0.98, 'pending', false, 'f4dfe74b-b3e7-5b5c-b02c-eda856e185cd'),
+  ('45d29bfb-3fb0-50cc-b5b0-b1782141524b', 'fd61693c-3f7e-5597-980b-1e69fdb768a0', '95838bcc-6871-5b9c-af53-baeb9a8a535d', 'Kernkraftwerk Beispielrhein (KBR)', 'has unit', 'Reactor Unit A', 'ea5135b8-f0d9-5538-be96-f4c97b133251', '605c6207-ee25-5e33-b7d3-aada4fd9c81b', 'facilityHasUnit', 0.9, 'pending', false, '0b488541-f6f0-5861-a312-2545ce4d3141'),
+  ('d137c753-02af-5bd6-bd72-4cf95388c139', 'fd61693c-3f7e-5597-980b-1e69fdb768a0', '95838bcc-6871-5b9c-af53-baeb9a8a535d', 'RPV internals of Unit A', 'located in building', 'reactor building RB-A', '1027fffa-39cc-5d6c-89a7-636f26134e32', 'd88a8aae-8d09-5388-8d99-124511424f09', 'componentLocatedInBuilding', 0.88, 'pending', false, 'f4885786-8caa-5f94-b478-fb72c698a366'),
+  ('0e97a6e7-0e0d-599d-a629-398330edebde', 'fd61693c-3f7e-5597-980b-1e69fdb768a0', '95838bcc-6871-5b9c-af53-baeb9a8a535d', 'AtG §7(3)', 'constrains', 'Permit KBR-DEC-2026-01', '91100fea-db32-57fc-9ede-5f416f1b322f', '1481f9c3-b650-52ed-815c-27373a818d20', 'legalRequirementConstrainsPermit', 0.92, 'pending', true, 'f156378c-6981-568b-9b44-3f5ea8b25139'),
+  ('2dc83868-1fc8-572c-a706-a4a92e1ac7a9', 'fd61693c-3f7e-5597-980b-1e69fdb768a0', '95838bcc-6871-5b9c-af53-baeb9a8a535d', 'Permit KBR-DEC-2026-01', 'issued by', 'Nuclear Supervisory Authority NRW', '1481f9c3-b650-52ed-815c-27373a818d20', 'ebbd4c9d-03a4-5a36-b1a7-fd7a70cc1ded', 'permitIssuedByAuthority', 0.99, 'pending', false, 'cfc429e2-d66c-592d-8eb4-101d3a59c925'),
+  ('e2b4b2b5-9f4c-5cec-b668-09619cadf9fa', 'fd61693c-3f7e-5597-980b-1e69fdb768a0', '95838bcc-6871-5b9c-af53-baeb9a8a535d', 'Permit KBR-DEC-2026-01', 'applies to', 'KBR Unit A Decommissioning Project', '1481f9c3-b650-52ed-815c-27373a818d20', '89697a05-e78d-5f9c-b7d9-0beac16be3b0', 'permitAppliesToProject', 0.95, 'pending', false, 'daf7e32d-5bc5-5db9-bab0-bf8a88f64ca6'),
+  ('baf13178-50e2-581a-8fcc-5bee9948574b', 'fd61693c-3f7e-5597-980b-1e69fdb768a0', '95838bcc-6871-5b9c-af53-baeb9a8a535d', 'Permit KBR-DEC-2026-01', 'approves', 'Step ST-240 Underwater segmentation of RPV internals', '1481f9c3-b650-52ed-815c-27373a818d20', 'dd60a0cd-0942-5b13-9c09-9a392abcaec5', 'permitApprovesStep', 0.93, 'pending', true, 'c4804059-b5de-54ed-8117-ee96b92a05ed'),
+  ('622b5619-6be6-5083-a687-542165c5db95', 'fd61693c-3f7e-5597-980b-1e69fdb768a0', '95838bcc-6871-5b9c-af53-baeb9a8a535d', 'Permit KBR-DEC-2026-01', 'requires', 'Report REP-MP-RC1-Q3-2026', '1481f9c3-b650-52ed-815c-27373a818d20', '33b7fbe1-85b6-55a7-9944-c11b4f8204a8', 'permitRequiresReport', 0.9, 'pending', false, '7b4d68e2-f1b5-5578-96e0-01e4168b491e'),
+  ('30f6e29c-134d-5723-853e-4711d8381d50', 'fd61693c-3f7e-5597-980b-1e69fdb768a0', '95838bcc-6871-5b9c-af53-baeb9a8a535d', 'Report REP-MP-RC1-Q3-2026', 'documents', 'Monitoring program MP-RC1', '33b7fbe1-85b6-55a7-9944-c11b4f8204a8', 'cfb1d293-8055-5e66-ac89-14f874a4ddf2', 'reportDocumentsMonitoringProgram', 0.96, 'pending', true, 'c3285099-f4cc-5f69-9c1b-ce0318bc8ef9'),
+  ('6827803b-a29c-5f6a-bc52-8d5c67c7e5d3', 'fd61693c-3f7e-5597-980b-1e69fdb768a0', '95838bcc-6871-5b9c-af53-baeb9a8a535d', 'KBR Unit A Decommissioning Project', 'has phase', 'Phase P2 Reactor Internals Segmentation', '89697a05-e78d-5f9c-b7d9-0beac16be3b0', '7dcfe1ee-a338-5775-9ae5-e336261bdec1', 'projectHasPhase', 0.91, 'pending', false, 'aa2e0652-0efe-553e-bfac-b1d70bdd12c6'),
+  ('bc9d1c59-5bf5-507e-aa05-839d3a741d08', 'fd61693c-3f7e-5597-980b-1e69fdb768a0', '95838bcc-6871-5b9c-af53-baeb9a8a535d', 'Phase P2 Reactor Internals Segmentation', 'includes', 'Step ST-240 Underwater segmentation of RPV internals', '7dcfe1ee-a338-5775-9ae5-e336261bdec1', 'dd60a0cd-0942-5b13-9c09-9a392abcaec5', 'phaseIncludesStep', 0.97, 'pending', false, '075a7ed7-0321-5b34-8614-8a5cb07b1566'),
+  ('751b4643-c90b-59bc-aa97-e6b3ee245b6d', 'fd61693c-3f7e-5597-980b-1e69fdb768a0', '95838bcc-6871-5b9c-af53-baeb9a8a535d', 'Step ST-240 Underwater segmentation of RPV internals', 'depends on', 'Step ST-010 Fuel removal verification', 'dd60a0cd-0942-5b13-9c09-9a392abcaec5', '92bff7ee-4832-5cd6-add8-9995269f3630', 'stepDependsOnStep', 0.98, 'pending', false, 'c80d72a5-9565-5668-b062-c853c631c4ab'),
+  ('38fff81d-ab1e-5eed-954b-56dd227f536e', 'fd61693c-3f7e-5597-980b-1e69fdb768a0', '95838bcc-6871-5b9c-af53-baeb9a8a535d', 'Step ST-240 Underwater segmentation of RPV internals', 'has work package', 'Work package WP-240-CUT', 'dd60a0cd-0942-5b13-9c09-9a392abcaec5', '4541cf68-6a81-52b5-8ab8-76820d6be6cb', 'stepHasWorkPackage', 0.93, 'pending', false, '43ea22a7-6da2-54a4-b3d1-fbe770b8d100'),
+  ('c7fd3176-0dea-553b-8919-4946218216ac', 'fd61693c-3f7e-5597-980b-1e69fdb768a0', '95838bcc-6871-5b9c-af53-baeb9a8a535d', 'Inventory INV-RPV-A-2026', 'characterizes', 'RPV internals of Unit A', 'f7295603-6af8-549f-b101-5d8e1625f062', '1027fffa-39cc-5d6c-89a7-636f26134e32', 'inventoryCharacterizesComponent', 0.99, 'pending', false, '5aca7b78-2fc4-5863-85e2-7478279112e4'),
+  ('7ab3c694-fcfb-538d-bd15-100d7a1a0363', 'fd61693c-3f7e-5597-980b-1e69fdb768a0', '95838bcc-6871-5b9c-af53-baeb9a8a535d', 'RPV internals of Unit A', 'located in zone', 'Zone RC-1 Reactor cavity wet work area', '1027fffa-39cc-5d6c-89a7-636f26134e32', 'eeebfa24-2d04-507a-a4c6-b854d92d454e', 'componentLocatedInZone', 0.94, 'pending', false, 'd33e2691-044b-55fd-b6cf-7a35aa1b635c'),
+  ('0b4ecb89-0041-5dab-9519-75a91119f599', 'fd61693c-3f7e-5597-980b-1e69fdb768a0', '95838bcc-6871-5b9c-af53-baeb9a8a535d', 'Step ST-240 Underwater segmentation of RPV internals', 'requires', 'Safety measure SM-UNDERWATER-CUTTING', 'dd60a0cd-0942-5b13-9c09-9a392abcaec5', '544ddd92-c905-5567-a53d-e9fd845e0797', 'stepRequiresSafetyMeasure', 0.98, 'pending', false, '9698dd69-17ba-5d33-9d67-cc1a3578fe38'),
+  ('3e29b006-8112-598b-8143-94e0705a0b24', 'fd61693c-3f7e-5597-980b-1e69fdb768a0', '95838bcc-6871-5b9c-af53-baeb9a8a535d', 'Step ST-240 Underwater segmentation of RPV internals', 'subject to', 'dose constraint DC-WORKER-20', 'dd60a0cd-0942-5b13-9c09-9a392abcaec5', '94db59ab-2f06-5623-a34c-2649dfb3068c', 'stepSubjectToDoseConstraint', 0.94, 'pending', true, '4f501f12-9cbb-53b9-915f-b2b688b5d022'),
+  ('135cc4e9-4998-5ae3-a9ed-c4e13cc347e5', 'fd61693c-3f7e-5597-980b-1e69fdb768a0', '95838bcc-6871-5b9c-af53-baeb9a8a535d', 'Monitoring program MP-RC1', 'observes', 'Zone RC-1 Reactor cavity wet work area', 'cfb1d293-8055-5e66-ac89-14f874a4ddf2', 'eeebfa24-2d04-507a-a4c6-b854d92d454e', 'monitoringProgramObservesZone', 0.99, 'pending', false, 'ef96de39-c158-5b5c-aff6-c776b00c6414'),
+  ('706a3a3f-76d2-562f-b116-e578285a69b3', 'fd61693c-3f7e-5597-980b-1e69fdb768a0', '95838bcc-6871-5b9c-af53-baeb9a8a535d', 'Step ST-240 Underwater segmentation of RPV internals', 'generates', 'Waste stream WS-AM-240 activated metal from RPV internals segmentation', 'dd60a0cd-0942-5b13-9c09-9a392abcaec5', '630ecc97-8ab2-5f89-ace1-438370ce0586', 'stepGeneratesWasteStream', 0.99, 'pending', false, 'd1b915d0-225e-5354-8997-e9e2072e52b9'),
+  ('2641c00d-0193-5336-a06f-05ed50a400cc', 'fd61693c-3f7e-5597-980b-1e69fdb768a0', '95838bcc-6871-5b9c-af53-baeb9a8a535d', 'Waste stream WS-AM-240 activated metal from RPV internals segmentation', 'packed in', 'Waste package WP-AM-001', '630ecc97-8ab2-5f89-ace1-438370ce0586', '1a97e4ab-8a2a-50e7-ad8b-c886b8d925a5', 'wasteStreamPackedInPackage', 0.97, 'pending', false, '451cae67-00ab-5dc9-aeda-7a03db2fbc11'),
+  ('c95eb4f3-3b9b-5106-a3aa-5243de144b5e', 'fd61693c-3f7e-5597-980b-1e69fdb768a0', '95838bcc-6871-5b9c-af53-baeb9a8a535d', 'Waste package WP-AM-001', 'requires', 'Clearance measurement CM-AM-001', '1a97e4ab-8a2a-50e7-ad8b-c886b8d925a5', 'b82a9caf-6b08-587b-9271-badb053ac106', 'packageRequiresClearanceMeasurement', 0.99, 'pending', false, 'f7b7bf5d-68a3-597d-8037-fdaffca4e259'),
+  ('3f9b3a96-9a57-5124-bf5c-93ad9024e5b8', 'fd61693c-3f7e-5597-980b-1e69fdb768a0', '95838bcc-6871-5b9c-af53-baeb9a8a535d', 'Clearance measurement CM-AM-001', 'supports release', 'Waste package WP-AM-001', 'b82a9caf-6b08-587b-9271-badb053ac106', '1a97e4ab-8a2a-50e7-ad8b-c886b8d925a5', 'clearanceMeasurementSupportsRelease', 0.83, 'pending', false, 'ccca18bd-0604-5933-85e8-834f19df58bb'),
+  ('adcafea1-c077-5b6f-9634-54c37069f2f5', 'fd61693c-3f7e-5597-980b-1e69fdb768a0', '95838bcc-6871-5b9c-af53-baeb9a8a535d', 'Waste package WP-AM-001', 'transported to', 'Central interim storage facility ZL-Beta in Germany', '1a97e4ab-8a2a-50e7-ad8b-c886b8d925a5', '9cbc6ab6-c3f1-51c0-b66f-9a896173b72b', 'packageTransportedToDisposalFacility', 0.95, 'pending', false, 'eab2d154-777d-51bb-b50d-14fed29435eb'),
+  ('8cda3674-31dc-5046-8deb-7aaeb2384544', 'fd61693c-3f7e-5597-980b-1e69fdb768a0', '95838bcc-6871-5b9c-af53-baeb9a8a535d', 'Transport campaign TC-AM-2026-01', 'moves', 'Waste package WP-AM-001', '0c918b47-cfdf-5210-9fc7-52780af2b2ea', '1a97e4ab-8a2a-50e7-ad8b-c886b8d925a5', 'transportCampaignMovesPackage', 0.95, 'pending', false, '05a5052a-edf6-57c7-be51-d747e9239e54');
 
 INSERT INTO fact_anchors (fact_id, anchor_id) VALUES
   ('8a4a7224-e995-5cd3-b6db-ce352bc7fc3a', 'f4dfe74b-b3e7-5b5c-b02c-eda856e185cd'),

@@ -290,16 +290,27 @@ async function resolveDocumentIdForRecord(
 export async function assertOntologyRecordAccess(
   recordType: OntologyScopedRecord,
   id: string,
-  db: ServerDb = getDb()
+  db: ServerDb = getDb(),
+  ontologyId?: string
 ): Promise<string> {
-  const ontologyId = await resolveOntologyIdForRecord(recordType, id, db)
-  if (!ontologyId) {
+  const targetOntologyId =
+    ontologyId ?? (await resolveOntologyIdForRecord(recordType, id, db))
+  if (!targetOntologyId) {
+    const [doc] = await db
+      .select({ id: ontologyDocuments.id })
+      .from(ontologyDocuments)
+      .where(eq(ontologyDocuments.id, id))
+      .limit(1)
+    if (doc) {
+      await assertOntologyDocumentAccess(doc.id, db)
+      return doc.id
+    }
     throwAccessDenied(
       "Ontology record is not accessible for the current group."
     )
   }
-  await assertOntologyDocumentAccess(ontologyId, db)
-  return ontologyId
+  await assertOntologyDocumentAccess(targetOntologyId, db)
+  return targetOntologyId
 }
 
 export async function assertDocumentRecordAccess(
