@@ -4,6 +4,8 @@ export interface BuildShaclShapesInput {
   baseIri: string
   ontology: ImportOntology
   closed?: boolean
+  preferLinkml?: boolean
+  engine?: "linkml" | "legacy" | "auto"
 }
 
 export type ShaclSeverity = "Info" | "Warning" | "Violation"

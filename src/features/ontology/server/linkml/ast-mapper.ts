@@ -1,5 +1,18 @@
 import YAML from "yaml"
 import type {
+  ImportClass,
+  ImportExample,
+  ImportLocalizedText,
+  ImportNote,
+  ImportOntology,
+  ImportRelation,
+  ImportRelationAttribute,
+} from "@/features/ontology/schemas/import"
+import { normalizeOntologyDataTypeOrDefault } from "@/features/ontology/utils/data-types"
+import { computeOntologyDagreLayout } from "../services/turtle-importer/layout"
+import type { ParseTurtleOptions } from "../services/turtle-importer/types"
+import { KNOWN_ONTOLOGY_PREFIXES } from "@/features/ontology/utils/external-uri"
+import type {
   CanonicalOntologySnapshot,
   OntologyAttributeSnapshot,
   OntologyClassDisjointnessSnapshot,
@@ -1146,5 +1159,431 @@ export function linkmlYamlToSnapshot(
     ...(examples.length > 0 ? { examples } : {}),
     ...(localizedTexts.length > 0 ? { localized_texts: localizedTexts } : {}),
     ...(effectiveUiLayout ? { ui_layout: effectiveUiLayout } : {}),
+  }
+}
+
+/**
+ * Converts an ImportOntology payload into a CanonicalOntologySnapshot.
+ */
+export function importOntologyToSnapshot(
+  ontology: ImportOntology,
+  baseIri?: string
+): CanonicalOntologySnapshot {
+  const docId = ontology.name
+    ? ontology.name.toLowerCase().replace(/[^a-z0-9_-]/g, "-")
+    : "ontology"
+
+  const docBaseIri =
+    baseIri ||
+    (ontology as { baseIri?: string }).baseIri ||
+    `https://example.org/${docId}#`
+
+  const prefixes: Record<string, string> = {
+    ...KNOWN_ONTOLOGY_PREFIXES,
+    ont:
+      docBaseIri.endsWith("#") || docBaseIri.endsWith("/")
+        ? docBaseIri
+        : `${docBaseIri}#`,
+    linkml: "https://w3id.org/linkml/",
+    ex: "https://example.org/",
+  }
+
+  // Scan class and relation names for any prefixes
+  for (const c of ontology.classes || []) {
+    const colonIdx = c.name?.indexOf(":") ?? -1
+    if (colonIdx > 0) {
+      const p = c.name.slice(0, colonIdx)
+      if (!prefixes[p]) {
+        prefixes[p] = `https://example.org/${p}#`
+      }
+    }
+  }
+  for (const r of ontology.relations || []) {
+    const colonIdx = r.name?.indexOf(":") ?? -1
+    if (colonIdx > 0) {
+      const p = r.name.slice(0, colonIdx)
+      if (!prefixes[p]) {
+        prefixes[p] = `https://example.org/${p}#`
+      }
+    }
+  }
+
+  const usecaseStr =
+    typeof ontology.usecase === "string" ? ontology.usecase : ""
+
+  const document: OntologyDocumentSnapshot = {
+    id: docId,
+    name: ontology.name || "ontology",
+    version: ontology.version ?? null,
+    default_language: ontology.defaultLanguage || "en",
+    usecase: usecaseStr,
+    base_iri: docBaseIri,
+    prefixes,
+    imports: ["linkml:types"],
+  }
+
+  const modules: OntologyModuleSnapshot[] = (ontology.modules || []).map(
+    (m) => ({
+      id: m.id || m.name,
+      name: m.name,
+      description: m.description,
+    })
+  )
+
+  const defaultModuleId = modules[0]?.id || "default-module"
+
+  const classKeyById = new Map<string, string>()
+  for (const c of ontology.classes || []) {
+    const key = c.name || c.id || ""
+    if (c.id) classKeyById.set(c.id, key)
+    if (c.name) classKeyById.set(c.name, key)
+  }
+
+  const allAttributes: OntologyAttributeSnapshot[] = []
+  const allRestrictions: OntologyClassRestrictionSnapshot[] = []
+  const disjointness: OntologyClassDisjointnessSnapshot[] = []
+
+  const classes: OntologyClassSnapshot[] = (ontology.classes || []).map(
+    (cls) => {
+      const classKey = cls.name || cls.id || ""
+      const classAttrs: OntologyAttributeSnapshot[] = (
+        cls.attributes || []
+      ).map((a) => {
+        const attrKey = a.name
+        const attrId = a.id || makeAttributeKey(classKey, attrKey)
+        return {
+          id: attrId,
+          class_id: classKey,
+          name: a.name,
+          data_type: a.dataType,
+          required: a.required ?? false,
+          description: a.description,
+        }
+      })
+
+      allAttributes.push(...classAttrs)
+
+      const classRestrictions: OntologyClassRestrictionSnapshot[] = (
+        cls.restrictions || []
+      ).map((r, idx) => ({
+        id: `${classKey}:restriction:${idx + 1}`,
+        class_id: classKey,
+        relation_id: r.propertyIri ?? null,
+        attribute_id: null,
+        restriction_type: r.type,
+        cardinality_value: r.cardinality ?? 1,
+      }))
+
+      allRestrictions.push(...classRestrictions)
+
+      const disjointList: string[] = []
+      if (cls.disjointWithClassIds) {
+        for (const target of cls.disjointWithClassIds) {
+          const resolved = classKeyById.get(target) || target
+          if (!disjointList.includes(resolved)) {
+            disjointList.push(resolved)
+            disjointness.push({
+              class_id: classKey,
+              disjoint_class_id: resolved,
+            })
+          }
+        }
+      }
+
+      const parentClassKey = cls.parentClassId
+        ? classKeyById.get(cls.parentClassId) || cls.parentClassId
+        : null
+
+      return {
+        id: classKey,
+        name: cls.name,
+        description: cls.description,
+        module_id: cls.moduleId ?? (cls.module ? cls.module : defaultModuleId),
+        parent_class_id: parentClassKey,
+        disjoint_with: disjointList.length > 0 ? disjointList : undefined,
+        disjoint_with_class_ids:
+          disjointList.length > 0 ? disjointList : undefined,
+        attributes: classAttrs,
+        restrictions:
+          classRestrictions.length > 0 ? classRestrictions : undefined,
+      }
+    }
+  )
+
+  const relations: OntologyRelationSnapshot[] = (ontology.relations || []).map(
+    (r) => {
+      const domainKey = classKeyById.get(r.domainClassId) || r.domainClassId
+      const rangeKey = classKeyById.get(r.rangeClassId) || r.rangeClassId
+      return {
+        id: r.id || r.name,
+        name: r.name,
+        domain_class_id: domainKey,
+        range_class_id: rangeKey,
+        description: r.description,
+        inverse_name: r.inverseName ?? null,
+        cardinality: r.cardinality ?? null,
+        instance_policy: (r as { instancePolicy?: string }).instancePolicy,
+      }
+    }
+  )
+
+  const relationAttributes: OntologyRelationAttributeSnapshot[] = (
+    ontology.relationAttributes || []
+  ).map((ra) => ({
+    id: ra.id || makeRelationAttributeKey(ra.relationId, ra.name),
+    relation_id: ra.relationId,
+    name: ra.name,
+    data_type: ra.dataType,
+    required: ra.required ?? false,
+    description: ra.description,
+    sort_order: ra.sortOrder,
+  }))
+
+  const notes: OntologyNoteSnapshot[] = (ontology.notes || []).map((n) => ({
+    id: n.id,
+    target_type: n.targetType,
+    target_id: n.targetId,
+    body: n.body,
+    author_name: n.authorName,
+    sort_order: n.sortOrder,
+  }))
+
+  const examples: OntologyExampleSnapshot[] = (ontology.examples || []).map(
+    (e) => ({
+      id: e.id,
+      target_type: e.targetType,
+      target_id: e.targetId,
+      value: e.value,
+      subject_label: e.subjectLabel,
+      predicate_label: e.predicateLabel,
+      object_label: e.objectLabel,
+      is_instance_candidate: e.isInstanceCandidate,
+      sort_order: e.sortOrder,
+    })
+  )
+
+  const localizedTexts: OntologyLocalizedTextSnapshot[] = (
+    ontology.localizedTexts || []
+  ).map((lt) => ({
+    id: (lt as { id?: string }).id,
+    target_type: lt.targetType,
+    target_id: lt.targetId,
+    field_name: lt.fieldName,
+    language_code: lt.languageCode,
+    value: lt.value,
+  }))
+
+  let uiLayout: OntologyUiLayout | undefined
+  if (ontology.visual) {
+    const classPositions: Record<
+      string,
+      Record<string, { x: number; y: number }>
+    > = {}
+    for (const cp of ontology.visual.classPositions || []) {
+      const mod = cp.moduleId || cp.module || defaultModuleId
+      if (!classPositions[mod]) classPositions[mod] = {}
+      classPositions[mod][cp.classId] = { x: cp.x, y: cp.y }
+    }
+    const moduleLayouts: Record<
+      string,
+      { x: number; y: number; width: number; height: number }
+    > = {}
+    for (const ml of ontology.visual.moduleLayouts || []) {
+      const mod = ml.moduleId || ml.module || defaultModuleId
+      moduleLayouts[mod] = {
+        x: ml.x,
+        y: ml.y,
+        width: ml.width,
+        height: ml.height,
+      }
+    }
+    uiLayout = { classPositions, moduleLayouts }
+  }
+
+  return {
+    document,
+    modules,
+    classes,
+    attributes: allAttributes,
+    relations,
+    relation_attributes: relationAttributes,
+    ...(allRestrictions.length > 0 ? { restrictions: allRestrictions } : {}),
+    ...(disjointness.length > 0 ? { disjointness } : {}),
+    ...(notes.length > 0 ? { notes } : {}),
+    ...(examples.length > 0 ? { examples } : {}),
+    ...(localizedTexts.length > 0 ? { localized_texts: localizedTexts } : {}),
+    ...(uiLayout ? { ui_layout: uiLayout } : {}),
+  }
+}
+
+/**
+ * Converts a CanonicalOntologySnapshot into an ImportOntology structure.
+ */
+export function snapshotToImportOntology(
+  snapshot: CanonicalOntologySnapshot,
+  options: ParseTurtleOptions = {}
+): ImportOntology {
+  const defaultLanguage =
+    options.defaultLanguage ?? snapshot.document.default_language ?? "en"
+
+  const ontologyName =
+    options.fileName?.replace(/\.[^/.]+$/, "") ||
+    snapshot.document.name ||
+    "Imported Ontology"
+
+  const defaultModuleId = "default-module"
+  const defaultModuleName = ontologyName
+
+  const modules: ImportOntology["modules"] =
+    snapshot.modules.length > 0
+      ? snapshot.modules.map((m) => ({
+          id: m.id,
+          name: m.name,
+          description: m.description ?? "",
+        }))
+      : [
+          {
+            id: defaultModuleId,
+            name: defaultModuleName,
+            description: snapshot.document.usecase ?? "",
+          },
+        ]
+
+  const classes: ImportClass[] = snapshot.classes.map((c, idx) => {
+    const classId = c.id || `cls-${idx + 1}`
+    const attrs = [
+      ...(c.attributes || []),
+      ...snapshot.attributes.filter(
+        (a) => a.class_id === c.id || a.class_id === c.name
+      ),
+    ]
+    const seenAttrs = new Set<string>()
+    const importAttrs = []
+    for (const a of attrs) {
+      if (seenAttrs.has(a.name)) continue
+      seenAttrs.add(a.name)
+      importAttrs.push({
+        id: a.id || `attr-${classId}-${a.name}`,
+        name: a.name,
+        dataType: normalizeOntologyDataTypeOrDefault(a.data_type),
+        required: Boolean(a.required),
+        description: a.description ?? "",
+      })
+    }
+
+    const restrictions = (c.restrictions || []).map((r) => ({
+      propertyIri: r.relation_id || r.attribute_id || "owl:topObjectProperty",
+      type:
+        (r.restriction_type as "exact" | "min" | "max" | "some" | "all") ||
+        "exact",
+      cardinality: r.cardinality_value,
+    }))
+
+    return {
+      id: classId,
+      name: c.name,
+      description: c.description ?? "",
+      moduleId: c.module_id || defaultModuleId,
+      module: defaultModuleName,
+      parentClassId: c.parent_class_id ?? null,
+      disjointWithClassIds: c.disjoint_with_class_ids || c.disjoint_with,
+      attributes: importAttrs,
+      restrictions: restrictions.length > 0 ? restrictions : undefined,
+    }
+  })
+
+  const relations: ImportRelation[] = snapshot.relations.map((r, idx) => ({
+    id: r.id || `rel-${idx + 1}`,
+    name: r.name,
+    domainClassId: r.domain_class_id,
+    rangeClassId: r.range_class_id,
+    description: r.description ?? "",
+    inverseName: r.inverse_name ?? null,
+    cardinality: r.cardinality ?? null,
+  }))
+
+  const relationAttributes: ImportRelationAttribute[] =
+    snapshot.relation_attributes.map((ra, idx) => ({
+      id: ra.id || `ra-${idx + 1}`,
+      relationId: ra.relation_id,
+      name: ra.name,
+      dataType: normalizeOntologyDataTypeOrDefault(ra.data_type),
+      required: Boolean(ra.required),
+      description: ra.description ?? "",
+      sortOrder: ra.sort_order ?? idx + 1,
+    }))
+
+  const examples: ImportExample[] = (snapshot.examples || []).map((e, idx) => ({
+    id: e.id || `ex-${idx + 1}`,
+    targetType:
+      (e.target_type as
+        "class" | "attribute" | "relation" | "relation_attribute" | "cq") ||
+      "class",
+    targetId: e.target_id,
+    value: e.value,
+    subjectLabel: e.subject_label ?? null,
+    predicateLabel: e.predicate_label ?? null,
+    objectLabel: e.object_label ?? null,
+    isInstanceCandidate: Boolean(e.is_instance_candidate ?? true),
+    sortOrder: e.sort_order ?? idx + 1,
+  }))
+
+  const notes: ImportNote[] = (snapshot.notes || []).map((n, idx) => ({
+    id: n.id || `note-${idx + 1}`,
+    targetType:
+      (n.target_type as
+        | "ontology"
+        | "module"
+        | "class"
+        | "relation"
+        | "attribute"
+        | "relation_attribute"
+        | "cq") || "ontology",
+    targetId: n.target_id,
+    body: n.body,
+    authorName: n.author_name ?? "",
+    sortOrder: n.sort_order ?? idx + 1,
+  }))
+
+  const localizedTexts: ImportLocalizedText[] = (
+    snapshot.localized_texts || []
+  ).map((lt) => ({
+    targetType:
+      (lt.target_type as
+        | "ontology"
+        | "module"
+        | "class"
+        | "relation"
+        | "attribute"
+        | "relation_attribute"
+        | "cq") || "ontology",
+    targetId: lt.target_id,
+    fieldName: lt.field_name,
+    languageCode: lt.language_code,
+    value: lt.value,
+  }))
+
+  const visual = computeOntologyDagreLayout(
+    classes,
+    relations,
+    defaultModuleName,
+    defaultModuleId
+  )
+
+  return {
+    defaultLanguage,
+    languages: [{ code: defaultLanguage, label: "English" }],
+    name: ontologyName,
+    usecase: snapshot.document.usecase ?? "",
+    version: snapshot.document.version ?? null,
+    modules,
+    classes,
+    relations,
+    relationAttributes,
+    competencyQuestions: [],
+    notes,
+    examples,
+    localizedTexts,
+    visual,
   }
 }

@@ -13,6 +13,11 @@ import {
 import { KNOWN_ONTOLOGY_PREFIXES } from "@/features/ontology/utils/external-uri"
 import { computeOntologyDagreLayout } from "./layout"
 import type { ParseTurtleOptions } from "./types"
+import { loadLinkmlRuntime } from "../../linkml/runtime"
+import {
+  linkmlYamlToSnapshot,
+  snapshotToImportOntology,
+} from "../../linkml/ast-mapper"
 
 const RDF_TYPE = "http://www.w3.org/1999/02/22-rdf-syntax-ns#type"
 const RDF_FIRST = "http://www.w3.org/1999/02/22-rdf-syntax-ns#first"
@@ -92,6 +97,47 @@ export function parseTurtleToImportOntology(
   content: string,
   options: ParseTurtleOptions = {}
 ): ImportOntology {
+  const preferLinkml = options.preferLinkml
+  const engine = options.engine
+
+  if (engine === "linkml" || preferLinkml === true) {
+    try {
+      const linkml = loadLinkmlRuntime()
+      const result = linkml.fromOwl(content)
+      if (result && result.schema) {
+        const ontId =
+          options.fileName?.replace(/\.[^/.]+$/, "") || "imported-ontology"
+        const snapshot = linkmlYamlToSnapshot(ontId, result.schema)
+        return snapshotToImportOntology(snapshot, options)
+      }
+    } catch (err) {
+      if (engine === "linkml") {
+        throw err
+      }
+      // If preferLinkml failed, fall through to N3 parser
+    }
+  } else if (engine !== "n3") {
+    // Engine is auto (default): try LinkML.fromOwl if it parses cleanly as standard OWL
+    try {
+      const linkml = loadLinkmlRuntime()
+      const result = linkml.fromOwl(content)
+      const isClean =
+        result &&
+        result.schema &&
+        (!result.warnings || result.warnings.length === 0)
+      if (isClean) {
+        const ontId =
+          options.fileName?.replace(/\.[^/.]+$/, "") || "imported-ontology"
+        const snapshot = linkmlYamlToSnapshot(ontId, result.schema)
+        if (snapshot.classes.length > 0) {
+          return snapshotToImportOntology(snapshot, options)
+        }
+      }
+    } catch {
+      // Fall through to N3 parser
+    }
+  }
+
   const parser = new N3Parser()
   const quads: Quad[] = parser.parse(content)
   const parsedPrefixes =

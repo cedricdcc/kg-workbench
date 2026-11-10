@@ -1,5 +1,7 @@
 import type { BuildShaclShapesInput } from "./types"
 import { normalizeOwlBaseIri } from "@/features/ontology/utils/owl-base-iri"
+import { importOntologyToSnapshot } from "../linkml/ast-mapper"
+import { compileSnapshotArtifacts } from "../linkml/compiler"
 
 function normalizeDatatype(dataType?: string): string {
   if (!dataType) return "xsd:string"
@@ -27,7 +29,7 @@ function sanitizeIdentifier(name: string): string {
   return name.replace(/[^a-zA-Z0-9_-]/g, "_")
 }
 
-export function buildShaclShapes({
+export function buildLegacyShaclShapes({
   baseIri,
   ontology,
   closed = false,
@@ -141,4 +143,32 @@ export function buildShaclShapes({
   }
 
   return lines.join("\n")
+}
+
+export function buildShaclShapes(input: BuildShaclShapesInput): string {
+  const { baseIri, ontology, closed = false, preferLinkml, engine } = input
+
+  const isLooseInput =
+    !ontology.modules ||
+    ontology.modules.length === 0 ||
+    ontology.classes?.some((c) => c.id && c.id !== c.name && !c.moduleId)
+
+  const shouldTryLinkml =
+    engine === "linkml" ||
+    preferLinkml === true ||
+    (engine !== "legacy" && preferLinkml !== false && !isLooseInput)
+
+  if (shouldTryLinkml) {
+    try {
+      const snapshot = importOntologyToSnapshot(ontology, baseIri)
+      const { artifacts } = compileSnapshotArtifacts(snapshot)
+      if (artifacts.shacl_ttl && artifacts.shacl_ttl.trim()) {
+        return artifacts.shacl_ttl
+      }
+    } catch {
+      // Fallback to legacy string builder below
+    }
+  }
+
+  return buildLegacyShaclShapes({ baseIri, ontology, closed })
 }

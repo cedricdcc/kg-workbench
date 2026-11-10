@@ -5,6 +5,8 @@ import {
   type BuildOntologyExportInput,
 } from "./ontology-transfer"
 import { buildShaclShapes } from "../shacl/generator"
+import { importOntologyToSnapshot } from "../linkml/ast-mapper"
+import { compileSnapshotArtifacts } from "../linkml/compiler"
 
 export type BuildOntologyShaclExportInput = Omit<
   BuildOntologyExportInput,
@@ -39,12 +41,28 @@ export async function buildOntologyShaclExport({
     includeVisual: false,
   })
 
-  return {
-    content: buildShaclShapes({
+  let content = ""
+  try {
+    const snapshot = importOntologyToSnapshot(jsonExport.payload, baseIri)
+    const { artifacts } = compileSnapshotArtifacts(snapshot)
+    if (artifacts.shacl_ttl && artifacts.shacl_ttl.trim()) {
+      content = artifacts.shacl_ttl
+    }
+  } catch {
+    // Fallback to existing builder below
+  }
+
+  if (!content) {
+    content = buildShaclShapes({
       baseIri,
       ontology: jsonExport.payload,
       closed,
-    }),
+      engine: "legacy",
+    })
+  }
+
+  return {
+    content,
     fileName: jsonExport.fileName.replace(/\.json$/i, ".shacl.ttl"),
   }
 }

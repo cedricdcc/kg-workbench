@@ -12,6 +12,8 @@ import {
   runOntologyLinter,
   type OntologyDefectReport,
 } from "@/features/ontology/utils/linter"
+import { importOntologyToSnapshot } from "../linkml/ast-mapper"
+import { compileSnapshotArtifacts } from "../linkml/compiler"
 
 export type BuildOntologyOwlExportInput = Omit<
   BuildOntologyExportInput,
@@ -48,12 +50,27 @@ export async function buildOntologyOwlExport({
   const { classes, relations } = convertToLinterEntities(jsonExport.payload)
   const defectsReport = runOntologyLinter({ classes, relations })
 
-  return {
-    content: buildOwlOntology({
+  let content = ""
+  try {
+    const snapshot = importOntologyToSnapshot(jsonExport.payload, baseIri)
+    const { artifacts } = compileSnapshotArtifacts(snapshot)
+    if (artifacts.owl_ttl && artifacts.owl_ttl.trim()) {
+      content = artifacts.owl_ttl
+    }
+  } catch {
+    // Fallback to existing builder below
+  }
+
+  if (!content) {
+    content = buildOwlOntology({
       baseIri,
       ontology: jsonExport.payload,
       defectsReport,
-    }),
+    })
+  }
+
+  return {
+    content,
     fileName: jsonExport.fileName.replace(/\.json$/i, ".owl"),
     defectsReport,
   }
