@@ -148,7 +148,8 @@ function ResolveDialogForm({
       </div>
 
       {/* Side-by-Side Statements Grid */}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+      {/* prettier-ignore */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Statement A */}
         <div className="flex flex-col gap-2 rounded-lg border bg-muted/20 p-3.5">
           <div className="flex items-center justify-between gap-2">

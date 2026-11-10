@@ -196,7 +196,7 @@ export function AnalystSubgraphModal({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="h-full min-h-0 min-h-[500px] w-full flex-1">
+        <div className="h-full min-h-[500px] w-full flex-1">
           <SubgraphFlowView
             nodes={nodes}
             edges={edges}
