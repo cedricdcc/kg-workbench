@@ -44,7 +44,9 @@ export async function buildOntologyShaclExport({
   let content = ""
   try {
     const snapshot = importOntologyToSnapshot(jsonExport.payload, baseIri)
-    const { artifacts } = compileSnapshotArtifacts(snapshot)
+    const { artifacts } = compileSnapshotArtifacts(snapshot, {
+      shaclOptions: { closed },
+    })
     if (artifacts.shacl_ttl && artifacts.shacl_ttl.trim()) {
       content = artifacts.shacl_ttl
     }

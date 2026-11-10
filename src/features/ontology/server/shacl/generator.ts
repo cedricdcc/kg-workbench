@@ -161,7 +161,9 @@ export function buildShaclShapes(input: BuildShaclShapesInput): string {
   if (shouldTryLinkml) {
     try {
       const snapshot = importOntologyToSnapshot(ontology, baseIri)
-      const { artifacts } = compileSnapshotArtifacts(snapshot)
+      const { artifacts } = compileSnapshotArtifacts(snapshot, {
+        shaclOptions: { closed },
+      })
       if (artifacts.shacl_ttl && artifacts.shacl_ttl.trim()) {
         return artifacts.shacl_ttl
       }

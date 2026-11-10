@@ -10,6 +10,10 @@ import type {
 export interface CompileLinkmlOptions {
   imports?: Record<string, string>
   importMap?: Record<string, string>
+  shaclOptions?: {
+    closed?: boolean
+    open?: boolean
+  }
 }
 
 function extractIssueElement(
@@ -191,7 +195,14 @@ export function compileLinkmlOntology(
     }
   }
 
-  const shaclTtl = runEmitter("shacl", () => view.shacl({ format: "ttl" }))
+  const shaclOpen =
+    options?.shaclOptions?.open ??
+    (options?.shaclOptions?.closed !== undefined
+      ? !options.shaclOptions.closed
+      : undefined)
+  const shaclTtl = runEmitter("shacl", () =>
+    view.shacl({ format: "ttl", open: shaclOpen })
+  )
   const rdfsTtl = runEmitter("rdfs", () => view.rdfs({ format: "ttl" }))
   const owlTtl = runEmitter("owl", () => view.owl({ format: "ttl" }))
   const pydanticPy = runEmitter("pydantic", () => view.pydantic())

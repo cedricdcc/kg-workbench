@@ -213,6 +213,7 @@ test("buildShaclShapes delegates to @neverblink/linkml view.shacl when preferLin
     baseIri: "https://example.org/enterprise#",
     ontology,
     preferLinkml: true,
+    closed: true,
   })
 
   assert.ok(
@@ -223,6 +224,10 @@ test("buildShaclShapes delegates to @neverblink/linkml view.shacl when preferLin
   assert.ok(
     shaclOutput.includes("badge_number") || shaclOutput.includes("badgeNumber"),
     "Output includes badge_number property"
+  )
+  assert.ok(
+    shaclOutput.includes("sh:closed true"),
+    "Output contains sh:closed true when closed: true"
   )
 })
 

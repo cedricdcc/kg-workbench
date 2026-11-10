@@ -7,6 +7,8 @@ import type {
   ImportOntology,
   ImportRelation,
   ImportRelationAttribute,
+  ImportVisualClassPosition,
+  ImportVisualModuleLayout,
 } from "@/features/ontology/schemas/import"
 import { normalizeOntologyDataTypeOrDefault } from "@/features/ontology/utils/data-types"
 import { computeOntologyDagreLayout } from "../services/turtle-importer/layout"
@@ -422,14 +424,31 @@ export function snapshotToLinkmlYaml(
     )
   }
 
+  // Count relations sharing the same domain, name, and range
+  const tripletCounts = new Map<string, number>()
+  for (const rel of snapshot.relations) {
+    const triplet = `${rel.domain_class_id}__${rel.name}__${rel.range_class_id}`
+    tripletCounts.set(triplet, (tripletCounts.get(triplet) || 0) + 1)
+  }
+
+  const tripletIndexMap = new Map<string, number>()
   const relationKeyMap = new Map<OntologyRelationSnapshot, string>()
   for (const rel of snapshot.relations) {
     const isColliding = (relationNameCounts.get(rel.name) || 0) > 1
     const isPreDisambiguated = Boolean(rel.id && rel.id.includes("__"))
-    const relationKey =
-      isColliding || isPreDisambiguated
-        ? `${rel.domain_class_id}__${rel.name}__${rel.range_class_id}`
-        : rel.name
+    const triplet = `${rel.domain_class_id}__${rel.name}__${rel.range_class_id}`
+    const hasTripletCollision = (tripletCounts.get(triplet) || 0) > 1
+
+    let relationKey: string
+    if (hasTripletCollision) {
+      const index = tripletIndexMap.get(triplet) || 0
+      tripletIndexMap.set(triplet, index + 1)
+      relationKey = `${triplet}__${index}`
+    } else if (isColliding || isPreDisambiguated) {
+      relationKey = triplet
+    } else {
+      relationKey = rel.name
+    }
     relationKeyMap.set(rel, relationKey)
   }
 
@@ -1471,13 +1490,28 @@ export function snapshotToImportOntology(
       })
     }
 
-    const restrictions = (c.restrictions || []).map((r) => ({
-      propertyIri: r.relation_id || r.attribute_id || "owl:topObjectProperty",
-      type:
+    const classRestrictions = [
+      ...(c.restrictions || []),
+      ...(snapshot.restrictions?.filter(
+        (r) => r.class_id === classId || r.class_id === c.name
+      ) || []),
+    ]
+    const seenRestrictions = new Set<string>()
+    const importRestrictions: NonNullable<ImportClass["restrictions"]> = []
+    for (const r of classRestrictions) {
+      const propIri = r.relation_id || r.attribute_id || "owl:topObjectProperty"
+      const resType =
         (r.restriction_type as "exact" | "min" | "max" | "some" | "all") ||
-        "exact",
-      cardinality: r.cardinality_value,
-    }))
+        "exact"
+      const resKey = `${r.id || ""}::${propIri}::${resType}::${r.cardinality_value}`
+      if (seenRestrictions.has(resKey)) continue
+      seenRestrictions.add(resKey)
+      importRestrictions.push({
+        propertyIri: propIri,
+        type: resType,
+        cardinality: r.cardinality_value,
+      })
+    }
 
     return {
       id: classId,
@@ -1488,7 +1522,8 @@ export function snapshotToImportOntology(
       parentClassId: c.parent_class_id ?? null,
       disjointWithClassIds: c.disjoint_with_class_ids || c.disjoint_with,
       attributes: importAttrs,
-      restrictions: restrictions.length > 0 ? restrictions : undefined,
+      restrictions:
+        importRestrictions.length > 0 ? importRestrictions : undefined,
     }
   })
 
@@ -1563,12 +1598,79 @@ export function snapshotToImportOntology(
     value: lt.value,
   }))
 
-  const visual = computeOntologyDagreLayout(
-    classes,
-    relations,
-    defaultModuleName,
-    defaultModuleId
-  )
+  let visual: ImportOntology["visual"] | undefined
+  if (snapshot.ui_layout) {
+    const moduleNameMap = new Map<string, string>()
+    for (const m of modules) {
+      if (m.id) moduleNameMap.set(m.id, m.name)
+      moduleNameMap.set(m.name, m.name)
+    }
+
+    const projectedClassPositions: ImportVisualClassPosition[] = []
+    const projectedModuleLayouts: ImportVisualModuleLayout[] = []
+
+    if (snapshot.ui_layout.classPositions) {
+      for (const [modKey, classMap] of Object.entries(
+        snapshot.ui_layout.classPositions
+      )) {
+        if (!classMap || typeof classMap !== "object") continue
+        const modName = moduleNameMap.get(modKey) || modKey || defaultModuleName
+        for (const [clsId, pos] of Object.entries(classMap)) {
+          if (pos && typeof pos.x === "number" && typeof pos.y === "number") {
+            projectedClassPositions.push({
+              classId: clsId,
+              moduleId: modKey,
+              module: modName,
+              x: pos.x,
+              y: pos.y,
+            })
+          }
+        }
+      }
+    }
+
+    if (snapshot.ui_layout.moduleLayouts) {
+      for (const [modKey, layout] of Object.entries(
+        snapshot.ui_layout.moduleLayouts
+      )) {
+        if (
+          layout &&
+          typeof layout.x === "number" &&
+          typeof layout.y === "number"
+        ) {
+          const modName =
+            moduleNameMap.get(modKey) || modKey || defaultModuleName
+          projectedModuleLayouts.push({
+            moduleId: modKey,
+            module: modName,
+            x: layout.x,
+            y: layout.y,
+            width: layout.width ?? 0,
+            height: layout.height ?? 0,
+          })
+        }
+      }
+    }
+
+    if (
+      projectedClassPositions.length > 0 ||
+      projectedModuleLayouts.length > 0
+    ) {
+      visual = {
+        classPositions: projectedClassPositions,
+        moduleLayouts: projectedModuleLayouts,
+      }
+    }
+  }
+
+  if (!visual) {
+    visual = computeOntologyDagreLayout(
+      classes,
+      relations,
+      defaultModuleName,
+      defaultModuleId
+    )
+  }
 
   return {
     defaultLanguage,

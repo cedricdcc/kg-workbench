@@ -4,6 +4,7 @@ import {
   linkmlYamlToSnapshot,
   makeAttributeKey,
   makeRelationAttributeKey,
+  snapshotToImportOntology,
   snapshotToLinkmlYaml,
 } from "../src/features/ontology/server/linkml/ast-mapper"
 import { loadLinkmlRuntime } from "../src/features/ontology/server/linkml/runtime"
@@ -696,4 +697,124 @@ slots:
   assert.equal(rel.domain_class_id, "Employee")
   assert.equal(rel.range_class_id, "Manager")
   assert.equal(rel.cardinality, "1:1") // multivalued: false & required: true
+})
+
+test("snapshotToImportOntology projects snapshot.ui_layout into visual classPositions and moduleLayouts", () => {
+  const snapshot: CanonicalOntologySnapshot = {
+    document: {
+      id: "doc-layout",
+      name: "layout_test",
+    },
+    modules: [{ id: "mod-1", name: "CoreModule" }],
+    classes: [
+      {
+        id: "cls-1",
+        name: "Person",
+        module_id: "mod-1",
+      },
+    ],
+    attributes: [],
+    relations: [],
+    relation_attributes: [],
+    ui_layout: {
+      classPositions: {
+        "mod-1": {
+          "cls-1": { x: 120, y: 240 },
+        },
+      },
+      moduleLayouts: {
+        "mod-1": { x: 50, y: 60, width: 300, height: 400 },
+      },
+    },
+  }
+
+  const importOntology = snapshotToImportOntology(snapshot)
+  assert.ok(importOntology.visual, "visual must be present")
+  assert.equal(importOntology.visual.classPositions.length, 1)
+  assert.equal(importOntology.visual.classPositions[0].classId, "cls-1")
+  assert.equal(importOntology.visual.classPositions[0].x, 120)
+  assert.equal(importOntology.visual.classPositions[0].y, 240)
+  assert.equal(importOntology.visual.moduleLayouts.length, 1)
+  assert.equal(importOntology.visual.moduleLayouts[0].x, 50)
+  assert.equal(importOntology.visual.moduleLayouts[0].y, 60)
+  assert.equal(importOntology.visual.moduleLayouts[0].width, 300)
+  assert.equal(importOntology.visual.moduleLayouts[0].height, 400)
+})
+
+test("snapshotToImportOntology falls back to root snapshot.restrictions when class has no local restrictions", () => {
+  const snapshot: CanonicalOntologySnapshot = {
+    document: {
+      id: "doc-restrictions",
+      name: "restrictions_test",
+    },
+    modules: [],
+    classes: [
+      {
+        id: "cls-1",
+        name: "Order",
+      },
+    ],
+    attributes: [],
+    relations: [],
+    relation_attributes: [],
+    restrictions: [
+      {
+        class_id: "cls-1",
+        relation_id: "has_item",
+        restriction_type: "min",
+        cardinality_value: 1,
+      },
+    ],
+  }
+
+  const importOntology = snapshotToImportOntology(snapshot)
+  const orderClass = importOntology.classes.find((c) => c.name === "Order")
+  assert.ok(orderClass)
+  assert.ok(orderClass.restrictions)
+  assert.equal(orderClass.restrictions.length, 1)
+  assert.equal(orderClass.restrictions[0].propertyIri, "has_item")
+  assert.equal(orderClass.restrictions[0].type, "min")
+  assert.equal(orderClass.restrictions[0].cardinality, 1)
+})
+
+test("snapshotToLinkmlYaml suffixes duplicate relation disambiguation keys if domain, name, and range collide", () => {
+  const snapshot: CanonicalOntologySnapshot = {
+    document: {
+      id: "doc-dupe-rel",
+      name: "duplicate_rel_test",
+    },
+    modules: [],
+    classes: [
+      { id: "Person", name: "Person" },
+      { id: "Company", name: "Company" },
+    ],
+    attributes: [],
+    relations: [
+      {
+        id: "rel-1",
+        name: "works_at",
+        domain_class_id: "Person",
+        range_class_id: "Company",
+        description: "Primary employment",
+      },
+      {
+        id: "rel-2",
+        name: "works_at",
+        domain_class_id: "Person",
+        range_class_id: "Company",
+        description: "Secondary employment",
+      },
+    ],
+    relation_attributes: [],
+  }
+
+  const yaml = snapshotToLinkmlYaml(snapshot)
+  assert.ok(
+    yaml.includes("Person__works_at__Company__0"),
+    "First colliding relation must be suffixed with __0"
+  )
+  assert.ok(
+    yaml.includes("Person__works_at__Company__1"),
+    "Second colliding relation must be suffixed with __1"
+  )
 })

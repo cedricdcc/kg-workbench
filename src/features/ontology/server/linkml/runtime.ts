@@ -2,12 +2,7 @@
  * Runtime helper for @neverblink/linkml with environment shims.
  */
 
-// Guard browser and non-Node environments before importing @neverblink/linkml
-if (typeof globalThis.process === "undefined") {
-  ;(globalThis as Record<string, unknown>).process = { cwd: () => "/" }
-} else if (typeof globalThis.process.cwd !== "function") {
-  ;(globalThis.process as unknown as { cwd: () => string }).cwd = () => "/"
-}
+import "./process-shim"
 
 import { LinkML } from "@neverblink/linkml"
 import type {

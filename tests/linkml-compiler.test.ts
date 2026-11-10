@@ -303,3 +303,21 @@ test("compileLinkmlOntology is deterministic for identical input", () => {
   assert.equal(result1.json_schema, result2.json_schema)
   assert.equal(result1.er_diagram, result2.er_diagram)
 })
+
+test("compileLinkmlOntology respects shaclOptions.closed flag", () => {
+  const closedResult = compileLinkmlOntology(SAMPLE_LINKML_YAML, {
+    shaclOptions: { closed: true },
+  })
+  assert.ok(
+    closedResult.shacl_ttl.includes("sh:closed true"),
+    "sh:closed true must appear when closed: true"
+  )
+
+  const openResult = compileLinkmlOntology(SAMPLE_LINKML_YAML, {
+    shaclOptions: { closed: false },
+  })
+  assert.ok(
+    openResult.shacl_ttl.includes("sh:closed false"),
+    "sh:closed false must appear when closed: false"
+  )
+})
