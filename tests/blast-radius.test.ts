@@ -151,3 +151,88 @@ test("buildRelationBlastRadiusReport aggregates relation dependents correctly", 
   assert.equal(report.summary.affectedFactsCount, 15)
   assert.equal(report.summary.affectedAttributesCount, 1)
 })
+
+test("BlastRadiusModal uses DialogContent with viewport='wide'", async () => {
+  const fs = await import("node:fs")
+  const path = await import("node:path")
+  const modalPath = path.resolve(
+    process.cwd(),
+    "src/features/ontology/components/blast-radius-modal/blast-radius-modal.tsx"
+  )
+  assert.ok(fs.existsSync(modalPath), "blast-radius-modal.tsx must exist")
+  const content = fs.readFileSync(modalPath, "utf-8")
+
+  assert.ok(
+    content.includes('viewport="wide"'),
+    "BlastRadiusModal must use DialogContent with viewport='wide'"
+  )
+})
+
+test("BlastRadiusDetails renders responsive 3-column impact dashboard", async () => {
+  const React = (await import("react")).default
+  const { renderToStaticMarkup } = await import("react-dom/server")
+  const { BlastRadiusDetails } =
+    await import("../src/features/ontology/components/blast-radius-modal/blast-radius-details")
+
+  const markup = renderToStaticMarkup(
+    React.createElement(BlastRadiusDetails, {
+      targetType: "class",
+      details: {
+        competencyQuestions: [
+          {
+            id: "cq-1",
+            question: "Which drugs treat diseases?",
+            roles: ["subject"],
+          },
+        ],
+        relations: [
+          {
+            id: "r-1",
+            name: "treats",
+            direction: "outgoing",
+            otherClassName: "Disease",
+          },
+        ],
+        subclasses: [{ id: "sub-1", name: "Antibiotic" }],
+        attributes: [{ id: "attr-1", name: "dosage", dataType: "xsd:string" }],
+      },
+      summary: {
+        affectedCqsCount: 1,
+        affectedFactsCount: 42,
+        affectedEntitiesCount: 10,
+        affectedRelationsCount: 1,
+        affectedSubclassesCount: 1,
+        affectedAttributesCount: 1,
+      },
+    })
+  )
+
+  assert.ok(
+    markup.includes("grid-cols-1") && markup.includes("md:grid-cols-3"),
+    "Must have responsive 3-column grid classes"
+  )
+  assert.ok(
+    markup.includes('data-card="competency-questions"'),
+    "Must render Card 1 for competency questions"
+  )
+  assert.ok(
+    markup.includes("Which drugs treat diseases?"),
+    "Must render CQ question in Card 1"
+  )
+  assert.ok(
+    markup.includes('data-card="relations-subclasses"'),
+    "Must render Card 2 for relations and subclasses"
+  )
+  assert.ok(
+    markup.includes("treats") && markup.includes("Antibiotic"),
+    "Must render relation and orphaned subclass in Card 2"
+  )
+  assert.ok(
+    markup.includes('data-card="attributes-facts"'),
+    "Must render Card 3 for attributes and facts"
+  )
+  assert.ok(
+    markup.includes("42") && markup.includes("dosage"),
+    "Must render affected facts count and attribute in Card 3"
+  )
+})

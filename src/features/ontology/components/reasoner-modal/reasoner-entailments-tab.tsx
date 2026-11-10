@@ -9,14 +9,14 @@ export function ReasonerEntailmentsTab({
 }: ReasonerEntailmentsTabProps) {
   if (inferredTriples.length === 0) {
     return (
-      <div className="py-8 text-center text-sm text-muted-foreground">
+      <div className="flex h-64 flex-col items-center justify-center p-8 text-center text-sm text-muted-foreground">
         No new entailments inferred. The ontology is fully explicit or minimal.
       </div>
     )
   }
 
   return (
-    <div className="space-y-3 max-h-[350px] overflow-y-auto pr-1">
+    <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
       {inferredTriples.map((t, idx) => (
         <div
           key={idx}

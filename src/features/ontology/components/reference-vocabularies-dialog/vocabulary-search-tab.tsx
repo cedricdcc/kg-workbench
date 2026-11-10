@@ -1,7 +1,16 @@
 "use client"
 
-import { useState } from "react"
-import { AlertCircle, Globe, Loader2, Plus, Search } from "lucide-react"
+import { useMemo, useState } from "react"
+import {
+  AlertCircle,
+  Check,
+  Copy,
+  ExternalLink,
+  Globe,
+  Loader2,
+  Plus,
+  Search,
+} from "lucide-react"
 import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -37,6 +46,20 @@ export function VocabularySearchTab({
   const [isSearching, setIsSearching] = useState(false)
   const [addingPrefix, setAddingPrefix] = useState<string | null>(null)
   const [failedNotice, setFailedNotice] = useState<string | null>(null)
+  const [selectedResultKey, setSelectedResultKey] = useState<string | null>(
+    null
+  )
+  const [copiedKey, setCopiedKey] = useState<string | null>(null)
+
+  const selectedResult = useMemo(() => {
+    if (selectedResultKey) {
+      const found = results.find(
+        (r) => `${r.source}-${r.prefix}` === selectedResultKey
+      )
+      if (found) return found
+    }
+    return results[0] ?? null
+  }, [results, selectedResultKey])
 
   async function handleSearch(e?: React.FormEvent) {
     if (e) e.preventDefault()
@@ -49,7 +72,14 @@ export function VocabularySearchTab({
     try {
       const enabledProviderIds =
         selectedFilter === "all"
-          ? ["ols4", "bartoc", "agroportal", "bioportal", "eu_vocabularies", "lov"]
+          ? [
+              "ols4",
+              "bartoc",
+              "agroportal",
+              "bioportal",
+              "eu_vocabularies",
+              "lov",
+            ]
           : [selectedFilter]
 
       const data = await searchAllRegistries(trimmed, {
@@ -58,10 +88,21 @@ export function VocabularySearchTab({
       })
 
       setResults(data.results)
+      if (data.results.length > 0) {
+        setSelectedResultKey(
+          `${data.results[0].source}-${data.results[0].prefix}`
+        )
+      } else {
+        setSelectedResultKey(null)
+      }
 
       if (data.failedProviders.length > 0) {
-        const failedNames = data.failedProviders.map((f) => f.providerId.toUpperCase()).join(", ")
-        setFailedNotice(`Could not reach ${failedNames}. Showing available results.`)
+        const failedNames = data.failedProviders
+          .map((f) => f.providerId.toUpperCase())
+          .join(", ")
+        setFailedNotice(
+          `Could not reach ${failedNames}. Showing available results.`
+        )
       }
 
       if (data.results.length === 0) {
@@ -97,11 +138,18 @@ export function VocabularySearchTab({
     }
   }
 
+  function handleCopy(text: string, key: string) {
+    navigator.clipboard.writeText(text)
+    setCopiedKey(key)
+    toast.success("Copied to clipboard.")
+    setTimeout(() => setCopiedKey(null), 1800)
+  }
+
   return (
-    <div className="flex h-full min-h-0 flex-1 flex-col space-y-2.5 pt-1">
+    <div className="flex h-full min-h-0 flex-1 flex-col space-y-2.5 overflow-hidden pt-1">
       {/* Registry Filter Pills */}
-      <div className="flex flex-wrap items-center gap-1.5 pb-1">
-        <span className="text-[11px] font-medium text-muted-foreground mr-1">
+      <div className="flex shrink-0 flex-wrap items-center gap-1.5 pb-1">
+        <span className="mr-1 text-[11px] font-medium text-muted-foreground">
           Search In:
         </span>
         {REGISTRY_FILTERS.map((filter) => {
@@ -111,10 +159,10 @@ export function VocabularySearchTab({
               key={filter.id}
               type="button"
               onClick={() => setSelectedFilter(filter.id)}
-              className={`px-2 py-0.5 rounded-full text-xs font-medium border transition-colors ${
+              className={`rounded-full border px-2 py-0.5 text-xs font-medium transition-colors ${
                 isSelected
-                  ? "bg-primary text-primary-foreground border-primary"
-                  : "bg-muted/30 hover:bg-muted/70 text-muted-foreground border-border/80"
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-border/80 bg-muted/30 text-muted-foreground hover:bg-muted/70"
               }`}
             >
               {filter.label}
@@ -151,87 +199,209 @@ export function VocabularySearchTab({
 
       {/* Resilient warning notice if a registry is down */}
       {failedNotice && (
-        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400 text-xs">
+        <div className="flex shrink-0 items-center gap-1.5 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-xs text-amber-600 dark:text-amber-400">
           <AlertCircle className="h-3.5 w-3.5 shrink-0" />
           <span>{failedNotice}</span>
         </div>
       )}
 
-      {/* Results ScrollArea */}
-      <ScrollArea className="min-h-0 flex-1 rounded-md border p-3">
-        {results.length === 0 ? (
-          <div className="flex h-full flex-col items-center justify-center p-8 text-center text-xs text-muted-foreground">
-            <Globe className="mb-2 h-8 w-8 opacity-40" />
-            <p className="font-medium text-foreground/80">
-              Search across multiple public registries (OLS4, BARTOC, AgroPortal, BioPortal, EU Vocabularies).
-            </p>
-            <p className="text-[11px] opacity-75 mt-1">
-              Popular standards: SOSA (sensors & observations), ENVO (environment), QUDT (units), DWC (biodiversity).
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-2.5">
-            {results.map((res) => {
-              const isAdded = existingPrefixes.has(res.prefix.toLowerCase())
-              const isAdding = addingPrefix === res.prefix
+      {/* Master-Detail 2-Pane Split (35% Left List / 65% Right Detail) */}
+      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden pt-1 md:flex-row">
+        {/* Left Pane (35%): Search Results List */}
+        <div className="flex min-h-0 w-full shrink-0 flex-col border-b pb-3 md:w-[35%] md:border-r md:border-b-0 md:pr-3 md:pb-0">
+          <ScrollArea className="min-h-0 flex-1 rounded-md border p-2">
+            {results.length === 0 ? (
+              <div className="flex h-48 flex-col items-center justify-center p-6 text-center text-xs text-muted-foreground">
+                <Globe className="mb-2 h-7 w-7 opacity-40" />
+                <p className="font-medium text-foreground/80">
+                  Search across public registries (OLS4, BARTOC, AgroPortal,
+                  BioPortal, EU Vocabularies).
+                </p>
+                <p className="mt-1 text-[11px] opacity-75">
+                  Popular standards: SOSA, ENVO, QUDT, DWC.
+                </p>
+              </div>
+            ) : (
+              <div
+                data-slot="registry-results-list"
+                className="space-y-1.5 pr-1"
+              >
+                {results.map((res) => {
+                  const key = `${res.source}-${res.prefix}`
+                  const isSelected = selectedResultKey === key
+                  const isAdded = existingPrefixes.has(res.prefix.toLowerCase())
 
-              return (
-                <div
-                  key={`${res.source}-${res.prefix}`}
-                  className="flex items-start justify-between gap-3 rounded-lg border p-3 transition-colors hover:bg-muted/40"
-                >
-                  <div className="flex-1 space-y-1">
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => setSelectedResultKey(key)}
+                      className={`w-full cursor-pointer rounded-md border p-2.5 text-left transition-all ${
+                        isSelected
+                          ? "border-primary bg-primary/10 shadow-xs ring-1 ring-primary/40"
+                          : "border-border/60 hover:border-primary/30 hover:bg-muted/40"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="truncate text-xs font-semibold text-foreground">
+                          {res.name}
+                        </span>
+                        <Badge
+                          variant="secondary"
+                          className="shrink-0 font-mono text-[9px] tracking-wider uppercase"
+                        >
+                          {res.source.toUpperCase()}
+                        </Badge>
+                      </div>
+                      <div className="mt-1 flex items-center justify-between gap-1">
+                        <Badge
+                          variant="outline"
+                          className="font-mono text-[9px] uppercase"
+                        >
+                          {res.prefix}
+                        </Badge>
+                        {isAdded && (
+                          <span className="text-[10px] font-medium text-emerald-600 dark:text-emerald-400">
+                            Added
+                          </span>
+                        )}
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+          </ScrollArea>
+        </div>
+
+        {/* Right Pane (65%): Registry Term / Vocabulary Metadata */}
+        <div
+          data-slot="registry-detail-pane"
+          className="flex min-h-0 w-full flex-1 flex-col overflow-y-auto pr-1 pl-1 md:w-[65%]"
+        >
+          {selectedResult ? (
+            <div className="space-y-4">
+              <div className="rounded-lg border bg-card p-4 shadow-xs">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-semibold text-foreground">
-                        {res.name}
-                      </span>
+                      <h3 className="text-base font-semibold text-foreground">
+                        {selectedResult.name}
+                      </h3>
                       <Badge
                         variant="outline"
                         className="font-mono text-[10px] uppercase"
                       >
-                        {res.prefix}
+                        {selectedResult.prefix}
                       </Badge>
                       <Badge
                         variant="secondary"
-                        className="text-[9px] tracking-wider uppercase font-mono"
+                        className="font-mono text-[10px] uppercase"
                       >
-                        {res.source.toUpperCase()}
+                        {selectedResult.source.toUpperCase()}
                       </Badge>
                     </div>
-                    {res.description && (
-                      <p className="line-clamp-2 text-xs text-muted-foreground">
-                        {res.description}
-                      </p>
-                    )}
-                    <div className="truncate font-mono text-[10px] text-muted-foreground/80">
-                      {res.baseIri}
-                    </div>
+                    <p className="mt-1 font-mono text-xs text-muted-foreground">
+                      Source ID: {selectedResult.sourceId}
+                    </p>
                   </div>
 
-                  <Button
-                    size="sm"
-                    variant={isAdded ? "secondary" : "default"}
-                    disabled={isAdded || isAdding}
-                    onClick={() => handleAdd(res)}
-                    className="shrink-0 gap-1 text-xs"
-                  >
-                    {isAdding ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    ) : isAdded ? (
-                      "Added"
+                  <div>
+                    {existingPrefixes.has(
+                      selectedResult.prefix.toLowerCase()
+                    ) ? (
+                      <Badge
+                        variant="secondary"
+                        className="gap-1 py-1 text-emerald-600 dark:text-emerald-400"
+                      >
+                        <Check className="h-3.5 w-3.5" /> Added to Workspace
+                      </Badge>
                     ) : (
-                      <>
-                        <Plus className="h-3.5 w-3.5" />
-                        Add
-                      </>
+                      <Button
+                        size="sm"
+                        disabled={addingPrefix === selectedResult.prefix}
+                        onClick={() => handleAdd(selectedResult)}
+                        className="gap-1.5 text-xs font-medium"
+                      >
+                        {addingPrefix === selectedResult.prefix ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Plus className="h-3.5 w-3.5" />
+                        )}
+                        Add to Workspace
+                      </Button>
                     )}
-                  </Button>
+                  </div>
                 </div>
-              )
-            })}
-          </div>
-        )}
-      </ScrollArea>
+
+                {/* Base IRI */}
+                <div className="mt-3 flex items-center justify-between rounded-md border border-border/60 bg-muted/30 px-3 py-2 text-xs">
+                  <div className="flex items-center gap-2 truncate font-mono text-muted-foreground">
+                    <span className="font-semibold text-foreground">
+                      Base IRI:
+                    </span>
+                    <span className="truncate">{selectedResult.baseIri}</span>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-1">
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() =>
+                        handleCopy(
+                          selectedResult.baseIri,
+                          `iri-${selectedResult.prefix}`
+                        )
+                      }
+                      className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                      title="Copy Base IRI"
+                    >
+                      {copiedKey === `iri-${selectedResult.prefix}` ? (
+                        <Check className="h-3 w-3 text-emerald-500" />
+                      ) : (
+                        <Copy className="h-3 w-3" />
+                      )}
+                    </Button>
+                    <a
+                      href={selectedResult.baseIri}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                      title="Open Base IRI"
+                    >
+                      <ExternalLink className="h-3 w-3" />
+                    </a>
+                  </div>
+                </div>
+
+                {/* Description */}
+                <div className="mt-4 border-t pt-3">
+                  <h4 className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
+                    Description & Scope
+                  </h4>
+                  <p className="mt-1 text-xs leading-relaxed text-foreground">
+                    {selectedResult.description || (
+                      <span className="text-muted-foreground italic">
+                        No description provided by registry.
+                      </span>
+                    )}
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="flex h-64 flex-col items-center justify-center p-8 text-center text-xs text-muted-foreground">
+              <Globe className="mb-2 h-8 w-8 opacity-30" />
+              <p className="font-medium text-foreground">
+                No ontology selected
+              </p>
+              <p className="mt-1 text-[11px]">
+                Search public registries and select an ontology to inspect its
+                scope, metadata, and base IRI.
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   )
 }

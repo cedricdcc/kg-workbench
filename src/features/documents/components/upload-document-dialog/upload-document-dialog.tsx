@@ -68,11 +68,8 @@ export function UploadDocumentDialog({
     <>
       <Dialog open={open} onOpenChange={handleOpenChange}>
         <DialogContent
-          className={
-            isDetailStep
-              ? "flex h-[calc(100vh-2rem)] max-h-[960px] w-[calc(100vw-2rem)] max-w-none flex-col overflow-hidden sm:max-w-none 2xl:max-w-[1680px]"
-              : "flex max-h-[calc(100vh-2rem)] flex-col overflow-hidden sm:max-w-2xl"
-          }
+          viewport={isDetailStep ? "fullscreen" : "wide"}
+          className="p-6"
         >
           {isDetailStep ? (
             <ModuleDetailStep

@@ -95,7 +95,7 @@ function BlastRadiusModalContent({
   }
 
   return (
-    <DialogContent className="max-w-xl">
+    <DialogContent viewport="wide" className="p-6">
       <DialogHeader>
         <div className="flex items-center justify-between gap-4 pr-6">
           <DialogTitle className="text-base font-semibold">
@@ -142,18 +142,19 @@ function BlastRadiusModalContent({
       )}
 
       {report && !loading && (
-        <div className="space-y-4 py-2">
+        <div className="flex min-h-0 flex-1 flex-col space-y-4 overflow-y-auto py-2">
           <BlastRadiusMetrics
             summary={report.summary}
             targetType={report.targetType}
           />
 
-          <div>
-            <p className="mb-1.5 text-xs font-medium text-foreground">
+          <div className="min-h-0 flex-1">
+            <p className="mb-2 text-xs font-semibold tracking-wider text-muted-foreground uppercase">
               Downstream Dependency Breakdown
             </p>
             <BlastRadiusDetails
               details={report.details}
+              summary={report.summary}
               targetType={report.targetType}
             />
           </div>

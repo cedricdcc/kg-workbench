@@ -66,9 +66,9 @@ export function ReferenceVocabulariesDialog({
         onOpenChange(next)
       }}
     >
-      <DialogContent className="flex h-[85vh] max-h-[85vh] w-[92vw] max-w-5xl flex-col overflow-hidden p-6 sm:max-w-5xl">
+      <DialogContent viewport="fullscreen" className="p-6">
         <DialogHeader className="shrink-0 pb-2">
-          <DialogTitle className="flex items-center gap-2 text-base">
+          <DialogTitle className="flex items-center gap-2 text-base font-semibold">
             <BookMarked className="h-4 w-4 text-primary" />
             Reference Vocabularies & Standard Ontologies
           </DialogTitle>
