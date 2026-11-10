@@ -247,6 +247,32 @@ if (isChildTest || !isReactServer) {
       "Must render contradiction entity in dialog"
     )
     assert.ok(
+      html.includes("grid-cols-1 md:grid-cols-2 gap-4"),
+      "Must render Statement A and B in 2-column responsive grid on desktop"
+    )
+    assert.ok(
+      html.includes("Statement A") && html.includes("Statement B"),
+      "Must render Statement A and Statement B section badges"
+    )
+    assert.ok(
+      html.includes("baltic_marine_2024.pdf"),
+      "Must render Statement A source document badge"
+    )
+    assert.ok(
+      html.includes("nordic_orgs.csv"),
+      "Must render Statement B source document badge"
+    )
+    assert.ok(
+      html.includes(
+        "The Baltic Research Foundation established primary headquarters in Stockholm."
+      ),
+      "Must render Statement A full quote text"
+    )
+    assert.ok(
+      html.includes("Baltic Research Foundation | HQ: Helsinki | Row 42"),
+      "Must render Statement B full quote text"
+    )
+    assert.ok(
       html.includes("Keep Statement A (Mark B as invalid)"),
       "Must render keep_a strategy option"
     )
@@ -439,6 +465,25 @@ test("AnalystShell imports and embeds ContradictionsTab component", () => {
   assert.ok(
     content.includes("<ContradictionsTab ontologyId={ontologyId} />"),
     "AnalystShell must mount ContradictionsTab in contradictions tab panel"
+  )
+})
+
+// Test 9: ResolveDialog wide viewport and responsive grid layout requirements
+test("ResolveDialog conforms to wide dialog layout requirements", () => {
+  const dialogPath = path.resolve(
+    process.cwd(),
+    "src/features/analyst/components/contradictions-view/resolve-dialog.tsx"
+  )
+  assert.ok(fs.existsSync(dialogPath), "resolve-dialog.tsx must exist")
+  const dialogContent = fs.readFileSync(dialogPath, "utf-8")
+
+  assert.ok(
+    dialogContent.includes('viewport="wide"'),
+    "ResolveDialog must use DialogContent with viewport='wide'"
+  )
+  assert.ok(
+    dialogContent.includes("grid-cols-1 md:grid-cols-2 gap-4"),
+    "ResolveDialog must layout Statement A and B side-by-side in responsive grid"
   )
 })
 

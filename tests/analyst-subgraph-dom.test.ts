@@ -155,6 +155,10 @@ if (isChildTest || !isReactServer) {
       html.includes("Organization") && html.includes("Location"),
       "Must render distinct kinds in footer legend"
     )
+    assert.ok(
+      html.includes("min-h-[500px]"),
+      "Must render min-h-[500px] for full canvas height"
+    )
     assert.ok(html.includes("Close"), "Must render close button in footer")
   })
 
@@ -341,6 +345,27 @@ test("AnalystShell imports and embeds AnalystSubgraphModal with props", () => {
   assert.ok(
     content.includes("subgraph={activeSubgraph}"),
     "AnalystShell must pass activeSubgraph to subgraph prop"
+  )
+})
+
+// Test 7: AnalystSubgraphModal fullscreen layout requirements
+test("AnalystSubgraphModal conforms to fullscreen viewport layout requirements", () => {
+  const modalPath = path.resolve(
+    process.cwd(),
+    "src/features/analyst/components/subgraph-preview/analyst-subgraph-modal.tsx"
+  )
+  assert.ok(fs.existsSync(modalPath), "analyst-subgraph-modal.tsx must exist")
+  const modalContent = fs.readFileSync(modalPath, "utf-8")
+
+  assert.ok(
+    modalContent.includes('viewport="fullscreen"'),
+    "AnalystSubgraphModal must use DialogContent with viewport='fullscreen'"
+  )
+  assert.ok(
+    modalContent.includes("flex-1") &&
+      modalContent.includes("min-h-[500px]") &&
+      modalContent.includes("h-full"),
+    "AnalystSubgraphModal must expand canvas with flex-1 h-full min-h-[500px]"
   )
 })
 

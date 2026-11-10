@@ -132,18 +132,24 @@ export function AnalystSubgraphModal({
     return (
       <div
         className={cn(
-          "flex w-full max-w-4xl flex-col gap-4 rounded-lg border bg-card p-6 text-card-foreground shadow-sm",
+          "flex w-full flex-col gap-4 rounded-lg border bg-card p-6 text-card-foreground shadow-sm",
           className
         )}
         data-testid={dataTestId}
       >
-        <div className="flex flex-col gap-1.5 text-left">{headerContent}</div>
-
-        <div className="min-h-[400px] w-full">
-          <SubgraphFlowView nodes={nodes} edges={edges} />
+        <div className="flex shrink-0 flex-col gap-1.5 text-left">
+          {headerContent}
         </div>
 
-        <div className="flex flex-col gap-3 border-t pt-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="h-full min-h-[500px] w-full flex-1">
+          <SubgraphFlowView
+            nodes={nodes}
+            edges={edges}
+            className="h-full min-h-[500px] w-full"
+          />
+        </div>
+
+        <div className="mt-auto flex shrink-0 flex-col gap-3 border-t pt-3 sm:flex-row sm:items-center sm:justify-between">
           {footerContent}
         </div>
       </div>
@@ -153,10 +159,11 @@ export function AnalystSubgraphModal({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className={cn("flex max-w-4xl flex-col gap-4 p-6", className)}
+        viewport="fullscreen"
+        className={cn("flex flex-col gap-4 p-6", className)}
         data-testid={dataTestId}
       >
-        <DialogHeader className="flex flex-col gap-1.5 text-left">
+        <DialogHeader className="flex shrink-0 flex-col gap-1.5 text-left">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <Network className="h-4 w-4 text-primary" />
@@ -189,11 +196,15 @@ export function AnalystSubgraphModal({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="min-h-[400px] w-full">
-          <SubgraphFlowView nodes={nodes} edges={edges} />
+        <div className="h-full min-h-0 min-h-[500px] w-full flex-1">
+          <SubgraphFlowView
+            nodes={nodes}
+            edges={edges}
+            className="h-full min-h-[500px] w-full"
+          />
         </div>
 
-        <DialogFooter className="flex flex-col gap-3 border-t pt-3 sm:flex-row sm:items-center sm:justify-between">
+        <DialogFooter className="mt-auto flex shrink-0 flex-col gap-3 border-t pt-3 sm:flex-row sm:items-center sm:justify-between">
           {footerContent}
         </DialogFooter>
       </DialogContent>

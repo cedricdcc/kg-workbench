@@ -1,9 +1,10 @@
 "use client"
 
 import { useState } from "react"
-import { AlertCircle, CheckCircle, Loader2 } from "lucide-react"
+import { AlertCircle, CheckCircle, FileText, Loader2 } from "lucide-react"
 import { toast } from "sonner"
 
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -39,6 +40,35 @@ function extractFactValue(fact: Record<string, unknown> | undefined): string {
   return Object.keys(fact).length > 0 ? JSON.stringify(fact) : ""
 }
 
+function extractFactSource(fact: Record<string, unknown> | undefined): string {
+  if (!fact) return "Unknown source"
+  if (typeof fact.documentTitle === "string" && fact.documentTitle)
+    return fact.documentTitle
+  if (typeof fact.sourceName === "string" && fact.sourceName)
+    return fact.sourceName
+  if (typeof fact.sourceTitle === "string" && fact.sourceTitle)
+    return fact.sourceTitle
+  if (typeof fact.document_name === "string" && fact.document_name)
+    return fact.document_name
+  if (typeof fact.source === "string" && fact.source) return fact.source
+  if (typeof fact.extractor === "string" && fact.extractor)
+    return fact.extractor
+  return "Unknown source"
+}
+
+function extractFactQuote(
+  fact: Record<string, unknown> | undefined
+): string | null {
+  if (!fact) return null
+  if (typeof fact.quoteText === "string" && fact.quoteText)
+    return fact.quoteText
+  if (typeof fact.quote_text === "string" && fact.quote_text)
+    return fact.quote_text
+  if (typeof fact.quote === "string" && fact.quote) return fact.quote
+  if (typeof fact.anchor === "string" && fact.anchor) return fact.anchor
+  return null
+}
+
 interface ResolveDialogFormProps {
   contradiction: KnowledgeContradiction
   onOpenChange: (open: boolean) => void
@@ -55,7 +85,12 @@ function ResolveDialogForm({
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const factAValue = extractFactValue(contradiction.factA)
+  const factASource = extractFactSource(contradiction.factA)
+  const factAQuote = extractFactQuote(contradiction.factA)
+
   const factBValue = extractFactValue(contradiction.factB)
+  const factBSource = extractFactSource(contradiction.factB)
+  const factBQuote = extractFactQuote(contradiction.factB)
 
   async function handleConfirm() {
     setIsSubmitting(true)
@@ -110,6 +145,65 @@ function ResolveDialogForm({
           </span>{" "}
           (&quot;{contradiction.relationName}&quot;).
         </p>
+      </div>
+
+      {/* Side-by-Side Statements Grid */}
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        {/* Statement A */}
+        <div className="flex flex-col gap-2 rounded-lg border bg-muted/20 p-3.5">
+          <div className="flex items-center justify-between gap-2">
+            <Badge variant="secondary" className="text-[11px] font-semibold">
+              Statement A
+            </Badge>
+            <div
+              className="flex max-w-[200px] items-center gap-1.5 truncate text-muted-foreground"
+              title={factASource}
+            >
+              <FileText className="h-3 w-3 shrink-0" />
+              <span className="truncate text-[11px] font-medium">
+                {factASource}
+              </span>
+            </div>
+          </div>
+
+          <div className="text-xs font-semibold text-foreground">
+            {factAValue || "—"}
+          </div>
+
+          {factAQuote && (
+            <blockquote className="mt-1 rounded-r-md border-l-2 border-primary/40 bg-muted/30 px-3 py-1.5 text-[11px] leading-relaxed text-muted-foreground italic">
+              &quot;{factAQuote}&quot;
+            </blockquote>
+          )}
+        </div>
+
+        {/* Statement B */}
+        <div className="flex flex-col gap-2 rounded-lg border bg-muted/20 p-3.5">
+          <div className="flex items-center justify-between gap-2">
+            <Badge variant="secondary" className="text-[11px] font-semibold">
+              Statement B
+            </Badge>
+            <div
+              className="flex max-w-[200px] items-center gap-1.5 truncate text-muted-foreground"
+              title={factBSource}
+            >
+              <FileText className="h-3 w-3 shrink-0" />
+              <span className="truncate text-[11px] font-medium">
+                {factBSource}
+              </span>
+            </div>
+          </div>
+
+          <div className="text-xs font-semibold text-foreground">
+            {factBValue || "—"}
+          </div>
+
+          {factBQuote && (
+            <blockquote className="mt-1 rounded-r-md border-l-2 border-primary/40 bg-muted/30 px-3 py-1.5 text-[11px] leading-relaxed text-muted-foreground italic">
+              &quot;{factBQuote}&quot;
+            </blockquote>
+          )}
+        </div>
       </div>
 
       {/* Strategies Radio Group */}
@@ -263,7 +357,7 @@ export function ResolveDialog({
     if (inline) return null
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className={className} />
+        <DialogContent viewport="wide" className={className} />
       </Dialog>
     )
   }
@@ -272,7 +366,7 @@ export function ResolveDialog({
     return (
       <div
         className={cn(
-          "flex w-full max-w-lg flex-col gap-4 rounded-lg border bg-card p-6 text-card-foreground shadow-sm",
+          "flex w-full max-w-4xl flex-col gap-4 rounded-lg border bg-card p-6 text-card-foreground shadow-sm",
           className
         )}
         data-testid="resolve-contradiction-dialog"
@@ -290,7 +384,8 @@ export function ResolveDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className={cn("sm:max-w-lg", className)}
+        viewport="wide"
+        className={cn("p-6", className)}
         data-testid="resolve-contradiction-dialog"
       >
         <DialogHeader className="sr-only">
@@ -299,12 +394,14 @@ export function ResolveDialog({
             Choose an authoritative resolution strategy for this conflict.
           </DialogDescription>
         </DialogHeader>
-        <ResolveDialogForm
-          key={contradiction.id}
-          contradiction={contradiction}
-          onOpenChange={onOpenChange}
-          onResolved={onResolved}
-        />
+        <div className="flex-1 overflow-y-auto">
+          <ResolveDialogForm
+            key={contradiction.id}
+            contradiction={contradiction}
+            onOpenChange={onOpenChange}
+            onResolved={onResolved}
+          />
+        </div>
       </DialogContent>
     </Dialog>
   )
