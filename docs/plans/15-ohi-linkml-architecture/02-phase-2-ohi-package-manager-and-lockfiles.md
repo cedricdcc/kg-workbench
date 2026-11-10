@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-Status: `open`
+Status: `done`
 
 **Goal:** Replace the legacy multi-registry scrapers (OLS4, LOV, BARTOC, OntoPortal, EU Vocabularies) with `ohi.dev` as the sole external ontology package manager, supporting `ohi.yaml` manifests, `ohi.lock.json` v2 cryptographic SHA-256 verification, transitive dependency resolution, and LinkML `importMap` wiring.
 
@@ -29,7 +29,7 @@ Status: `open`
 
 ---
 
-### Task 1: Define `ohi.yaml` & `ohi.lock.json` v2 Types and Parser (Slice 2.1) `open`
+### Task 1: Define `ohi.yaml` & `ohi.lock.json` v2 Types and Parser (Slice 2.1) `closed`
 
 **Files:**
 
@@ -47,24 +47,24 @@ Status: `open`
   - `serializeOhiYaml(manifest: OhiManifest): string`
   - `computeSha256(content: string | Uint8Array): string`
 
-- [ ] **Step 1: Write failing tests for `ohi.yaml` parsing/serialization and SHA-256 computation**
+- [x] **Step 1: Write failing tests for `ohi.yaml` parsing/serialization and SHA-256 computation**
       Create `tests/ohi-manifest-and-lockfile.test.ts` testing round-trip YAML formatting for the spec's exact `ohi.yaml` example (`w3c/dcat@3`, `w3c/prov-o@2013`) and SHA-256 digest verification.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
       Run: `npm exec pnpm -- test tests/ohi-manifest-and-lockfile.test.ts`
 
-- [ ] **Step 3: Implement `src/features/ontology/server/ohi/types.ts` and `manifest.ts`**
+- [x] **Step 3: Implement `src/features/ontology/server/ohi/types.ts` and `manifest.ts`**
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
       Run: `npm exec pnpm -- test tests/ohi-manifest-and-lockfile.test.ts`
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
       `git add src/features/ontology/server/ohi/types.ts src/features/ontology/server/ohi/manifest.ts tests/ohi-manifest-and-lockfile.test.ts`
       `git commit -m "feat(ohi): add ohi.yaml manifest parser and ohi.lock.json v2 types"`
 
 ---
 
-### Task 2: Implement `ohi.dev` Catalog Client & Transitive Resolver (Slice 2.2) `open`
+### Task 2: Implement `ohi.dev` Catalog Client & Transitive Resolver (Slice 2.2) `closed`
 
 **Files:**
 
@@ -80,19 +80,19 @@ Status: `open`
   - `inspectOhiPublication(ontologyRef: string): Promise<OhiPublicationMetadata>`
   - `resolveOhiDependencyTree(manifest: OhiManifest): Promise<{ lockfile: OhiLockfileV2; artifacts: Map<string, string> }>`
 
-- [ ] **Step 1: Write failing tests for transitive resolution (`w3c/dcat@3` → `dcterms`, `skos`, `prov-o`) and deduplication**
+- [x] **Step 1: Write failing tests for transitive resolution (`w3c/dcat@3` → `dcterms`, `skos`, `prov-o`) and deduplication**
       Create `tests/ohi-catalog-resolver.test.ts` verifying that adding `w3c/dcat@3` resolves its transitive dependencies in the target format (`linkml-yaml` or `owl-turtle`), populates `selections` and `files` with immutable URLs and SHA-256 digests, and deduplicates shared transitive dependencies.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
       Run: `npm exec pnpm -- test tests/ohi-catalog-resolver.test.ts`
 
-- [ ] **Step 3: Implement `builtin-publications.ts` and `catalog-client.ts`**
+- [x] **Step 3: Implement `builtin-publications.ts` and `catalog-client.ts`**
       Include canonical LinkML YAML and OWL Turtle publications for `w3c/prov-o@2013`, `w3c/dcat@3`, `w3c/skos@2009`, `dublincore/dcterms@2020`, `w3c/ssn@2017`, `w3c/org@2014`, `foaf/foaf@0.1`, and `schemaorg/schema@28` with live `ohi.dev` HTTP lookup + built-in fallback.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
       Run: `npm exec pnpm -- test tests/ohi-catalog-resolver.test.ts`
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
       `git add src/features/ontology/server/ohi/builtin-publications.ts src/features/ontology/server/ohi/catalog-client.ts tests/ohi-catalog-resolver.test.ts`
       `git commit -m "feat(ohi): implement ohi.dev catalog client and transitive dependency resolver"`
 
