@@ -37,6 +37,7 @@ const eslintConfig = defineConfig([
     "**/.pytest_cache/**",
     ".agents/**",
     ".superpowers/**",
+    ".worktrees/**",
   ]),
 ])
 
