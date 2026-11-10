@@ -93,7 +93,7 @@ function CqDetailPanelEditor({
   }
 
   return (
-    <ScrollArea className="h-full bg-card/20">
+    <ScrollArea className="h-full bg-card/20" data-testid="cq-detail-panel">
       <div className="flex flex-col gap-6 p-6">
         {/* Header with Title and Delete action */}
         <div className="flex items-center justify-between border-b border-border/50 pb-4">
@@ -118,64 +118,78 @@ function CqDetailPanelEditor({
           </Button>
         </div>
 
-        {/* Section 1: Question Formulation */}
-        <div className="flex flex-col gap-2 rounded-xl border border-border/70 bg-card p-4 shadow-2xs">
-          <div className="flex items-center justify-between">
-            <label className="text-xs font-semibold text-foreground">
-              Question Formulation
-            </label>
-            {isQuestionDirty ? (
-              <Button
-                size="sm"
-                onClick={handleSaveQuestion}
-                disabled={isSavingQuestion}
-                className="h-7 gap-1 px-2.5 text-xs"
-              >
-                <Save className="h-3 w-3" />
-                <span>Save Text</span>
-              </Button>
-            ) : null}
+        {/* Responsive top row on lg: viewports: Question (65%) | Module Associations (35%) */}
+        <div
+          className="grid grid-cols-1 gap-6 lg:grid-cols-[13fr_7fr]"
+          data-testid="cq-detail-top-row"
+        >
+          {/* Section 1: Question Formulation (Left 65%) */}
+          <div
+            className="flex flex-col gap-2 rounded-xl border border-border/70 bg-card p-4 shadow-2xs"
+            data-testid="cq-question-formulation-card"
+          >
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-semibold text-foreground">
+                Question Formulation
+              </label>
+              {isQuestionDirty ? (
+                <Button
+                  size="sm"
+                  onClick={handleSaveQuestion}
+                  disabled={isSavingQuestion}
+                  className="h-7 gap-1 px-2.5 text-xs"
+                >
+                  <Save className="h-3 w-3" />
+                  <span>Save Text</span>
+                </Button>
+              ) : null}
+            </div>
+            <Textarea
+              value={localQuestion}
+              onChange={(e) => setLocalQuestion(e.target.value)}
+              onBlur={handleSaveQuestion}
+              rows={3}
+              placeholder="Formulate the competency question..."
+              className="min-h-[88px] flex-1 resize-y text-xs"
+            />
           </div>
-          <Textarea
-            value={localQuestion}
-            onChange={(e) => setLocalQuestion(e.target.value)}
-            onBlur={handleSaveQuestion}
-            rows={3}
-            placeholder="Formulate the competency question..."
-            className="resize-y text-xs"
-          />
+
+          {/* Section 2: Module Associations (Right 35%) */}
+          <div
+            className="flex flex-col justify-start rounded-xl border border-border/70 bg-card p-4 shadow-2xs"
+            data-testid="cq-module-associations-card"
+          >
+            <CqModuleSelector
+              modules={modules}
+              selectedModuleIds={selectedModuleIds}
+              onToggleModule={(moduleId) => onToggleModule(moduleId)}
+            />
+          </div>
         </div>
 
-        {/* Section 2: Concept Mapping Card */}
-        <CqConceptMappingCard
-          triples={cq.triples}
-          subjectClassId={cq.subject_class_id}
-          predicateRelationId={cq.predicate_relation_id}
-          objectClassId={cq.object_class_id}
-          classes={classes}
-          relations={relations}
-          modules={modules}
-          currentModuleId={currentModuleId}
-          onUpdateTriples={async (updatedTriples) => {
-            if (onUpdateTriples) {
-              await onUpdateTriples(updatedTriples)
-            } else {
-              const first = updatedTriples[0]
-              await onUpdateMapping({
-                subjectClassId: first?.subjectClassId ?? null,
-                predicateRelationId: first?.predicateRelationId ?? null,
-                objectClassId: first?.objectClassId ?? null,
-              })
-            }
-          }}
-        />
-
-        {/* Section 3: Module Associations */}
-        <div className="rounded-xl border border-border/70 bg-card p-4 shadow-2xs">
-          <CqModuleSelector
+        {/* Section 3: Concept Mapping Card (100% full width) */}
+        <div className="w-full" data-testid="cq-concept-mapping-section">
+          <CqConceptMappingCard
+            triples={cq.triples}
+            subjectClassId={cq.subject_class_id}
+            predicateRelationId={cq.predicate_relation_id}
+            objectClassId={cq.object_class_id}
+            classes={classes}
+            relations={relations}
             modules={modules}
-            selectedModuleIds={selectedModuleIds}
-            onToggleModule={(moduleId) => onToggleModule(moduleId)}
+            currentModuleId={currentModuleId}
+            onUpdateTriples={async (updatedTriples) => {
+              if (onUpdateTriples) {
+                await onUpdateTriples(updatedTriples)
+              } else {
+                const first = updatedTriples[0]
+                await onUpdateMapping({
+                  subjectClassId: first?.subjectClassId ?? null,
+                  predicateRelationId: first?.predicateRelationId ?? null,
+                  objectClassId: first?.objectClassId ?? null,
+                })
+              }
+            }}
           />
         </div>
 

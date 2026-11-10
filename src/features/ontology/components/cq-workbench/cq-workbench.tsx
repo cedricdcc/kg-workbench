@@ -313,10 +313,10 @@ export function CqWorkbench({
         onAiDraft={() => setAiGenerateOpen(true)}
       />
 
-      {/* Main Split Workbench: List (50%) | Inspector (50%) */}
+      {/* Main Split Workbench: List (Fixed) | Detail Inspector (Flex-1 Full Screen) */}
       <div className="flex min-h-0 flex-1">
         {/* Left/Center Pane: CQ List Panel */}
-        <div className="w-1/2 max-w-2xl min-w-[340px] border-r border-border/60">
+        <div className="w-[360px] shrink-0 border-r border-border/60 lg:w-[400px]">
           <CqListPanel
             cqs={filteredCqs}
             evaluationsById={evaluationsById}
@@ -331,7 +331,7 @@ export function CqWorkbench({
         </div>
 
         {/* Right Pane: Concept Mapping & Detail Inspector */}
-        <div className="min-w-[380px] flex-1 bg-card/20">
+        <div className="min-w-0 flex-1 bg-card/20">
           <CqDetailPanel
             cq={activeCq}
             classes={classes}
