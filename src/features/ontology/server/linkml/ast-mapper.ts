@@ -376,6 +376,9 @@ export function snapshotToLinkmlYaml(
         ...(mod.description ? { description: mod.description } : {}),
       }
       const modAnnotations: Record<string, unknown> = {}
+      if (mod.name) {
+        modAnnotations.kg_name = mod.name
+      }
       const modNotes = getNotesForTarget(snapshot.notes, "module", [
         mod.id,
         subsetKey,
@@ -659,8 +662,24 @@ export function snapshotToLinkmlYaml(
       if (classRestrictions.length > 0) {
         const slotUsage: Record<string, unknown> = {}
         for (const r of classRestrictions) {
-          const target = r.relation_id || r.attribute_id
+          let target = r.relation_id || r.attribute_id
           if (!target) continue
+
+          // If target is an attribute with composite key (e.g. Person.email), extract attribute name
+          if (r.attribute_id && target.includes(".")) {
+            target = target.split(".").pop() || target
+          }
+
+          // If target is a relation, check if relation was disambiguated to a relationKey
+          if (r.relation_id) {
+            const matchingRel = snapshot.relations.find(
+              (rel) => rel.id === r.relation_id || rel.name === r.relation_id
+            )
+            if (matchingRel && relationKeyMap.has(matchingRel)) {
+              target = relationKeyMap.get(matchingRel)!
+            }
+          }
+
           const currentUsage =
             (slotUsage[target] as Record<string, unknown>) || {}
           if (
@@ -786,24 +805,22 @@ export function linkmlYamlToSnapshot(
   if (parsed.subsets && typeof parsed.subsets === "object") {
     for (const [subsetKey, subsetRaw] of Object.entries(parsed.subsets)) {
       const subsetDef = (subsetRaw || {}) as Record<string, unknown>
+      const modAnnotations = subsetDef.annotations as
+        Record<string, unknown> | undefined
+      const modName = modAnnotations?.kg_name
+        ? String(modAnnotations.kg_name)
+        : subsetDef.name
+          ? String(subsetDef.name)
+          : subsetKey
+
       modules.push({
         id: subsetKey,
-        name: subsetDef.name ? String(subsetDef.name) : subsetKey,
+        name: modName,
         description: subsetDef.description ? String(subsetDef.description) : "",
       })
 
-      extractNotes(
-        subsetDef.annotations as Record<string, unknown> | undefined,
-        "module",
-        subsetKey,
-        notes
-      )
-      extractLocalizedTexts(
-        subsetDef.annotations as Record<string, unknown> | undefined,
-        "module",
-        subsetKey,
-        localizedTexts
-      )
+      extractNotes(modAnnotations, "module", subsetKey, notes)
+      extractLocalizedTexts(modAnnotations, "module", subsetKey, localizedTexts)
     }
   }
 
@@ -857,11 +874,37 @@ export function linkmlYamlToSnapshot(
           classDef.slot_usage
         )) {
           const usage = (usageRaw || {}) as Record<string, unknown>
+          const isClassAttribute =
+            classDef.attributes &&
+            typeof classDef.attributes === "object" &&
+            targetKey in classDef.attributes
+          const isSlot =
+            parsed.slots &&
+            typeof parsed.slots === "object" &&
+            targetKey in parsed.slots
+
+          let relationId: string | null = null
+          let attributeId: string | null = null
+
+          if (isClassAttribute && !isSlot) {
+            attributeId = makeAttributeKey(classKey, targetKey)
+          } else {
+            const slotDef = (
+              parsed.slots as Record<string, unknown> | undefined
+            )?.[targetKey] as Record<string, unknown> | undefined
+            const slotAnnotations = slotDef?.annotations as
+              Record<string, unknown> | undefined
+            relationId = slotAnnotations?.kg_relation_id
+              ? String(slotAnnotations.kg_relation_id)
+              : targetKey
+          }
+
           if (usage.minimum_cardinality !== undefined) {
             const rest: OntologyClassRestrictionSnapshot = {
               id: `${classKey}:${targetKey}:min`,
               class_id: classKey,
-              relation_id: targetKey,
+              relation_id: relationId,
+              attribute_id: attributeId,
               restriction_type: "min",
               cardinality_value: Number(usage.minimum_cardinality),
             }
@@ -872,7 +915,8 @@ export function linkmlYamlToSnapshot(
             const rest: OntologyClassRestrictionSnapshot = {
               id: `${classKey}:${targetKey}:max`,
               class_id: classKey,
-              relation_id: targetKey,
+              relation_id: relationId,
+              attribute_id: attributeId,
               restriction_type: "max",
               cardinality_value: Number(usage.maximum_cardinality),
             }
@@ -883,7 +927,8 @@ export function linkmlYamlToSnapshot(
             const rest: OntologyClassRestrictionSnapshot = {
               id: `${classKey}:${targetKey}:exact`,
               class_id: classKey,
-              relation_id: targetKey,
+              relation_id: relationId,
+              attribute_id: attributeId,
               restriction_type: "exact",
               cardinality_value: Number(usage.exact_cardinality),
             }
