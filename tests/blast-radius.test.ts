@@ -1,10 +1,15 @@
 import assert from "node:assert/strict"
+import { execFileSync } from "node:child_process"
+import path from "node:path"
 import { test } from "node:test"
 import {
   calculateRiskScore,
   buildClassBlastRadiusReport,
   buildRelationBlastRadiusReport,
 } from "../src/features/ontology/server/blast-radius/calculate"
+
+const isReactServer = process.execArgv.some((a) => a.includes("react-server"))
+const isChildTest = process.env.CHILD_REACT_DOM_TEST === "1"
 
 test("calculateRiskScore returns 0 and low severity when metrics are zero", () => {
   const result = calculateRiskScore({
@@ -168,71 +173,108 @@ test("BlastRadiusModal uses DialogContent with viewport='wide'", async () => {
   )
 })
 
-test("BlastRadiusDetails renders responsive 3-column impact dashboard", async () => {
-  const React = (await import("react")).default
-  const { renderToStaticMarkup } = await import("react-dom/server")
-  const { BlastRadiusDetails } =
-    await import("../src/features/ontology/components/blast-radius-modal/blast-radius-details")
+if (isChildTest || !isReactServer) {
+  test("BlastRadiusDetails renders responsive 3-column impact dashboard", async () => {
+    const React = (await import("react")).default
+    const { renderToStaticMarkup } = await import("react-dom/server")
+    const { BlastRadiusDetails } =
+      await import("../src/features/ontology/components/blast-radius-modal/blast-radius-details")
 
-  const markup = renderToStaticMarkup(
-    React.createElement(BlastRadiusDetails, {
-      targetType: "class",
-      details: {
-        competencyQuestions: [
-          {
-            id: "cq-1",
-            question: "Which drugs treat diseases?",
-            roles: ["subject"],
-          },
-        ],
-        relations: [
-          {
-            id: "r-1",
-            name: "treats",
-            direction: "outgoing",
-            otherClassName: "Disease",
-          },
-        ],
-        subclasses: [{ id: "sub-1", name: "Antibiotic" }],
-        attributes: [{ id: "attr-1", name: "dosage", dataType: "xsd:string" }],
-      },
-      summary: {
-        affectedCqsCount: 1,
-        affectedFactsCount: 42,
-        affectedEntitiesCount: 10,
-        affectedRelationsCount: 1,
-        affectedSubclassesCount: 1,
-        affectedAttributesCount: 1,
-      },
-    })
-  )
+    const markup = renderToStaticMarkup(
+      React.createElement(BlastRadiusDetails, {
+        targetType: "class",
+        details: {
+          competencyQuestions: [
+            {
+              id: "cq-1",
+              question: "Which drugs treat diseases?",
+              roles: ["subject"],
+            },
+          ],
+          relations: [
+            {
+              id: "r-1",
+              name: "treats",
+              direction: "outgoing",
+              otherClassName: "Disease",
+            },
+          ],
+          subclasses: [{ id: "sub-1", name: "Antibiotic" }],
+          attributes: [
+            { id: "attr-1", name: "dosage", dataType: "xsd:string" },
+          ],
+        },
+        summary: {
+          affectedCqsCount: 1,
+          affectedFactsCount: 42,
+          affectedEntitiesCount: 10,
+          affectedRelationsCount: 1,
+          affectedSubclassesCount: 1,
+          affectedAttributesCount: 1,
+        },
+      })
+    )
 
-  assert.ok(
-    markup.includes("grid-cols-1") && markup.includes("md:grid-cols-3"),
-    "Must have responsive 3-column grid classes"
-  )
-  assert.ok(
-    markup.includes('data-card="competency-questions"'),
-    "Must render Card 1 for competency questions"
-  )
-  assert.ok(
-    markup.includes("Which drugs treat diseases?"),
-    "Must render CQ question in Card 1"
-  )
-  assert.ok(
-    markup.includes('data-card="relations-subclasses"'),
-    "Must render Card 2 for relations and subclasses"
-  )
-  assert.ok(
-    markup.includes("treats") && markup.includes("Antibiotic"),
-    "Must render relation and orphaned subclass in Card 2"
-  )
-  assert.ok(
-    markup.includes('data-card="attributes-facts"'),
-    "Must render Card 3 for attributes and facts"
-  )
-  assert.ok(
-    markup.includes("42") && markup.includes("dosage"),
-    "Must render affected facts count and attribute in Card 3"
-  )
-})
+    assert.ok(
+      markup.includes("grid-cols-1") && markup.includes("md:grid-cols-3"),
+      "Must have responsive 3-column grid classes"
+    )
+    assert.ok(
+      markup.includes('data-card="competency-questions"'),
+      "Must render Card 1 for competency questions"
+    )
+    assert.ok(
+      markup.includes("Which drugs treat diseases?"),
+      "Must render CQ question in Card 1"
+    )
+    assert.ok(
+      markup.includes('data-card="relations-subclasses"'),
+      "Must render Card 2 for relations and subclasses"
+    )
+    assert.ok(
+      markup.includes("treats") && markup.includes("Antibiotic"),
+      "Must render relation and orphaned subclass in Card 2"
+    )
+    assert.ok(
+      markup.includes('data-card="attributes-facts"'),
+      "Must render Card 3 for attributes and facts"
+    )
+    assert.ok(
+      markup.includes("42") && markup.includes("dosage"),
+      "Must render affected facts count and attribute in Card 3"
+    )
+  })
+}
+
+if (isReactServer && !isChildTest) {
+  test("Client DOM rendering tests for BlastRadiusDetails via tsx runner", () => {
+    const tsxCli = path.resolve(process.cwd(), "node_modules/tsx/dist/cli.mjs")
+    const testFile = path.resolve(process.cwd(), "tests/blast-radius.test.ts")
+    const childEnv: NodeJS.ProcessEnv = {
+      ...process.env,
+      CHILD_REACT_DOM_TEST: "1",
+    }
+    for (const key of Object.keys(childEnv)) {
+      if (key.startsWith("NODE_TEST_")) {
+        delete childEnv[key]
+      }
+    }
+
+    const output = execFileSync(
+      process.execPath,
+      [tsxCli, "--test", testFile],
+      {
+        encoding: "utf-8",
+        env: childEnv,
+      }
+    )
+    assert.ok(
+      output.includes("pass"),
+      "Child client DOM rendering tests must pass"
+    )
+    assert.ok(
+      !output.includes("fail 1"),
+      "Child client DOM tests must have 0 failures"
+    )
+  })
+}

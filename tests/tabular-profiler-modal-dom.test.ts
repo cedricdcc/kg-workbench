@@ -1,4 +1,5 @@
 import assert from "node:assert/strict"
+import { execFileSync } from "node:child_process"
 import fs from "node:fs"
 import path from "node:path"
 import { test } from "node:test"
@@ -11,6 +12,9 @@ import {
 } from "../src/features/tabular/components/tabular-profiler-modal/formatters"
 import { shouldContinuePolling } from "../src/features/tabular/hooks/polling"
 import type { TabularProfileResult } from "../src/features/tabular/types"
+
+const isReactServer = process.execArgv.some((a) => a.includes("react-server"))
+const isChildTest = process.env.CHILD_REACT_DOM_TEST === "1"
 
 test("formatTypeBadge maps canonical KG types to visual attributes", () => {
   assert.equal(formatTypeBadge("string").variant, "outline")
@@ -136,32 +140,70 @@ test("TabularProfilerModal conforms to fullscreen Option B layout requirements",
   )
 })
 
-test("TabularPreviewTab renders with full-width horizontal scroll container", async () => {
-  const React = (await import("react")).default
-  const { renderToStaticMarkup } = await import("react-dom/server")
-  const { TabularPreviewTab } =
-    await import("../src/features/tabular/components/tabular-profiler-modal/preview-tab")
+if (isChildTest || !isReactServer) {
+  test("TabularPreviewTab renders with full-width horizontal scroll container", async () => {
+    const React = (await import("react")).default
+    const { renderToStaticMarkup } = await import("react-dom/server")
+    const { TabularPreviewTab } =
+      await import("../src/features/tabular/components/tabular-profiler-modal/preview-tab")
 
-  const markup = renderToStaticMarkup(
-    React.createElement(TabularPreviewTab, {
-      rows: [
-        { id: 1, name: "Alice", email: "alice@example.com" },
-        { id: 2, name: "Bob", email: "bob@example.com" },
-      ],
-      columns: [{ name: "id" }, { name: "name" }, { name: "email" }],
-    })
-  )
+    const markup = renderToStaticMarkup(
+      React.createElement(TabularPreviewTab, {
+        rows: [
+          { id: 1, name: "Alice", email: "alice@example.com" },
+          { id: 2, name: "Bob", email: "bob@example.com" },
+        ],
+        columns: [{ name: "id" }, { name: "name" }, { name: "email" }],
+      })
+    )
 
-  assert.ok(
-    markup.includes("w-full"),
-    "TabularPreviewTab container must have w-full"
-  )
-  assert.ok(
-    markup.includes("overflow-x-auto"),
-    "TabularPreviewTab container must have overflow-x-auto"
-  )
-  assert.ok(
-    markup.includes("Alice"),
-    "Rendered preview must include sample data"
-  )
-})
+    assert.ok(
+      markup.includes("w-full"),
+      "TabularPreviewTab container must have w-full"
+    )
+    assert.ok(
+      markup.includes("overflow-x-auto"),
+      "TabularPreviewTab container must have overflow-x-auto"
+    )
+    assert.ok(
+      markup.includes("Alice"),
+      "Rendered preview must include sample data"
+    )
+  })
+}
+
+if (isReactServer && !isChildTest) {
+  test("Client DOM rendering tests for TabularPreviewTab via tsx runner", () => {
+    const tsxCli = path.resolve(process.cwd(), "node_modules/tsx/dist/cli.mjs")
+    const testFile = path.resolve(
+      process.cwd(),
+      "tests/tabular-profiler-modal-dom.test.ts"
+    )
+    const childEnv: NodeJS.ProcessEnv = {
+      ...process.env,
+      CHILD_REACT_DOM_TEST: "1",
+    }
+    for (const key of Object.keys(childEnv)) {
+      if (key.startsWith("NODE_TEST_")) {
+        delete childEnv[key]
+      }
+    }
+
+    const output = execFileSync(
+      process.execPath,
+      [tsxCli, "--test", testFile],
+      {
+        encoding: "utf-8",
+        env: childEnv,
+      }
+    )
+    assert.ok(
+      output.includes("pass"),
+      "Child client DOM rendering tests must pass"
+    )
+    assert.ok(
+      !output.includes("fail 1"),
+      "Child client DOM tests must have 0 failures"
+    )
+  })
+}

@@ -1,4 +1,5 @@
 import assert from "node:assert/strict"
+import { execFileSync } from "node:child_process"
 import fs from "node:fs"
 import path from "node:path"
 import { test } from "node:test"
@@ -8,6 +9,9 @@ import {
   initializeWizardState,
 } from "../src/features/tabular/components/dataset-mapping-wizard/types"
 import type { ArchivedDatasetSource } from "../src/features/tabular/types"
+
+const isReactServer = process.execArgv.some((a) => a.includes("react-server"))
+const isChildTest = process.env.CHILD_REACT_DOM_TEST === "1"
 
 test("validateMappingSpecBeforeCommit rejects missing primary key column", () => {
   const result = validateMappingSpecBeforeCommit({
@@ -228,64 +232,102 @@ test("Dataset mapping wizard steps 2 and 3 render responsive multi-column layout
   )
 })
 
-test("StepAiSynthesisReview renders multi-column summary cards in DOM", async () => {
-  const React = (await import("react")).default
-  const { renderToStaticMarkup } = await import("react-dom/server")
-  const { StepAiSynthesisReview } =
-    await import("../src/features/tabular/components/dataset-mapping-wizard/step-ai-synthesis-review")
+if (isChildTest || !isReactServer) {
+  test("StepAiSynthesisReview renders multi-column summary cards in DOM", async () => {
+    const React = (await import("react")).default
+    const { renderToStaticMarkup } = await import("react-dom/server")
+    const { StepAiSynthesisReview } =
+      await import("../src/features/tabular/components/dataset-mapping-wizard/step-ai-synthesis-review")
 
-  const markup = renderToStaticMarkup(
-    React.createElement(StepAiSynthesisReview, {
-      wizardState: {
-        targetClassName: "Customer",
-        primaryKeyColumn: "customer_id",
-        privacyConfigs: [],
-        columnMappings: [
-          {
-            columnName: "customer_id",
-            inferredType: "string",
-            targetKind: "attribute",
-            targetAttributeName: "customerId",
-            targetDataType: "xsd:string",
-            isPrimaryKey: true,
-          },
-          {
-            columnName: "company_id",
-            inferredType: "string",
-            targetKind: "relation",
-            targetRelationName: "hasCompany",
-            targetClassId: "cls-1",
-          },
-        ],
-        synthesizedElements: {
-          classes: [{ name: "Company", description: "Company entity" }],
-          attributes: [
+    const markup = renderToStaticMarkup(
+      React.createElement(StepAiSynthesisReview, {
+        wizardState: {
+          targetClassName: "Customer",
+          primaryKeyColumn: "customer_id",
+          privacyConfigs: [],
+          columnMappings: [
             {
-              className: "Customer",
-              name: "creditScore",
-              dataType: "xsd:integer",
+              columnName: "customer_id",
+              inferredType: "string",
+              targetKind: "attribute",
+              targetAttributeName: "customerId",
+              targetDataType: "xsd:string",
+              isPrimaryKey: true,
+            },
+            {
+              columnName: "company_id",
+              inferredType: "string",
+              targetKind: "relation",
+              targetRelationName: "hasCompany",
+              targetClassId: "cls-1",
             },
           ],
-          relations: [
-            {
-              sourceClass: "Customer",
-              name: "worksAt",
-              targetClass: "Company",
-            },
-          ],
+          synthesizedElements: {
+            classes: [{ name: "Company", description: "Company entity" }],
+            attributes: [
+              {
+                className: "Customer",
+                name: "creditScore",
+                dataType: "xsd:integer",
+              },
+            ],
+            relations: [
+              {
+                sourceClass: "Customer",
+                name: "worksAt",
+                targetClass: "Company",
+              },
+            ],
+          },
         },
-      },
-    })
-  )
+      })
+    )
 
-  assert.ok(
-    markup.includes("grid-cols-1") &&
-      markup.includes("lg:grid-cols-2") &&
-      markup.includes("xl:grid-cols-3"),
-    "Must render responsive grid classes in markup"
-  )
-  assert.ok(markup.includes("Customer"), "Must render target class")
-  assert.ok(markup.includes("customer_id"), "Must render primary key column")
-  assert.ok(markup.includes("Company"), "Must render synthesized class")
-  assert.ok(markup.includes("worksAt"), "Must render synthesized relation")
-})
+    assert.ok(
+      markup.includes("grid-cols-1") &&
+        markup.includes("lg:grid-cols-2") &&
+        markup.includes("xl:grid-cols-3"),
+      "Must render responsive grid classes in markup"
+    )
+    assert.ok(markup.includes("Customer"), "Must render target class")
+    assert.ok(markup.includes("customer_id"), "Must render primary key column")
+    assert.ok(markup.includes("Company"), "Must render synthesized class")
+    assert.ok(markup.includes("worksAt"), "Must render synthesized relation")
+  })
+}
+
+if (isReactServer && !isChildTest) {
+  test("Client DOM rendering tests for StepAiSynthesisReview via tsx runner", () => {
+    const tsxCli = path.resolve(process.cwd(), "node_modules/tsx/dist/cli.mjs")
+    const testFile = path.resolve(
+      process.cwd(),
+      "tests/dataset-mapping-wizard-dom.test.ts"
+    )
+    const childEnv: NodeJS.ProcessEnv = {
+      ...process.env,
+      CHILD_REACT_DOM_TEST: "1",
+    }
+    for (const key of Object.keys(childEnv)) {
+      if (key.startsWith("NODE_TEST_")) {
+        delete childEnv[key]
+      }
+    }
+
+    const output = execFileSync(
+      process.execPath,
+      [tsxCli, "--test", testFile],
+      {
+        encoding: "utf-8",
+        env: childEnv,
+      }
+    )
+    assert.ok(
+      output.includes("pass"),
+      "Child client DOM rendering tests must pass"
+    )
+    assert.ok(
+      !output.includes("fail 1"),
+      "Child client DOM tests must have 0 failures"
+    )
+  })
+}
