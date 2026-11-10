@@ -108,8 +108,21 @@ export function compileLinkmlOntology(
     .digest("hex")
   const compiledAt = new Date().toISOString()
 
-  const imports = options?.imports ?? {}
-  const importMap = options?.importMap
+  const isDirectYamlMap =
+    options?.importMap &&
+    Object.values(options.importMap).some(
+      (v) =>
+        typeof v === "string" &&
+        (v.includes("\n") || v.startsWith("id:") || v.startsWith("name:"))
+    )
+  const imports = options?.imports
+    ? isDirectYamlMap
+      ? { ...options.importMap, ...options.imports }
+      : options.imports
+    : isDirectYamlMap
+      ? (options.importMap as Record<string, string>)
+      : {}
+  const importMap = isDirectYamlMap ? undefined : options?.importMap
 
   let loadResult
   try {

@@ -15,11 +15,11 @@ The work is divided into **5 self-contained, sequentially executable phases** so
   - Slice 1.2: Bidirectional Workbench DTO ↔ LinkML YAML AST mapper (`ast-mapper.ts`) `done`
   - Slice 1.3: Multi-format compiler (`shacl`, `rdfs`, `owl`, `pydantic`, `jsonSchema`, `erDiagram`, `lint`) `done`
   - Slice 1.4: Replace legacy SHACL/OWL string builders & Turtle importer with `@neverblink/linkml` `done`
-- [Phase 2 - `ohi.dev` Package Manager, SHA-256 Lockfiles & Registry Replacement](./02-phase-2-ohi-package-manager-and-lockfiles.md) `open`
-  - Slice 2.1: Add `ohi.yaml` & `ohi.lock.json` v2 columns to DB schema `open`
-  - Slice 2.2: Implement `ohi.dev` catalog client & transitive dependency resolver `open`
-  - Slice 2.3: Implement SHA-256 lockfile verifier, tamper/drift detector & term embedding indexer `open`
-  - Slice 2.4: Remove legacy OLS4/LOV/BARTOC/OntoPortal/EU registry scrapers `open`
+- [Phase 2 - `ohi.dev` Package Manager, SHA-256 Lockfiles & Registry Replacement](./02-phase-2-ohi-package-manager-and-lockfiles.md) `done`
+  - Slice 2.1: Add `ohi.yaml` & `ohi.lock.json` v2 columns to DB schema `done`
+  - Slice 2.2: Implement `ohi.dev` catalog client & transitive dependency resolver `done`
+  - Slice 2.3: Implement SHA-256 lockfile verifier, tamper/drift detector & term embedding indexer `done`
+  - Slice 2.4: Remove legacy OLS4/LOV/BARTOC/OntoPortal/EU registry scrapers `done`
 - [Phase 3 - Option 2A Canonical LinkML Document Store & Symbol Cascades](./03-phase-3-canonical-store-migration-and-cascades.md) `open`
   - Slice 3.1: Drizzle schema refactor (drop 13 ontology SQL tables, switch 3 external boundaries to `text` symbol keys) & seed update `open`
   - Slice 3.2: Implement transactional symbol cascade service (`cascadeSymbolRename`, `cascadeSymbolDelete`, `diffLinkmlAstSymbols`) `open`

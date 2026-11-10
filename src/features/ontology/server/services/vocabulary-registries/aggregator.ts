@@ -1,11 +1,19 @@
-import { getRegistryProvider } from "./providers"
+import { getRegistryProvider } from "./ohi-provider"
+import {
+  searchOhiPackages,
+  type SearchOhiOptions,
+} from "../../ohi/catalog-client"
+import { getBuiltinPublication } from "../../ohi/builtin-publications"
 import type { RegistrySearchResult } from "./types"
 
 export interface SearchRegistriesOptions {
   enabledProviderIds?: string[]
   timeoutMs?: number
   limitPerProvider?: number
+  limit?: number
   apiKeys?: Record<string, string>
+  catalogUrl?: string
+  offlineOnly?: boolean
 }
 
 export interface MultiRegistrySearchResponse {
@@ -13,6 +21,9 @@ export interface MultiRegistrySearchResponse {
   failedProviders: Array<{ providerId: string; error: string }>
 }
 
+/**
+ * Searches registries across enabled provider targets, routing to ohi.dev catalog with deduplication.
+ */
 export async function searchAllRegistries(
   query: string,
   options?: SearchRegistriesOptions
@@ -22,23 +33,44 @@ export async function searchAllRegistries(
     return { results: [], failedProviders: [] }
   }
 
-  const timeoutMs = options?.timeoutMs || 4000
-  const limit = options?.limitPerProvider || 10
-
+  const limit = options?.limitPerProvider || options?.limit || 20
   const providerIds =
     options?.enabledProviderIds && options.enabledProviderIds.length > 0
       ? options.enabledProviderIds
-      : ["ols4", "bartoc", "agroportal", "lov"]
+      : ["ohi"]
 
   const searchPromises = providerIds.map(async (providerId) => {
     const provider = getRegistryProvider(providerId)
     if (!provider) {
       throw new Error(`Provider "${providerId}" not found`)
     }
-    const apiKey = options?.apiKeys?.[providerId]
+
+    const opts: SearchOhiOptions = {
+      limit,
+      catalogUrl: options?.catalogUrl,
+      offlineOnly: options?.offlineOnly,
+    }
+
+    const packages = await searchOhiPackages(trimmed, opts)
+    const results: RegistrySearchResult[] = packages.map((pkg) => {
+      const builtin = getBuiltinPublication(pkg.package_ref)
+      const baseIri =
+        builtin?.metadata.base_url ||
+        `https://ohi.dev/${pkg.namespace}/${pkg.name}`
+
+      return {
+        source: "ohi",
+        sourceId: `${pkg.namespace}/${pkg.name}`,
+        prefix: pkg.name,
+        name: pkg.title || pkg.name,
+        description: pkg.description || "",
+        baseIri,
+      }
+    })
+
     return {
       providerId,
-      results: await provider.search(trimmed, { limit, timeoutMs, apiKey }),
+      results,
     }
   })
 
@@ -63,9 +95,7 @@ export async function searchAllRegistries(
       failedProviders.push({
         providerId: requestedId,
         error:
-          res.reason instanceof Error
-            ? res.reason.message
-            : String(res.reason),
+          res.reason instanceof Error ? res.reason.message : String(res.reason),
       })
     }
   }
@@ -76,6 +106,9 @@ export async function searchAllRegistries(
   }
 }
 
+/**
+ * Convenience wrapper returning a flat array of RegistrySearchResult.
+ */
 export async function searchRegistries(
   query: string,
   options?: SearchRegistriesOptions

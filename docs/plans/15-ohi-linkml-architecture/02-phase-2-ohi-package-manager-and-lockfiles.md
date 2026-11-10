@@ -29,7 +29,7 @@ Status: `open`
 
 ---
 
-### Slice 2.1: Define `ohi.yaml` & `ohi.lock.json` v2 Types and Parser `open`
+### Task 1: Define `ohi.yaml` & `ohi.lock.json` v2 Types and Parser (Slice 2.1) `open`
 
 **Files:**
 
@@ -64,7 +64,7 @@ Status: `open`
 
 ---
 
-### Slice 2.2: Implement `ohi.dev` Catalog Client & Transitive Resolver `open`
+### Task 2: Implement `ohi.dev` Catalog Client & Transitive Resolver (Slice 2.2) `open`
 
 **Files:**
 
@@ -98,7 +98,7 @@ Status: `open`
 
 ---
 
-### Slice 2.3: Lockfile Verifier, Drift Detector & LinkML Import Map Builder `open`
+### Task 3: Lockfile Verifier, Drift Detector & LinkML Import Map Builder (Slice 2.3) `closed`
 
 **Files:**
 
@@ -113,24 +113,24 @@ Status: `open`
   - `verifyOhiLockfileArtifacts(lockfile: OhiLockfileV2, storedArtifacts: Record<string, string>): OhiLockVerificationReport`
   - `buildLinkmlImportsFromOhi(lockfile: OhiLockfileV2, storedArtifacts: Record<string, string>): { imports: Record<string, string>; importMap: Record<string, string> }`
 
-- [ ] **Step 1: Write failing tests for SHA-256 drift detection and LinkML `importMap` compilation**
+- [x] **Step 1: Write failing tests for SHA-256 drift detection and LinkML `importMap` compilation**
       Create `tests/ohi-lockfile-verifier.test.ts` testing: 1. Clean verification when all SHA-256 digests match. 2. Drift/tamper error when a cached artifact string is modified. 3. Compiling an ontology that imports `w3c/prov-o@2013` via `buildLinkmlImportsFromOhi` + `compileLinkmlOntology`.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
       Run: `npm exec pnpm -- test tests/ohi-lockfile-verifier.test.ts`
 
-- [ ] **Step 3: Implement `lockfile-verifier.ts` and `import-map.ts`**
+- [x] **Step 3: Implement `lockfile-verifier.ts` and `import-map.ts`**
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
       Run: `npm exec pnpm -- test tests/ohi-lockfile-verifier.test.ts`
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
       `git add src/features/ontology/server/ohi/lockfile-verifier.ts src/features/ontology/server/ohi/import-map.ts tests/ohi-lockfile-verifier.test.ts`
       `git commit -m "feat(ohi): add SHA-256 lockfile verifier and LinkML importMap builder"`
 
 ---
 
-### Slice 2.4: Replace Legacy Vocabulary Registries with `ohi.dev` Service Layer `open`
+### Task 4: Replace Legacy Vocabulary Registries with `ohi.dev` Service Layer (Slice 2.4) `closed`
 
 **Files:**
 
@@ -148,13 +148,13 @@ Status: `open`
 - Produces:
   - Updated `reference-vocabularies.ts` actions (`searchOhiRegistryAction`, `addReferenceOntology`, `syncReferenceOntology`) backed solely by `ohi.dev`.
 
-- [ ] **Step 1: Update registry service & actions to route exclusively through `src/features/ontology/server/ohi/`**
+- [x] **Step 1: Update registry service & actions to route exclusively through `src/features/ontology/server/ohi/`**
       Remove OLS4, LOV, BARTOC, OntoPortal, and EU Vocabularies provider files and wire `reference-vocabularies.ts` and `domain-discovery.ts` to `ohi.dev`.
 
-- [ ] **Step 2: Run full check suite**
+- [x] **Step 2: Run full check suite**
       Run: `npm exec pnpm -- check`
       Expected: All lint, typecheck, test, and build checks PASS.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
       `git add -A src/features/ontology/server/ tests/`
       `git commit -m "refactor(ontology): replace legacy vocabulary registries with ohi.dev package manager"`

@@ -1,5 +1,6 @@
 export type RegistrySearchResult = {
   source:
+    | "ohi"
     | "ols"
     | "lov"
     | "bartoc"
@@ -55,7 +56,8 @@ export interface VocabularyRegistryProvider {
   readonly name: string
   readonly defaultEndpoint: string
   readonly requiresApiKey: boolean
-  readonly category: "general" | "biomedical" | "agri_eco" | "eu_public" | "iot" | "custom"
+  readonly category:
+    "general" | "biomedical" | "agri_eco" | "eu_public" | "iot" | "custom"
 
   testEndpoint(
     endpoint: string,

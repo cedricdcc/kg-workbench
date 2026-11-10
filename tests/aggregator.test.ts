@@ -28,10 +28,24 @@ test("searchAllRegistries handles failing providers gracefully without aborting 
 
   assert.ok(Array.isArray(result.results))
   assert.ok(result.failedProviders.length >= 1)
-  assert.ok(result.failedProviders.some((f) => f.providerId === "non_existent_provider"))
+  assert.ok(
+    result.failedProviders.some((f) => f.providerId === "non_existent_provider")
+  )
 })
 
 test("searchRegistries provides backwards-compatible flat array", async () => {
   const results = await searchRegistries("sosa")
   assert.ok(Array.isArray(results))
+})
+
+test("searchAllRegistries queries ohi provider directly and returns packages with source 'ohi'", async () => {
+  const result = await searchAllRegistries("prov", {
+    enabledProviderIds: ["ohi"],
+  })
+  assert.ok(Array.isArray(result.results))
+  assert.equal(result.failedProviders.length, 0)
+  assert.ok(result.results.length > 0)
+  assert.equal(result.results[0].source, "ohi")
+  assert.ok(result.results[0].prefix)
+  assert.ok(result.results[0].baseIri)
 })

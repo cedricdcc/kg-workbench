@@ -31,25 +31,14 @@ export interface CompiledOntologyArtifacts {
   lint_issues: LinkmlLintIssue[]
 }
 
-export interface OhiLockfileV2 {
-  lock_version: 2
-  selections: Array<{
-    ontology: string
-    release_url: string
-    artifact_url: string
-    format:
-      "owl-turtle" | "owl-rdfxml" | "rdfs-turtle" | "linkml-yaml" | "ossie-yaml"
-  }>
-  files: Array<{
-    ontology: string
-    base_url: string
-    url: string
-    path: string
-    format:
-      "owl-turtle" | "owl-rdfxml" | "rdfs-turtle" | "linkml-yaml" | "ossie-yaml"
-    sha256: string
-  }>
-}
+export type {
+  OhiFormat,
+  OhiDependencyRef,
+  OhiManifest,
+  OhiLockSelection,
+  OhiLockedFile,
+  OhiLockfileV2,
+} from "../ohi/types"
 
 export interface OntologyDocumentSnapshot {
   id: string
