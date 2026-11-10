@@ -1,6 +1,8 @@
 export interface ParseTurtleOptions {
   fileName?: string
   defaultLanguage?: string
+  preferLinkml?: boolean
+  engine?: "linkml" | "n3" | "auto"
 }
 
 export interface ExtractedOntologyHeader {

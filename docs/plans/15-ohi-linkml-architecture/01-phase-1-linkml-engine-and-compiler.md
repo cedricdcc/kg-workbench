@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-Status: `open`
+Status: `done`
 
 **Goal:** Install `@neverblink/linkml@0.18.2`, build the lossless Workbench DTO ↔ LinkML YAML AST mapper (`src/features/ontology/server/linkml/ast-mapper.ts`), build the multi-format compiler (`shacl`, `rdfs`, `owl`, `pydantic`, `jsonSchema`, `frictionless`, `erDiagram`, `lint`), and replace the handwritten SHACL/OWL string builders and Turtle importer.
 
@@ -29,7 +29,7 @@ Status: `open`
 
 ---
 
-### Slice 1.1: Install `@neverblink/linkml` & Define Canonical Types `open`
+### Task 1: Install `@neverblink/linkml` & Define Canonical Types `done`
 
 **Files:**
 
@@ -66,7 +66,7 @@ Status: `open`
 
 ---
 
-### Slice 1.2: Bidirectional Workbench DTO ↔ LinkML YAML AST Mapper `open`
+### Task 2: Bidirectional Workbench DTO ↔ LinkML YAML AST Mapper `done`
 
 **Files:**
 
@@ -100,7 +100,7 @@ Status: `open`
 
 ---
 
-### Slice 1.3: Multi-Format Compiler (`shacl`, `rdfs`, `owl`, `pydantic`, `jsonSchema`, `erDiagram`, `lint`) `open`
+### Task 3: Multi-Format Compiler (`shacl`, `rdfs`, `owl`, `pydantic`, `jsonSchema`, `erDiagram`, `lint`) `done`
 
 **Files:**
 
@@ -132,7 +132,7 @@ Status: `open`
 
 ---
 
-### Slice 1.4: Replace Legacy SHACL/OWL String Builders & Upgrade Importer `open`
+### Task 4: Replace Legacy SHACL/OWL String Builders & Upgrade Importer `done`
 
 **Files:**
 
