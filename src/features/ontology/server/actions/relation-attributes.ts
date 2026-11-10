@@ -25,9 +25,12 @@ export async function createRelationAttribute(
   explicitOntologyId?: string
 ): Promise<OntologyRelationAttribute> {
   const db = getDb()
-  const ontologyId =
-    explicitOntologyId ??
-    (await assertOntologyRecordAccess("ontology_relations", relationId, db))
+  const ontologyId = await assertOntologyRecordAccess(
+    "ontology_relations",
+    relationId,
+    db,
+    explicitOntologyId
+  )
 
   const newAttrId = `${relationId}.${data.name.trim()}`
   let created: OntologyRelationAttributeSnapshot | undefined
@@ -92,9 +95,12 @@ export async function updateRelationAttribute(
   explicitOntologyId?: string
 ): Promise<OntologyRelationAttribute> {
   const db = getDb()
-  const ontologyId =
-    explicitOntologyId ??
-    (await assertOntologyRecordAccess("ontology_relation_attributes", id, db))
+  const ontologyId = await assertOntologyRecordAccess(
+    "ontology_relation_attributes",
+    id,
+    db,
+    explicitOntologyId
+  )
 
   let targetAttr: OntologyRelationAttributeSnapshot | undefined
   let diffOptions: { attributeRenames?: Record<string, string> } | undefined
@@ -160,9 +166,12 @@ export async function deleteRelationAttribute(
   explicitOntologyId?: string
 ): Promise<void> {
   const db = getDb()
-  const ontologyId =
-    explicitOntologyId ??
-    (await assertOntologyRecordAccess("ontology_relation_attributes", id, db))
+  const ontologyId = await assertOntologyRecordAccess(
+    "ontology_relation_attributes",
+    id,
+    db,
+    explicitOntologyId
+  )
 
   await saveCanonicalOntology(
     ontologyId,

@@ -217,4 +217,30 @@ describe("Option 2A Canonical DB Schema & Domain Types", () => {
     }
     assert.equal(mockRelation.id, "works_for")
   })
+
+  it("confirms legacy relational sub-tables are completely removed from schema exports", async () => {
+    const schema = await import("../src/server/db/schema")
+    const legacyTableNames = [
+      "ontologyModules",
+      "ontologyClasses",
+      "ontologyAttributes",
+      "ontologyRelations",
+      "ontologyRelationAttributes",
+      "ontologyClassPositions",
+      "ontologyModuleLayout",
+      "ontologyLanguages",
+      "ontologyNotes",
+      "ontologyLocalizedTexts",
+      "ontologyExamples",
+      "ontologyClassDisjointness",
+      "ontologyClassRestrictions",
+    ]
+    for (const name of legacyTableNames) {
+      assert.equal(
+        (schema as Record<string, unknown>)[name],
+        undefined,
+        `${name} must not be exported in schema.ts`
+      )
+    }
+  })
 })

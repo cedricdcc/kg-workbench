@@ -59,9 +59,12 @@ export async function getModuleRecord(
   explicitOntologyId?: string
 ): Promise<OntologyModule> {
   const db = getDb()
-  const ontologyId =
-    explicitOntologyId ??
-    (await assertOntologyRecordAccess("ontology_modules", moduleId, db))
+  const ontologyId = await assertOntologyRecordAccess(
+    "ontology_modules",
+    moduleId,
+    db,
+    explicitOntologyId
+  )
   const snapshot = await loadCanonicalOntology(ontologyId, db)
   const mod = snapshot.modules?.find(
     (m) => m.id === moduleId || m.name === moduleId

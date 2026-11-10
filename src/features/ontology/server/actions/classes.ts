@@ -105,9 +105,12 @@ export async function updateClass(
   explicitOntologyId?: string
 ): Promise<OntologyClass> {
   const db = getDb()
-  const ontologyId =
-    explicitOntologyId ??
-    (await assertOntologyRecordAccess("ontology_classes", id, db))
+  const ontologyId = await assertOntologyRecordAccess(
+    "ontology_classes",
+    id,
+    db,
+    explicitOntologyId
+  )
 
   let targetClass: OntologyClassSnapshot | undefined
   const newName = data.name?.trim()
@@ -203,9 +206,12 @@ export async function deleteClass(
   explicitOntologyId?: string
 ): Promise<void> {
   const db = getDb()
-  const ontologyId =
-    explicitOntologyId ??
-    (await assertOntologyRecordAccess("ontology_classes", id, db))
+  const ontologyId = await assertOntologyRecordAccess(
+    "ontology_classes",
+    id,
+    db,
+    explicitOntologyId
+  )
 
   await saveCanonicalOntology(
     ontologyId,

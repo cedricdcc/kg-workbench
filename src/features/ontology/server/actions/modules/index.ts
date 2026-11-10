@@ -104,9 +104,12 @@ export async function updateModule(
   explicitOntologyId?: string
 ): Promise<OntologyModule> {
   const db = getDb()
-  const ontologyId =
-    explicitOntologyId ??
-    (await assertOntologyRecordAccess("ontology_modules", id, db))
+  const ontologyId = await assertOntologyRecordAccess(
+    "ontology_modules",
+    id,
+    db,
+    explicitOntologyId
+  )
 
   const input = typeof data === "string" ? { name: data } : data
   const newName =
@@ -207,9 +210,12 @@ export async function deleteModule(
   explicitOntologyId?: string
 ): Promise<void> {
   const db = getDb()
-  const ontologyId =
-    explicitOntologyId ??
-    (await assertOntologyRecordAccess("ontology_modules", id, db))
+  const ontologyId = await assertOntologyRecordAccess(
+    "ontology_modules",
+    id,
+    db,
+    explicitOntologyId
+  )
 
   await saveCanonicalOntology(
     ontologyId,

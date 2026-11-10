@@ -108,9 +108,12 @@ export async function updateRelation(
   explicitOntologyId?: string
 ): Promise<OntologyRelation> {
   const db = getDb()
-  const ontologyId =
-    explicitOntologyId ??
-    (await assertOntologyRecordAccess("ontology_relations", id, db))
+  const ontologyId = await assertOntologyRecordAccess(
+    "ontology_relations",
+    id,
+    db,
+    explicitOntologyId
+  )
 
   let targetRel: OntologyRelationSnapshot | undefined
   const newName = data.name?.trim()
@@ -192,9 +195,12 @@ export async function deleteRelation(
   explicitOntologyId?: string
 ): Promise<void> {
   const db = getDb()
-  const ontologyId =
-    explicitOntologyId ??
-    (await assertOntologyRecordAccess("ontology_relations", id, db))
+  const ontologyId = await assertOntologyRecordAccess(
+    "ontology_relations",
+    id,
+    db,
+    explicitOntologyId
+  )
 
   await saveCanonicalOntology(
     ontologyId,
