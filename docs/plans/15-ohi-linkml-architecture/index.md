@@ -10,11 +10,11 @@ The work is divided into **5 self-contained, sequentially executable phases** so
 
 ## Phased Sub-Plans (Execution Order)
 
-- [Phase 1 - Core `@neverblink/linkml` AST Mapper, Compiler & Importer](./01-phase-1-linkml-engine-and-compiler.md) `open`
-  - Slice 1.1: Install `@neverblink/linkml` & define canonical LinkML / compiler types `open`
-  - Slice 1.2: Bidirectional Workbench DTO ↔ LinkML YAML AST mapper (`ast-mapper.ts`) `open`
-  - Slice 1.3: Multi-format compiler (`shacl`, `rdfs`, `owl`, `pydantic`, `jsonSchema`, `erDiagram`, `lint`) `open`
-  - Slice 1.4: Replace legacy SHACL/OWL string builders & Turtle importer with `@neverblink/linkml` `open`
+- [Phase 1 - Core `@neverblink/linkml` AST Mapper, Compiler & Importer](./01-phase-1-linkml-engine-and-compiler.md) `done`
+  - Slice 1.1: Install `@neverblink/linkml` & define canonical LinkML / compiler types `done`
+  - Slice 1.2: Bidirectional Workbench DTO ↔ LinkML YAML AST mapper (`ast-mapper.ts`) `done`
+  - Slice 1.3: Multi-format compiler (`shacl`, `rdfs`, `owl`, `pydantic`, `jsonSchema`, `erDiagram`, `lint`) `done`
+  - Slice 1.4: Replace legacy SHACL/OWL string builders & Turtle importer with `@neverblink/linkml` `done`
 - [Phase 2 - `ohi.dev` Package Manager, SHA-256 Lockfiles & Registry Replacement](./02-phase-2-ohi-package-manager-and-lockfiles.md) `open`
   - Slice 2.1: Add `ohi.yaml` & `ohi.lock.json` v2 columns to DB schema `open`
   - Slice 2.2: Implement `ohi.dev` catalog client & transitive dependency resolver `open`
