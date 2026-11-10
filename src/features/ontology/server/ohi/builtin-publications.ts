@@ -47,6 +47,7 @@ export interface OhiPublicationMetadata {
     format?: OhiFormat
   }>
   artifacts: Partial<Record<OhiFormat, OhiArtifactDescriptor>>
+  tags?: string[]
 }
 
 /**
@@ -161,6 +162,7 @@ function buildPublication(
       "linkml-yaml": linkmlArtifact,
       "owl-turtle": turtleArtifact,
     },
+    tags,
   }
 
   return {
@@ -492,6 +494,88 @@ ssn:Stimulus a owl:Class ;
 `
 
 // ---------------------------------------------------------------------------
+// 5b. w3c/sosa@2017
+// ---------------------------------------------------------------------------
+const SOSA_LINKML = `id: http://www.w3.org/ns/sosa
+name: sosa
+title: "Sensor, Observation, Sample, and Actuator (SOSA) Core Ontology"
+version: "2017"
+prefixes:
+  sosa: http://www.w3.org/ns/sosa/
+  linkml: https://w3id.org/linkml/
+default_prefix: sosa
+imports:
+  - linkml:types
+classes:
+  Observation:
+    description: Act of carrying out an (Observation) Procedure to estimate or calculate a value of a property of a FeatureOfInterest.
+  Sensor:
+    description: Device, agent (including humans), or software (simulation) involved in, or implementing, a Procedure.
+  Platform:
+    description: A Entity to which other Entities (like Sensors, Actuators, Samplers, and other Platforms) may be attached.
+  FeatureOfInterest:
+    description: The thing whose property is being estimated or observed.
+  ObservableProperty:
+    description: An observable quality (property, characteristic) of a FeatureOfInterest.
+  ActuatableProperty:
+    description: An actuatable property of a FeatureOfInterest.
+  Actuator:
+    description: A device that is used by, or implements, an (Actuation) Procedure that changes the state of the world.
+  Sampler:
+    description: A device that is used by, or implements, a (Sampling) Procedure to create or transform one or more samples.
+  Procedure:
+    description: A workflow, protocol, plan, algorithm, or computational method specifying how to make an Observation.
+slots:
+  hosts:
+    domain: Platform
+    range: Sensor
+  observes:
+    domain: Sensor
+    range: ObservableProperty
+  hasFeatureOfInterest:
+    domain: Observation
+    range: FeatureOfInterest
+  observedProperty:
+    domain: Observation
+    range: ObservableProperty
+  madeBySensor:
+    domain: Observation
+    range: Sensor
+`
+
+const SOSA_TURTLE = `@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix sosa: <http://www.w3.org/ns/sosa/> .
+
+<http://www.w3.org/ns/sosa/> a owl:Ontology ;
+    rdfs:label "Sensor, Observation, Sample, and Actuator (SOSA) Core Ontology" ;
+    owl:versionInfo "2017" .
+
+sosa:Observation a owl:Class ;
+    rdfs:label "Observation" ;
+    rdfs:comment "Act of carrying out an (Observation) Procedure to estimate or calculate a value of a property of a FeatureOfInterest." .
+
+sosa:Sensor a owl:Class ;
+    rdfs:label "Sensor" ;
+    rdfs:comment "Device, agent (including humans), or software (simulation) involved in, or implementing, a Procedure." .
+
+sosa:Platform a owl:Class ;
+    rdfs:label "Platform" ;
+    rdfs:comment "A Entity to which other Entities may be attached." .
+
+sosa:ActuatableProperty a owl:Class ;
+    rdfs:label "ActuatableProperty" ;
+    rdfs:comment "An actuatable property of a FeatureOfInterest." .
+
+sosa:hosts a owl:ObjectProperty ;
+    rdfs:label "hosts" .
+
+sosa:observes a owl:ObjectProperty ;
+    rdfs:label "observes" .
+`
+
+// ---------------------------------------------------------------------------
 // 6. w3c/org@2014
 // ---------------------------------------------------------------------------
 const ORG_LINKML = `id: http://www.w3.org/ns/org
@@ -777,6 +861,22 @@ export const BUILTIN_PUBLICATIONS: Map<string, BuiltinPublication> = new Map([
     ),
   ],
   [
+    "w3c/sosa@2017",
+    buildPublication(
+      "w3c",
+      "sosa",
+      "2017",
+      "Sensor, Observation, Sample, and Actuator (SOSA) Core Ontology",
+      "SOSA ontology describing sensors, observations, actuations, and samples.",
+      "W3C-Software-Notice",
+      "http://www.w3.org/ns/sosa/",
+      [],
+      SOSA_LINKML,
+      SOSA_TURTLE,
+      ["sosa", "sensor", "observation", "sampling", "actuator", "iot", "w3c"]
+    ),
+  ],
+  [
     "w3c/org@2014",
     buildPublication(
       "w3c",
@@ -873,7 +973,7 @@ export function getBuiltinPublication(
 
   // If version is specified, check namespace/name@version
   if (version) {
-    for (const [key, pub] of BUILTIN_PUBLICATIONS.entries()) {
+    for (const pub of BUILTIN_PUBLICATIONS.values()) {
       if (
         pub.metadata.name.toLowerCase() === name.toLowerCase() &&
         pub.metadata.version === version &&
@@ -949,5 +1049,6 @@ export function getBuiltinPackageSummaries(): OhiPackageSummary[] {
     latest_version: latest.metadata.version,
     versions: versions.sort((a, b) => compareVersions(b, a)),
     license: latest.metadata.license,
+    tags: latest.metadata.tags,
   }))
 }

@@ -1,8 +1,6 @@
 import {
-  BUILTIN_PUBLICATIONS,
   getBuiltinPackageSummaries,
   getBuiltinPublication,
-  parsePackageRef,
   type OhiArtifactDescriptor,
   type OhiPackageSummary,
   type OhiPublicationMetadata,
@@ -119,7 +117,8 @@ export async function searchOhiPackages(
       pkg.namespace.toLowerCase().includes(cleanQuery) ||
       pkg.package_ref.toLowerCase().includes(cleanQuery) ||
       pkg.title.toLowerCase().includes(cleanQuery) ||
-      pkg.description.toLowerCase().includes(cleanQuery)
+      pkg.description.toLowerCase().includes(cleanQuery) ||
+      pkg.tags?.some((t) => t.toLowerCase().includes(cleanQuery))
     )
   })
 

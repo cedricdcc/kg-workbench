@@ -130,7 +130,7 @@ Status: `open`
 
 ---
 
-### Task 4: Replace Legacy Vocabulary Registries with `ohi.dev` Service Layer (Slice 2.4) `open`
+### Task 4: Replace Legacy Vocabulary Registries with `ohi.dev` Service Layer (Slice 2.4) `closed`
 
 **Files:**
 
@@ -148,13 +148,13 @@ Status: `open`
 - Produces:
   - Updated `reference-vocabularies.ts` actions (`searchOhiRegistryAction`, `addReferenceOntology`, `syncReferenceOntology`) backed solely by `ohi.dev`.
 
-- [ ] **Step 1: Update registry service & actions to route exclusively through `src/features/ontology/server/ohi/`**
+- [x] **Step 1: Update registry service & actions to route exclusively through `src/features/ontology/server/ohi/`**
       Remove OLS4, LOV, BARTOC, OntoPortal, and EU Vocabularies provider files and wire `reference-vocabularies.ts` and `domain-discovery.ts` to `ohi.dev`.
 
-- [ ] **Step 2: Run full check suite**
+- [x] **Step 2: Run full check suite**
       Run: `npm exec pnpm -- check`
       Expected: All lint, typecheck, test, and build checks PASS.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
       `git add -A src/features/ontology/server/ tests/`
       `git commit -m "refactor(ontology): replace legacy vocabulary registries with ohi.dev package manager"`

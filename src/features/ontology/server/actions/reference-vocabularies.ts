@@ -23,6 +23,13 @@ import {
   type EndpointTestResult,
   type RegistrySearchResult,
 } from "@/features/ontology/server/services/vocabulary-registries"
+import {
+  searchOhiPackages,
+  inspectOhiPublication,
+  resolveOhiDependencyTree,
+} from "@/features/ontology/server/ohi/catalog-client"
+import { getBuiltinPublication } from "@/features/ontology/server/ohi/builtin-publications"
+import type { OhiManifest } from "@/features/ontology/server/ohi/types"
 import { formatKeyHint, getEffectiveApiKey } from "@/server/api-keys"
 import { encryptSecret } from "@/server/crypto"
 import { getUserIdFromCookies } from "@/server/user-identity"
@@ -38,6 +45,7 @@ export type AddReferenceOntologyInput = {
   name: string
   baseIri: string
   sourceRegistry:
+    | "ohi"
     | "ols"
     | "lov"
     | "bartoc"
@@ -64,16 +72,70 @@ export type TermAlignmentCandidate = {
   similarity: number
 }
 
+export async function searchOhiRegistryAction(
+  query: string,
+  options?: { limit?: number }
+): Promise<RegistrySearchResult[]> {
+  const packages = await searchOhiPackages(query, { limit: options?.limit })
+  return packages.map((pkg) => {
+    const builtin = getBuiltinPublication(pkg.package_ref)
+    return {
+      source: "ohi",
+      sourceId: `${pkg.namespace}/${pkg.name}`,
+      prefix: pkg.name,
+      name: pkg.title || pkg.name,
+      description: pkg.description || "",
+      baseIri:
+        builtin?.metadata.base_url ||
+        `https://ohi.dev/${pkg.namespace}/${pkg.name}`,
+    }
+  })
+}
+
 export async function addReferenceOntology(
   input: AddReferenceOntologyInput
 ): Promise<{ id: string; prefix: string; name: string }> {
-  const prefix = input.prefix?.trim().toLowerCase()
+  let prefix = input.prefix?.trim().toLowerCase()
+  let name = input.name?.trim()
+  let baseIri = input.baseIri?.trim()
+  const sourceRegistry = input.sourceRegistry || "ohi"
+  const sourceId = input.sourceId?.trim() || prefix
+
+  if (sourceRegistry === "ohi" && sourceId) {
+    try {
+      const pub = await inspectOhiPublication(sourceId)
+      if (!prefix) {
+        prefix = pub.name.toLowerCase()
+      }
+      if (!name) {
+        name = pub.title || pub.name.toUpperCase()
+      }
+      if (!baseIri) {
+        baseIri = pub.base_url || `https://ohi.dev/${pub.namespace}/${pub.name}`
+      }
+
+      // Resolve transitive dependency tree to verify lockability
+      const manifest: OhiManifest = {
+        format_version: 1,
+        default_format: "linkml-yaml",
+        download_dir: ".ohi",
+        dependencies: [{ ontology: pub.package_ref, format: "linkml-yaml" }],
+      }
+      await resolveOhiDependencyTree(manifest)
+    } catch (err) {
+      console.warn(
+        `[addReferenceOntology] OHI inspection or dependency resolution warning for "${sourceId}":`,
+        err
+      )
+    }
+  }
+
   if (!prefix) {
     throw new Error("Prefix is required.")
   }
-
-  const name = input.name?.trim() || prefix.toUpperCase()
-  const baseIri = input.baseIri?.trim()
+  if (!name) {
+    name = prefix.toUpperCase()
+  }
   if (!baseIri) {
     throw new Error("Base IRI is required.")
   }
@@ -87,8 +149,8 @@ export async function addReferenceOntology(
       prefix,
       name,
       base_iri: baseIri,
-      source_registry: input.sourceRegistry || "ols",
-      source_id: input.sourceId || prefix,
+      source_registry: sourceRegistry,
+      source_id: sourceId || prefix,
       version: input.version || "",
       group_key: groupKey,
     })
@@ -125,11 +187,8 @@ export async function syncReferenceOntology(
     throw new Error("Reference ontology not found.")
   }
 
-  // Fetch terms from public registry
-  const terms = await fetchRegistryTerms(
-    ont.source_registry as "ols" | "lov",
-    ont.source_id
-  )
+  // Fetch terms from public registry or ohi.dev
+  const terms = await fetchRegistryTerms(ont.source_registry, ont.source_id)
 
   if (terms.length === 0) {
     return { termsSynced: 0 }
