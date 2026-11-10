@@ -564,37 +564,7 @@ test("End-to-end integration pipeline: conversation -> query -> worker claim & c
     assert.equal(claimData.job.target_worker, "analyst")
     assert.equal(claimData.job.status, "claimed")
 
-    // Step 4: Analyst worker completes job through /api/system/jobs/[id]/complete
-    const completeReq = new Request(
-      `http://localhost/api/system/jobs/${queryResult.jobId}/complete`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          result: {
-            processedBy: "analyst-worker-node-1",
-            status: "processed",
-            subgraphSize: { nodes: 3, edges: 2 },
-          },
-        }),
-      }
-    )
-    const completeRes = await completeHandler(completeReq, {
-      params: Promise.resolve({ id: queryResult.jobId }),
-    })
-    assert.equal(completeRes.status, 200)
-    const completeData = await completeRes.json()
-    assert.equal(completeData.ok, true)
-    assert.equal(completeData.id, queryResult.jobId)
-
-    // Verify job status updated to completed in queue
-    assert.equal(matchedJob.status, "completed")
-    assert.equal(
-      (matchedJob.result as { processedBy?: string })?.processedBy,
-      "analyst-worker-node-1"
-    )
-
-    // Step 5: Assistant message persistence with citations, reasoning trace, and subgraph
+    // Step 4: Analyst worker completes job through /api/system/jobs/[id]/complete with assistant payload
     const assistantPayload = {
       conversation_id: conv.id,
       sender: "assistant",
@@ -669,10 +639,36 @@ test("End-to-end integration pipeline: conversation -> query -> worker claim & c
       ],
     }
 
-    await simulatedDb
-      .insert(analystMessages)
-      .values(assistantPayload)
-      .returning()
+    const completeReq = new Request(
+      `http://localhost/api/system/jobs/${queryResult.jobId}/complete`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          result: {
+            processedBy: "analyst-worker-node-1",
+            status: "processed",
+            ...assistantPayload,
+          },
+        }),
+      }
+    )
+    const completeRes = await completeHandler(completeReq, {
+      params: Promise.resolve({ id: queryResult.jobId }),
+    })
+    assert.equal(completeRes.status, 200)
+    const completeData = await completeRes.json()
+    assert.equal(completeData.ok, true)
+    assert.equal(completeData.id, queryResult.jobId)
+
+    // Verify job status updated to completed in queue
+    assert.equal(matchedJob.status, "completed")
+    assert.equal(
+      (matchedJob.result as { processedBy?: string })?.processedBy,
+      "analyst-worker-node-1"
+    )
+
+    // Step 5: (completeJob automatically persisted assistant message into analyst_messages)
 
     // Step 6: Query conversation messages & verify full history and structure
     const messages = await getMessagesQuery(

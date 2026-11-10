@@ -1,5 +1,11 @@
 import { eq, sql } from "drizzle-orm"
-import { domainEvents, jobQueue } from "../db/schema"
+import {
+  analystConversations,
+  analystMessages,
+  domainEvents,
+  jobQueue,
+  knowledgeContradictions,
+} from "../db/schema"
 import type { DbOrTx } from "./types"
 
 export function calculateRetryBackoff(attempt: number): number {
@@ -121,6 +127,114 @@ export async function completeJob(
       updated_at: new Date().toISOString(),
     })
     .where(eq(jobQueue.id, jobId))
+
+  // Dispatch post-completion side effects for domain events
+  try {
+    const dbClient = db as unknown as {
+      select: () => {
+        from: (table: unknown) => {
+          where: (condition: unknown) => {
+            limit: (n: number) => Promise<Array<typeof jobQueue.$inferSelect>>
+          }
+        }
+      }
+    }
+    const [jobRecord] = await dbClient
+      .select()
+      .from(jobQueue)
+      .where(eq(jobQueue.id, jobId))
+      .limit(1)
+
+    if (jobRecord?.event_id) {
+      const eventClient = db as unknown as {
+        select: () => {
+          from: (table: unknown) => {
+            where: (condition: unknown) => {
+              limit: (
+                n: number
+              ) => Promise<Array<typeof domainEvents.$inferSelect>>
+            }
+          }
+        }
+      }
+      const [eventRecord] = await eventClient
+        .select()
+        .from(domainEvents)
+        .where(eq(domainEvents.id, jobRecord.event_id))
+        .limit(1)
+
+      if (eventRecord) {
+        const payload = (eventRecord.payload as Record<string, unknown>) || {}
+        if (eventRecord.event_type === "analyst.query_requested") {
+          const conversationId =
+            (payload.conversationId as string) ||
+            (result?.conversationId as string)
+          if (conversationId) {
+            const answer =
+              (result?.content as string) ||
+              (result?.answer as string) ||
+              "Analysis complete."
+            const insertClient = db as unknown as {
+              insert: (table: unknown) => {
+                values: (val: unknown) => Promise<unknown>
+              }
+            }
+            await insertClient.insert(analystMessages).values({
+              conversation_id: conversationId,
+              sender: "assistant",
+              content: answer,
+              reasoning_trace:
+                result?.reasoning_trace ?? result?.reasoningTrace ?? null,
+              subgraph: result?.subgraph ?? null,
+              citations: result?.citations ?? null,
+            })
+
+            const updateConvClient = db as unknown as {
+              update: (table: unknown) => {
+                set: (val: unknown) => {
+                  where: (condition: unknown) => Promise<unknown>
+                }
+              }
+            }
+            await updateConvClient
+              .update(analystConversations)
+              .set({ updated_at: new Date().toISOString() })
+              .where(eq(analystConversations.id, conversationId))
+          }
+        } else if (
+          eventRecord.event_type === "analyst.drift_analysis_requested"
+        ) {
+          const contradictions =
+            (result?.contradictions as Array<Record<string, unknown>>) || []
+          if (contradictions.length > 0) {
+            const insertClient = db as unknown as {
+              insert: (table: unknown) => {
+                values: (val: unknown) => Promise<unknown>
+              }
+            }
+            for (const c of contradictions) {
+              await insertClient.insert(knowledgeContradictions).values({
+                ontology_id:
+                  (c.ontologyId as string) || eventRecord.aggregate_id,
+                group_key: (c.groupKey as string) || "shared",
+                entity_id: String(c.entityId || "entity"),
+                entity_label: String(c.entityLabel || c.entityId || "Entity"),
+                relation_name: String(c.relationName || "relation"),
+                conflict_type: String(c.conflictType || "value_mismatch"),
+                fact_a: c.factA || {},
+                fact_b: c.factB || {},
+                explanation: String(c.explanation || "Contradiction detected"),
+                status: "open",
+                resolution_action: null,
+              })
+            }
+          }
+        }
+      }
+    }
+  } catch {
+    // Non-fatal if domain post-processing encountered error
+  }
 }
 
 export async function failJob(
@@ -150,6 +264,65 @@ export async function failJob(
         updated_at: new Date().toISOString(),
       })
       .where(eq(jobQueue.id, jobId))
+
+    // If analyst query failed permanently, write assistant error message so UI doesn't hang
+    try {
+      const selectClient = db as unknown as {
+        select: () => {
+          from: (table: unknown) => {
+            where: (condition: unknown) => {
+              limit: (n: number) => Promise<Array<typeof jobQueue.$inferSelect>>
+            }
+          }
+        }
+      }
+      const [jobRecord] = await selectClient
+        .select()
+        .from(jobQueue)
+        .where(eq(jobQueue.id, jobId))
+        .limit(1)
+
+      if (jobRecord?.event_id) {
+        const eventClient = db as unknown as {
+          select: () => {
+            from: (table: unknown) => {
+              where: (condition: unknown) => {
+                limit: (
+                  n: number
+                ) => Promise<Array<typeof domainEvents.$inferSelect>>
+              }
+            }
+          }
+        }
+        const [eventRecord] = await eventClient
+          .select()
+          .from(domainEvents)
+          .where(eq(domainEvents.id, jobRecord.event_id))
+          .limit(1)
+
+        if (eventRecord?.event_type === "analyst.query_requested") {
+          const payload = (eventRecord.payload as Record<string, unknown>) || {}
+          const conversationId = payload.conversationId as string
+          if (conversationId) {
+            const insertClient = db as unknown as {
+              insert: (table: unknown) => {
+                values: (val: unknown) => Promise<unknown>
+              }
+            }
+            await insertClient.insert(analystMessages).values({
+              conversation_id: conversationId,
+              sender: "assistant",
+              content: `Sorry, I encountered an error while processing the knowledge graph query: ${errorMessage}. Please check service health and try again.`,
+              reasoning_trace: [{ step: "Job Failure", detail: errorMessage }],
+              subgraph: null,
+              citations: null,
+            })
+          }
+        }
+      }
+    } catch {
+      // Non-fatal
+    }
 
     return { status: "failed" }
   }

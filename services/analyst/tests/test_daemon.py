@@ -139,3 +139,96 @@ async def test_execute_job():
     assert result["processedBy"] == settings.worker_id
     assert result["status"] == "processed"
     assert result["eventType"] == "analyst.qa_query"
+
+
+@pytest.mark.asyncio
+async def test_execute_job_query_empty_graph():
+    claimed_job = {
+        "ok": True,
+        "job": {
+            "id": "analyst-job-empty",
+            "attempts": 1,
+        },
+        "eventPayload": {
+            "eventType": "analyst.query_requested",
+            "conversationId": "conv-123",
+            "query": "Find all organizations in Finland",
+            "facts": [],
+            "anchors": [],
+            "datasets": [],
+        },
+    }
+
+    mock_client = AsyncMock()
+    mock_complete_resp = MagicMock()
+    mock_complete_resp.status_code = 200
+    mock_client.post.return_value = mock_complete_resp
+
+    await execute_job(mock_client, claimed_job)
+
+    assert mock_client.post.called
+    complete_call = mock_client.post.call_args
+    assert "analyst-job-empty/complete" in complete_call[0][0]
+    result = complete_call[1]["json"]["result"]
+    assert result["status"] == "completed"
+    assert "no accepted facts or mapped tabular datasets" in result["answer"]
+    assert result["subgraph"]["nodes"] == []
+    assert len(result["reasoningTrace"]) > 0
+
+
+@pytest.mark.asyncio
+async def test_execute_job_query_with_facts():
+    claimed_job = {
+        "ok": True,
+        "job": {
+            "id": "analyst-job-facts",
+            "attempts": 1,
+        },
+        "eventPayload": {
+            "eventType": "analyst.query_requested",
+            "conversationId": "conv-456",
+            "query": "Find marine institutes in Finland",
+            "facts": [
+                {
+                    "id": "fact-1",
+                    "subject_text": "Finnish Marine Institute",
+                    "subject_entity_id": "ent-1",
+                    "relation_text": "located_in",
+                    "object_text": "Finland",
+                    "object_entity_id": "ent-2",
+                    "review_status": "accepted",
+                    "confidence": 0.95,
+                    "document_id": "doc-1",
+                }
+            ],
+            "anchors": [
+                {
+                    "fact_id": "fact-1",
+                    "sourceName": "Baltic Survey 2025",
+                    "document_id": "doc-1",
+                    "paragraph_id": 3,
+                    "quote_text": "The Finnish Marine Institute operates headquarters in Finland.",
+                }
+            ],
+            "datasets": [],
+        },
+    }
+
+    mock_client = AsyncMock()
+    mock_complete_resp = MagicMock()
+    mock_complete_resp.status_code = 200
+    mock_client.post.return_value = mock_complete_resp
+
+    await execute_job(mock_client, claimed_job)
+
+    assert mock_client.post.called
+    complete_call = mock_client.post.call_args
+    assert "analyst-job-facts/complete" in complete_call[0][0]
+    result = complete_call[1]["json"]["result"]
+    assert result["status"] == "completed"
+    assert len(result["subgraph"]["nodes"]) >= 2
+    assert len(result["subgraph"]["edges"]) >= 1
+    assert len(result["reasoningTrace"]) >= 3
+    assert len(result["citations"]) >= 1
+    assert "Finnish Marine Institute" in result["answer"]
+
