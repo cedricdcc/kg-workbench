@@ -1,7 +1,7 @@
 import YAML from "yaml"
 import { parsePackageRef } from "./builtin-publications"
 import { findArtifactContent } from "./lockfile-verifier"
-import type { OhiLockedFile, OhiLockfileV2 } from "./types"
+import type { OhiLockfileV2 } from "./types"
 
 /**
  * Injects CURIE aliases into LinkML YAML (e.g. `prov:Activity: is_a: Activity`)
