@@ -29,7 +29,7 @@ Status: `open`
 
 ---
 
-### Slice 3.1: Drizzle Schema Refactor, Domain Types & SQL Migration `open`
+### Task 1: Drizzle Schema Refactor, Domain Types & SQL Migration (Slice 3.1) `closed`
 
 **Files:**
 
@@ -67,7 +67,7 @@ Status: `open`
 
 ---
 
-### Slice 3.2: Transactional Symbol Cascade Service & AST Diff Engine `open`
+### Task 2: Transactional Symbol Cascade Service & AST Diff Engine (Slice 3.2) `closed`
 
 **Files:**
 
@@ -85,24 +85,24 @@ Status: `open`
   - `loadCanonicalOntology(ontologyId: string, db?: DbClient): Promise<CanonicalOntologySnapshot>`
   - `saveCanonicalOntology(ontologyId: string, mutator: (draft: CanonicalOntologySnapshot) => void | Promise<void>, options?: { recompile?: boolean }): Promise<CanonicalOntologySnapshot>`
 
-- [ ] **Step 1: Write failing tests for symbol diffing and rename/delete cascade plans**
+- [x] **Step 1: Write failing tests for symbol diffing and rename/delete cascade plans**
       Create `tests/linkml-symbol-cascade.test.ts` testing class rename (`"Person"` → `"Individual"` cascading to `"Individual.age"`), relation rename, class delete, and raw LinkML diff detection.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
       Run: `npm exec pnpm -- test tests/linkml-symbol-cascade.test.ts`
 
-- [ ] **Step 3: Implement `symbol-cascade.ts` and `document-store.ts`**
+- [x] **Step 3: Implement `symbol-cascade.ts` and `document-store.ts`**
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
       Run: `npm exec pnpm -- test tests/linkml-symbol-cascade.test.ts`
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
       `git add src/features/ontology/server/linkml/symbol-cascade.ts src/features/ontology/server/linkml/document-store.ts tests/linkml-symbol-cascade.test.ts`
       `git commit -m "feat(ontology): add transactional symbol cascade service and canonical document store"`
 
 ---
 
-### Slice 3.3: Refactor Ontology Server Queries & Blast Radius to Read from `linkml_yaml` `open`
+### Task 3: Refactor Ontology Server Queries & Blast Radius to Read from `linkml_yaml` (Slice 3.3) `open`
 
 **Files:**
 
@@ -139,7 +139,7 @@ Status: `open`
 
 ---
 
-### Slice 3.4: Refactor Ontology & Tabular Server Write Actions `open`
+### Task 4: Refactor Ontology & Tabular Server Write Actions (Slice 3.4) `open`
 
 **Files:**
 
