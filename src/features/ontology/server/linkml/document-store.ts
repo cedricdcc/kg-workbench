@@ -20,9 +20,11 @@ export interface DbClient extends DbTransaction {
   transaction?: <T>(cb: (tx: DbTransaction) => Promise<T>) => Promise<T>
 }
 
+export type AnyDbClient = DbClient | ReturnType<typeof getDb>
+
 export interface SaveCanonicalOntologyOptions {
   recompile?: boolean
-  db?: DbClient
+  db?: AnyDbClient
   diffOptions?: DiffLinkmlOptions
 }
 
@@ -46,7 +48,7 @@ const DELETE_ORDER: Record<SymbolKind, number> = {
  */
 export async function loadCanonicalOntology(
   ontologyId: string,
-  db?: DbClient
+  db?: AnyDbClient
 ): Promise<CanonicalOntologySnapshot> {
   const database = (db ?? getDb()) as unknown as DbClient
 

@@ -1,5 +1,6 @@
 export {
   getOntologyClass,
+  getOntologyClassById,
   getOntologyClasses,
   getOntologyClassesByModule,
 } from "./classes"
@@ -10,7 +11,11 @@ export {
   getOntologyDocumentsForPicker,
 } from "./documents"
 export { getOntologyLanguages } from "./languages"
-export { getClassPositions, getModuleLayouts } from "./layout"
+export {
+  getClassPositions,
+  getModuleLayouts,
+  getOntologyLayout,
+} from "./layout"
 export {
   getAffectedCompetencyQuestionsForExample,
   getOntologyExamples,
@@ -24,6 +29,7 @@ export {
 export { getOntologyModules } from "./modules"
 export {
   getOntologyRelation,
+  getOntologyRelationById,
   getOntologyRelations,
   getOntologyRelationsByModule,
 } from "./relations"
