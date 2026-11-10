@@ -15,9 +15,9 @@ export function SettingsShell({
   initialServices = [],
 }: SettingsShellProps) {
   return (
-    <div className="flex-1 space-y-8 p-6 max-w-4xl">
+    <div className="mx-auto w-full max-w-7xl flex-1 space-y-8 p-6 md:p-8">
       <div className="space-y-1">
-        <h1 className="text-2xl font-bold font-heading tracking-tight">
+        <h1 className="font-heading text-2xl font-bold tracking-tight">
           Settings
         </h1>
         <p className="text-sm text-muted-foreground">
@@ -26,7 +26,7 @@ export function SettingsShell({
         </p>
       </div>
 
-      <div className="space-y-8">
+      <div className="grid grid-cols-1 items-start gap-8 lg:grid-cols-2">
         <ApiKeysSection initialStatuses={initialStatuses} />
         {initialServices.length > 0 && (
           <ServicesSection services={initialServices} />

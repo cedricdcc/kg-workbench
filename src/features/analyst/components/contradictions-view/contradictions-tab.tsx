@@ -132,7 +132,7 @@ export function ContradictionsTab({
 
   return (
     <div
-      className={cn("flex w-full max-w-4xl flex-col gap-4", className)}
+      className={cn("mx-auto flex w-full max-w-7xl flex-col gap-4", className)}
       data-testid="contradictions-tab"
     >
       {/* Top Header / Action Bar */}
@@ -286,7 +286,10 @@ export function ContradictionsTab({
         </div>
       ) : (
         /* List of Contradiction Cards */
-        <div className="flex flex-col gap-3" data-testid="contradictions-list">
+        <div
+          className="grid grid-cols-1 gap-4 xl:grid-cols-2"
+          data-testid="contradictions-list"
+        >
           {filteredContradictions.map((contra) => (
             <ContradictionCard
               key={contra.id}

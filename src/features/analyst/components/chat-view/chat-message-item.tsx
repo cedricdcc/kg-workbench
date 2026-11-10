@@ -166,7 +166,7 @@ export function ChatMessageItem({
         <Sparkles className="h-4 w-4" />
       </div>
 
-      <div className="flex max-w-3xl min-w-0 flex-1 flex-col gap-3">
+      <div className="flex w-full max-w-6xl min-w-0 flex-1 flex-col gap-3">
         <div className="rounded-2xl rounded-tl-xs border bg-card p-4 text-xs text-card-foreground shadow-xs">
           {/* Formatted Text Content with parsed citation pills */}
           <div className="leading-relaxed whitespace-pre-wrap text-foreground">
@@ -205,30 +205,6 @@ export function ChatMessageItem({
             })}
           </div>
 
-          {/* Additional Sources List if citations provided */}
-          {message.citations && message.citations.length > 0 && (
-            <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-border/50 pt-2.5 text-[11px]">
-              <span className="mr-1 flex items-center gap-1 font-medium text-muted-foreground">
-                <FileText className="h-3 w-3" /> Sources:
-              </span>
-              {message.citations.map((c, i) => (
-                <button
-                  key={i}
-                  type="button"
-                  onClick={() => onSelectCitation?.(c)}
-                  className="inline-flex cursor-pointer items-center gap-1 rounded-full border bg-muted/40 px-2 py-0.5 font-mono text-[10px] transition-colors hover:bg-primary/10 hover:text-primary"
-                  data-testid="citation-pill"
-                >
-                  <span>{c.sourceName}</span>
-                  {c.paragraphIndex !== undefined && (
-                    <span>§{c.paragraphIndex}</span>
-                  )}
-                  {c.tableRowKey && <span>#{c.tableRowKey}</span>}
-                </button>
-              ))}
-            </div>
-          )}
-
           {/* Subgraph button */}
           {message.subgraph && (
             <div className="mt-3 border-t border-border/40 pt-2">
@@ -252,12 +228,70 @@ export function ChatMessageItem({
           )}
         </div>
 
-        {/* Embedded Reasoning Trace Card */}
-        {message.reasoningTrace && message.reasoningTrace.length > 0 && (
-          <ReasoningTraceCard
-            steps={message.reasoningTrace}
-            defaultOpen={defaultTraceOpen}
-          />
+        {/* Embedded Reasoning Trace Card & Source Citations Sub-Grid */}
+        {((message.reasoningTrace && message.reasoningTrace.length > 0) ||
+          (message.citations && message.citations.length > 0)) && (
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            {message.reasoningTrace && message.reasoningTrace.length > 0 && (
+              <ReasoningTraceCard
+                steps={message.reasoningTrace}
+                defaultOpen={defaultTraceOpen}
+                className={cn(
+                  (!message.citations || message.citations.length === 0) &&
+                    "col-span-full"
+                )}
+              />
+            )}
+
+            {message.citations && message.citations.length > 0 && (
+              <div
+                className={cn(
+                  "rounded-lg border bg-muted/30 p-3 text-xs",
+                  (!message.reasoningTrace ||
+                    message.reasoningTrace.length === 0) &&
+                    "col-span-full"
+                )}
+                data-testid="citations-card"
+              >
+                <div className="mb-2 flex items-center gap-1.5 font-medium text-foreground">
+                  <FileText className="h-3.5 w-3.5 text-primary" />
+                  <span>Sources</span>
+                  <Badge
+                    variant="secondary"
+                    className="h-4 px-1.5 text-[10px] font-normal"
+                  >
+                    {message.citations.length}
+                  </Badge>
+                </div>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {message.citations.map((c, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => onSelectCitation?.(c)}
+                      className="inline-flex cursor-pointer items-center gap-1 rounded-full border bg-background/80 px-2 py-0.5 font-mono text-[10px] transition-colors hover:bg-primary/10 hover:text-primary"
+                      data-testid="citation-pill"
+                      data-citation-source={c.sourceName}
+                      title={`Inspect citation: ${c.sourceName}`}
+                    >
+                      {c.sourceType === "table" ? (
+                        <TableIcon className="h-3 w-3 shrink-0" />
+                      ) : (
+                        <FileText className="h-3 w-3 shrink-0" />
+                      )}
+                      <span>{c.sourceName}</span>
+                      {c.paragraphIndex !== undefined && (
+                        <span className="opacity-80">§{c.paragraphIndex}</span>
+                      )}
+                      {c.tableRowKey && (
+                        <span className="opacity-80">#{c.tableRowKey}</span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         )}
 
         <span className="px-1 text-[10px] text-muted-foreground">

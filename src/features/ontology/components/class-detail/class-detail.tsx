@@ -98,7 +98,7 @@ export function ClassDetail({
 
   return (
     <>
-      <Tabs defaultValue="general" className="min-w-0 px-6 pt-3 pb-6">
+      <Tabs defaultValue="general" className="w-full min-w-0 px-6 pt-3 pb-6">
         <TabsList className="w-full justify-start" variant="line">
           <TabsTrigger value="general">General</TabsTrigger>
           <TabsTrigger value="instances">
@@ -117,7 +117,7 @@ export function ClassDetail({
           <TabsTrigger value="notes">Notes ({notes.length})</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="general" className="mt-1.5 space-y-6">
+        <TabsContent value="general" className="mt-1.5 w-full space-y-6">
           {activeDefects && activeDefects.length > 0 && (
             <DefectCalloutBanner
               defects={activeDefects}
@@ -133,7 +133,7 @@ export function ClassDetail({
             ontologyId={ontologyId}
           />
 
-          <section>
+          <section className="w-full">
             <LocalizedTextEditor
               ontologyId={ontologyId}
               target={{ type: "class", id: cls.id }}
@@ -160,7 +160,7 @@ export function ClassDetail({
             />
           </section>
 
-          <section>
+          <section className="w-full">
             <SemanticAlignmentsCard
               ontologyId={ontologyId}
               entityId={cls.id}
@@ -180,7 +180,7 @@ export function ClassDetail({
           </div>
         </TabsContent>
 
-        <TabsContent value="instances" className="mt-1.5 space-y-6">
+        <TabsContent value="instances" className="mt-1.5 w-full space-y-6">
           <EntityInstances
             ontologyId={ontologyId}
             target={{ type: "class", id: cls.id }}
@@ -194,7 +194,7 @@ export function ClassDetail({
           />
         </TabsContent>
 
-        <TabsContent value="attributes" className="mt-1.5 space-y-6">
+        <TabsContent value="attributes" className="mt-1.5 w-full space-y-6">
           <AttributeTable
             key={cls.id}
             ontologyId={ontologyId}
@@ -209,7 +209,7 @@ export function ClassDetail({
           />
         </TabsContent>
 
-        <TabsContent value="relations" className="mt-1.5 space-y-6">
+        <TabsContent value="relations" className="mt-1.5 w-full space-y-6">
           <ClassDetailRelations
             classId={cls.id}
             relations={relations}
@@ -219,7 +219,7 @@ export function ClassDetail({
           />
         </TabsContent>
 
-        <TabsContent value="notes" className="mt-1.5 space-y-6">
+        <TabsContent value="notes" className="mt-1.5 w-full space-y-6">
           <NotesEditor
             ontologyId={ontologyId}
             target={{ type: "class", id: cls.id }}

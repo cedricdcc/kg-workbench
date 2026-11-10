@@ -91,7 +91,7 @@ export function AttributeTable({
   }
 
   return (
-    <div className="min-w-0">
+    <div className="w-full min-w-0">
       <div className="mb-2 flex items-center justify-between">
         <p className="text-xs font-medium text-muted-foreground">
           Attributes ({attributes.length})
@@ -105,7 +105,7 @@ export function AttributeTable({
           <Plus className="h-3.5 w-3.5" />
         </Button>
       </div>
-      <Table className="table-fixed">
+      <Table className="w-full table-fixed">
         <TableHeader>
           <TableRow>
             <TableHead className="w-30 text-xs">Name</TableHead>

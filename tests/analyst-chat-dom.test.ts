@@ -114,6 +114,14 @@ if (isChildTest || !isReactServer) {
       "Must have assistant sender attribute"
     )
     assert.ok(
+      html.includes("max-w-6xl w-full"),
+      "Must expand assistant container to max-w-6xl w-full"
+    )
+    assert.ok(
+      html.includes("grid grid-cols-1 md:grid-cols-2 gap-3"),
+      "Must place ReasoningTraceCard and Citations in a responsive 2-column sub-grid"
+    )
+    assert.ok(
       html.includes("baltic_marine_2026.pdf"),
       "Must render parsed document citation pill"
     )
@@ -128,6 +136,37 @@ if (isChildTest || !isReactServer) {
     assert.ok(
       html.includes("Anchor entity identification"),
       "Must embed ReasoningTraceCard with step details"
+    )
+  })
+
+  test("ChatMessageItem renders full width for reasoning trace when no citations exist", async () => {
+    const { ChatMessageItem } =
+      await import("../src/features/analyst/components/chat-view/chat-message-item")
+
+    const assistantMsgOnlyTrace: AnalystMessage = {
+      id: "msg-asst-2",
+      conversationId: "conv-1",
+      sender: "assistant",
+      content: "Simple answer without external citations.",
+      reasoningTrace: [
+        { step: "Graph lookup", detail: "Scanned nodes directly" },
+      ],
+      createdAt: "2026-11-09T10:00:05.000Z",
+    }
+
+    const html = renderToStaticMarkup(
+      React.createElement(ChatMessageItem, {
+        message: assistantMsgOnlyTrace,
+      })
+    )
+
+    assert.ok(
+      html.includes("col-span-full"),
+      "Must span full width when only reasoning trace exists"
+    )
+    assert.ok(
+      html.includes("max-w-6xl w-full"),
+      "Must retain max-w-6xl w-full container"
     )
   })
 

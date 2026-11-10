@@ -332,6 +332,10 @@ if (isChildTest || !isReactServer) {
       "Must render Run Drift Analysis button"
     )
     assert.ok(
+      html.includes("grid-cols-1 xl:grid-cols-2 gap-4"),
+      "Must render contradictions list in a responsive 2-column grid on wide screens"
+    )
+    assert.ok(
       html.includes("Baltic Research Foundation"),
       "Must render contradiction A card"
     )
