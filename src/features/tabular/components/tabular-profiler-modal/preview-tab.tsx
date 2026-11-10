@@ -17,7 +17,7 @@ export function TabularPreviewTab({ rows, columns }: TabularPreviewTabProps) {
   const colNames = columns.map((c) => c.name)
 
   return (
-    <div className="max-h-[calc(100vh-20rem)] w-full overflow-x-auto overflow-y-auto rounded-md border border-border">
+    <div className="h-full min-h-0 w-full flex-1 overflow-x-auto overflow-y-auto rounded-md border border-border">
       <table className="w-full border-collapse text-left text-xs">
         <thead className="sticky top-0 z-10 bg-muted/50 font-medium tracking-wider text-muted-foreground uppercase backdrop-blur-sm">
           <tr>

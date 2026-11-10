@@ -19,7 +19,7 @@ export function TabularSchemaTab({ columns }: TabularSchemaTabProps) {
   }
 
   return (
-    <div className="max-h-[calc(100vh-20rem)] w-full overflow-auto rounded-md border border-border">
+    <div className="h-full min-h-0 w-full flex-1 overflow-auto rounded-md border border-border">
       <table className="w-full border-collapse text-left text-sm">
         <thead className="sticky top-0 z-10 bg-muted/50 text-xs font-medium tracking-wider text-muted-foreground uppercase backdrop-blur-sm">
           <tr>

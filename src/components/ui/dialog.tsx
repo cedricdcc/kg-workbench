@@ -52,7 +52,7 @@ const dialogViewportVariants = {
     "fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl border bg-popover p-4 text-xs/relaxed text-popover-foreground shadow-lg duration-100 outline-none sm:max-w-md",
   wide: "fixed top-1/2 left-1/2 z-50 w-[calc(100vw-2rem)] max-w-5xl max-h-[88vh] -translate-x-1/2 -translate-y-1/2 rounded-xl border bg-background text-popover-foreground shadow-2xl flex flex-col overflow-hidden outline-none duration-100",
   fullscreen:
-    "fixed top-3 left-3 md:top-6 md:left-6 z-50 w-[calc(100vw-1.5rem)] md:w-[calc(100vw-3rem)] h-[calc(100vh-1.5rem)] md:h-[calc(100vh-3rem)] max-w-none max-h-none -translate-x-0 -translate-y-0 rounded-xl border bg-background text-popover-foreground shadow-2xl flex flex-col overflow-hidden outline-none duration-100",
+    "fixed top-3 left-3 md:top-6 md:left-6 z-50 w-[calc(100vw-1.5rem)] md:w-[calc(100vw-3rem)] h-[calc(100vh-1.5rem)] md:h-[calc(100vh-3rem)] max-w-none max-h-none translate-x-0 translate-y-0 rounded-xl border bg-background text-popover-foreground shadow-2xl flex flex-col overflow-hidden outline-none duration-100",
 } as const
 
 type DialogViewport = keyof typeof dialogViewportVariants

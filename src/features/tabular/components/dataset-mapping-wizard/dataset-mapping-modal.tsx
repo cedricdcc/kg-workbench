@@ -139,7 +139,7 @@ export function DatasetMappingModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent viewport="fullscreen" className="p-6">
         <DialogHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between pr-6">
             <div className="flex items-center gap-2">
               <Network className="h-5 w-5 text-primary" />
               <DialogTitle>Map Dataset to Knowledge Graph</DialogTitle>
