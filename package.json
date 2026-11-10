@@ -28,6 +28,7 @@
     ]
   },
   "dependencies": {
+    "@neverblink/linkml": "0.18.2",
     "@supabase/supabase-js": "^2.116.0",
     "@tanstack/react-query": "^5.103.1",
     "@xyflow/react": "^12.11.6",

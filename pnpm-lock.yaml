@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      '@neverblink/linkml':
+        specifier: 0.18.2
+        version: 0.18.2
       '@supabase/supabase-js':
         specifier: ^2.116.0
         version: 2.116.0
@@ -939,6 +942,9 @@ packages:
     peerDependencies:
       '@emnapi/core': ^1.7.1 || ^2.0.0-alpha.4
       '@emnapi/runtime': ^1.7.1 || ^2.0.0-alpha.4
+
+  '@neverblink/linkml@0.18.2':
+    resolution: {integrity: sha512-7//IJoxX3Wb4lmGLVf50WSb3LSw7FEhHw75xbRsgkmCoPyxVaSinFlHBVV7zZna0hCqKBD1hnk+rjdNBLGVEdw==}
 
   '@next/env@16.3.6':
     resolution: {integrity: sha512-x9Vblze1EbtltQYnNH38xCPWU3TVfBd1eXqA3+w9+BTpedkkdNpAaltXlGQ/nsc1+E0mVTNrtcbX3GoO09zeLQ==}
@@ -5564,6 +5570,8 @@ snapshots:
       '@emnapi/runtime': 1.10.0
       '@tybys/wasm-util': 0.10.4
     optional: true
+
+  '@neverblink/linkml@0.18.2': {}
 
   '@next/env@16.3.6': {}
 

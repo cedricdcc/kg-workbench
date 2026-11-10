@@ -37,6 +37,8 @@ server_entry_points:
     purpose: Pre-flight blast radius calculation engine, dependency graph traversal, and deterministic risk scoring matrix (0-100 severity).
   - path: src/features/ontology/server/shacl/
     purpose: W3C SHACL shapes compilation (NodeShapes, PropertyShapes, cardinalities, datatypes) and in-memory fact validation engine.
+  - path: src/features/ontology/server/linkml/
+    purpose: Canonical LinkML runtime loader, TypeScript types, AST mapper, compiler, and symbol cascade service.
   - path: src/features/ontology/server/actions/generate-ontology.ts
     purpose: AI-assisted ontology draft generation from competency questions with local vector grounding, contextual expansion, and transactional persistence.
   - path: src/features/ontology/server/services/ai-relation-reconciliation.ts
