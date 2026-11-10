@@ -1,16 +1,20 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
+import YAML from "yaml"
 import {
   inspectOhiPublication,
   OhiPackageNotFoundError,
   resolveOhiDependencyTree,
   searchOhiPackages,
 } from "../src/features/ontology/server/ohi/catalog-client"
-import { BUILTIN_PUBLICATIONS } from "../src/features/ontology/server/ohi/builtin-publications"
+import {
+  BUILTIN_PUBLICATIONS,
+  compareVersions,
+} from "../src/features/ontology/server/ohi/builtin-publications"
 import { computeSha256 } from "../src/features/ontology/server/ohi/manifest"
 import type { OhiManifest } from "../src/features/ontology/server/ohi/types"
 
-test("BUILTIN_PUBLICATIONS registry integrity", () => {
+test("BUILTIN_PUBLICATIONS registry integrity and valid YAML syntax", () => {
   const expectedOntologies = [
     "w3c/prov-o@2013",
     "w3c/dcat@3",
@@ -39,6 +43,18 @@ test("BUILTIN_PUBLICATIONS registry integrity", () => {
       linkml.content.length > 0,
       `linkml-yaml artifact for ${ref} must not be empty`
     )
+
+    // Critical Finding 1: Explicitly verify YAML syntax parses without error
+    const parsedYaml = YAML.parse(linkml.content) as Record<string, unknown>
+    assert.ok(
+      parsedYaml && typeof parsedYaml === "object",
+      `LinkML YAML for ${ref} must parse into a valid YAML object`
+    )
+    assert.ok(parsedYaml.id, `LinkML YAML for ${ref} must have id`)
+    assert.ok(parsedYaml.name, `LinkML YAML for ${ref} must have name`)
+    assert.ok(parsedYaml.title, `LinkML YAML for ${ref} must have title`)
+    assert.ok(parsedYaml.classes, `LinkML YAML for ${ref} must define classes`)
+
     const computedLinkmlSha = computeSha256(linkml.content)
     assert.equal(
       linkml.sha256,
@@ -291,6 +307,88 @@ test("offline / air-gapped resolution succeeds when network fails", async () => 
         file.sha256
       )
     }
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
+test("compareVersions sorts semver and release numbers correctly", () => {
+  // Finding 3: 1.10.0 must be newer than 1.2.0
+  assert.ok(compareVersions("1.10.0", "1.2.0") > 0)
+  assert.ok(compareVersions("1.2.0", "1.10.0") < 0)
+  assert.ok(compareVersions("2020", "2012") > 0)
+  assert.ok(compareVersions("3", "1") > 0)
+  assert.equal(compareVersions("1.0.0", "1.0.0"), 0)
+  assert.ok(compareVersions("0.2", "0.1") > 0)
+})
+
+test("resolveOhiDependencyTree normalizes Windows backslashes in download_dir", async () => {
+  const manifest: OhiManifest = {
+    format_version: 1,
+    default_format: "owl-turtle",
+    download_dir: ".ohi\\vendor\\artifacts",
+    dependencies: [{ ontology: "w3c/prov-o@2013" }],
+  }
+
+  const { lockfile } = await resolveOhiDependencyTree(manifest, {
+    offlineOnly: true,
+  })
+  assert.equal(lockfile.files.length, 1)
+  assert.ok(
+    lockfile.files[0].package_path.startsWith(
+      ".ohi/vendor/artifacts/w3c/prov-o/2013/"
+    ),
+    `package_path must normalize backslashes: ${lockfile.files[0].package_path}`
+  )
+  assert.ok(!lockfile.files[0].package_path.includes("\\"))
+})
+
+test("resolveOhiDependencyTree detects corrupt/tampered artifact checksums", async () => {
+  const originalFetch = globalThis.fetch
+  try {
+    // Return a mocked publication with an intentionally mismatched sha256
+    globalThis.fetch = async (url: unknown) => {
+      const urlStr = String(url)
+      if (urlStr.includes("/publications/custom%2Fcorrupt%401")) {
+        return {
+          ok: true,
+          json: async () => ({
+            package_ref: "custom/corrupt@1",
+            namespace: "custom",
+            name: "corrupt",
+            version: "1",
+            title: "Corrupt Package",
+            base_url: "https://example.org/corrupt#",
+            release_url: "https://ohi.dev/custom/corrupt/releases/1",
+            dependencies: [],
+            artifacts: {
+              "owl-turtle": {
+                format: "owl-turtle",
+                package_path: ".ohi/custom/corrupt/1/corrupt.owl.ttl",
+                url: "https://ohi.dev/custom/corrupt/releases/1/artifacts/corrupt.owl.ttl",
+                sha256:
+                  "0000000000000000000000000000000000000000000000000000000000000000",
+                content:
+                  "@prefix ex: <https://example.org/> . ex:A a ex:Class .",
+              },
+            },
+          }),
+        } as unknown as Response
+      }
+      return { ok: false, status: 404 } as unknown as Response
+    }
+
+    const manifest: OhiManifest = {
+      format_version: 1,
+      default_format: "owl-turtle",
+      download_dir: ".ohi",
+      dependencies: [{ ontology: "custom/corrupt@1" }],
+    }
+
+    await assert.rejects(
+      async () => resolveOhiDependencyTree(manifest),
+      /Artifact checksum mismatch/
+    )
   } finally {
     globalThis.fetch = originalFetch
   }

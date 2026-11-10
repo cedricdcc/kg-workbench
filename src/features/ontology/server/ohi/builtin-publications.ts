@@ -177,7 +177,7 @@ function buildPublication(
 // ---------------------------------------------------------------------------
 const PROV_O_LINKML = `id: http://www.w3.org/ns/prov
 name: prov
-title: W3C PROV-O: The PROV Ontology
+title: "W3C PROV-O: The PROV Ontology"
 version: "2013"
 prefixes:
   prov: http://www.w3.org/ns/prov#
@@ -243,7 +243,7 @@ prov:wasAttributedTo a owl:ObjectProperty ;
 // ---------------------------------------------------------------------------
 const DCAT_LINKML = `id: http://www.w3.org/ns/dcat
 name: dcat
-title: W3C Data Catalog Vocabulary (DCAT) - Version 3
+title: "W3C Data Catalog Vocabulary (DCAT) - Version 3"
 version: "3"
 prefixes:
   dcat: http://www.w3.org/ns/dcat#
@@ -304,7 +304,7 @@ dcat:distribution a owl:ObjectProperty ;
 // ---------------------------------------------------------------------------
 const SKOS_LINKML = `id: http://www.w3.org/2004/02/skos/core
 name: skos
-title: SKOS Simple Knowledge Organization System
+title: "SKOS Simple Knowledge Organization System"
 version: "2009"
 prefixes:
   skos: http://www.w3.org/2004/02/skos/core#
@@ -366,7 +366,7 @@ skos:narrower a owl:ObjectProperty ;
 // ---------------------------------------------------------------------------
 const DCTERMS_LINKML = `id: http://purl.org/dc/terms
 name: dcterms
-title: DCMI Metadata Terms
+title: "DCMI Metadata Terms"
 version: "2020"
 prefixes:
   dcterms: http://purl.org/dc/terms/
@@ -433,7 +433,7 @@ dcterms:Agent a owl:Class ;
 
 const DCTERMS_2012_LINKML = `id: http://purl.org/dc/terms
 name: dcterms
-title: DCMI Metadata Terms (2012)
+title: "DCMI Metadata Terms (2012)"
 version: "2012"
 prefixes:
   dcterms: http://purl.org/dc/terms/
@@ -451,7 +451,7 @@ classes:
 // ---------------------------------------------------------------------------
 const SSN_LINKML = `id: http://www.w3.org/ns/ssn
 name: ssn
-title: Semantic Sensor Network Ontology (SSN)
+title: "Semantic Sensor Network Ontology (SSN)"
 version: "2017"
 prefixes:
   ssn: http://www.w3.org/ns/ssn/
@@ -496,7 +496,7 @@ ssn:Stimulus a owl:Class ;
 // ---------------------------------------------------------------------------
 const ORG_LINKML = `id: http://www.w3.org/ns/org
 name: org
-title: The Organization Ontology
+title: "The Organization Ontology"
 version: "2014"
 prefixes:
   org: http://www.w3.org/ns/org#
@@ -549,7 +549,7 @@ org:Role a owl:Class ;
 // ---------------------------------------------------------------------------
 const FOAF_LINKML = `id: http://xmlns.com/foaf/0.1
 name: foaf
-title: Friend of a Friend (FOAF) Vocabulary
+title: "Friend of a Friend (FOAF) Vocabulary"
 version: "0.1"
 prefixes:
   foaf: http://xmlns.com/foaf/0.1/
@@ -609,7 +609,7 @@ foaf:knows a owl:ObjectProperty ;
 // ---------------------------------------------------------------------------
 const SCHEMA_LINKML = `id: https://schema.org
 name: schema
-title: Schema.org Vocabulary
+title: "Schema.org Vocabulary"
 version: "28"
 prefixes:
   schema: https://schema.org/
@@ -827,6 +827,37 @@ export const BUILTIN_PUBLICATIONS: Map<string, BuiltinPublication> = new Map([
 ])
 
 /**
+ * Compares two version strings numerically segment-by-segment.
+ * Supports standard semver (1.10.0 vs 1.2.0), release integers (2020 vs 2012), and dotted versions.
+ * Returns > 0 if vA > vB, < 0 if vA < vB, 0 if equal.
+ */
+export function compareVersions(vA: string, vB: string): number {
+  const partsA = vA.split(/[-.+]/).map((p) => {
+    const num = parseInt(p, 10)
+    return isNaN(num) ? p : num
+  })
+  const partsB = vB.split(/[-.+]/).map((p) => {
+    const num = parseInt(p, 10)
+    return isNaN(num) ? p : num
+  })
+
+  const maxLen = Math.max(partsA.length, partsB.length)
+  for (let i = 0; i < maxLen; i++) {
+    const segA = partsA[i] ?? 0
+    const segB = partsB[i] ?? 0
+
+    if (typeof segA === "number" && typeof segB === "number") {
+      if (segA !== segB) return segA - segB
+    } else {
+      const cmp = String(segA).localeCompare(String(segB))
+      if (cmp !== 0) return cmp
+    }
+  }
+
+  return 0
+}
+
+/**
  * Find built-in publication matching a reference.
  * If version is omitted, returns the latest version of that package.
  */
@@ -871,12 +902,10 @@ export function getBuiltinPublication(
     return undefined
   }
 
-  // Sort descending by version (e.g. 2020 > 2012, 3 > 1)
-  candidates.sort((a, b) => {
-    const vA = parseFloat(a.metadata.version) || 0
-    const vB = parseFloat(b.metadata.version) || 0
-    return vB - vA
-  })
+  // Sort descending by version (e.g. 2020 > 2012, 1.10.0 > 1.2.0)
+  candidates.sort((a, b) =>
+    compareVersions(b.metadata.version, a.metadata.version)
+  )
 
   return candidates[0]
 }
@@ -900,9 +929,12 @@ export function getBuiltinPackageSummaries(): OhiPackageSummary[] {
       })
     } else {
       existing.versions.push(pub.metadata.version)
-      const currentLatestNum = parseFloat(existing.latest.metadata.version) || 0
-      const newNum = parseFloat(pub.metadata.version) || 0
-      if (newNum > currentLatestNum) {
+      if (
+        compareVersions(
+          pub.metadata.version,
+          existing.latest.metadata.version
+        ) > 0
+      ) {
         existing.latest = pub
       }
     }
@@ -915,9 +947,7 @@ export function getBuiltinPackageSummaries(): OhiPackageSummary[] {
     title: latest.metadata.title,
     description: latest.metadata.description || "",
     latest_version: latest.metadata.version,
-    versions: versions.sort(
-      (a, b) => (parseFloat(b) || 0) - (parseFloat(a) || 0)
-    ),
+    versions: versions.sort((a, b) => compareVersions(b, a)),
     license: latest.metadata.license,
   }))
 }

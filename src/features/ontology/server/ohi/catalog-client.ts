@@ -49,6 +49,17 @@ export interface ResolveOhiOptions {
 }
 
 /**
+ * Standard file extensions for each supported artifact format.
+ */
+const FORMAT_EXTENSIONS: Record<OhiFormat, string> = {
+  "linkml-yaml": "linkml.yaml",
+  "owl-turtle": "owl.ttl",
+  "owl-rdfxml": "owl.rdf",
+  "rdfs-turtle": "rdfs.ttl",
+  "ossie-yaml": "ossie.yaml",
+}
+
+/**
  * Normalizes URL with custom catalog base URL if provided.
  */
 function normalizeCatalogUrl(url: string, catalogUrl?: string): string {
@@ -195,7 +206,9 @@ export async function resolveOhiDependencyTree(
 ): Promise<{ lockfile: OhiLockfileV2; artifacts: Map<string, string> }> {
   const catalogUrl = options?.catalogUrl || "https://ohi.dev"
   const offlineOnly = options?.offlineOnly ?? false
-  const downloadDir = (manifest.download_dir || ".ohi").replace(/\/+$/, "")
+  const downloadDir = (manifest.download_dir || ".ohi")
+    .replace(/\\/g, "/")
+    .replace(/\/+$/, "")
   const defaultFormat = manifest.default_format || "owl-turtle"
 
   const selections: OhiLockSelection[] = []
@@ -287,9 +300,14 @@ export async function resolveOhiDependencyTree(
       )
     }
 
-    const sha256 = descriptor.sha256 || computeSha256(content)
-    const fileExt =
-      descriptor.format === "linkml-yaml" ? "linkml.yaml" : "owl.ttl"
+    const actualSha256 = computeSha256(content)
+    if (descriptor.sha256 && descriptor.sha256 !== actualSha256) {
+      throw new Error(
+        `Artifact checksum mismatch for ${pub.package_ref} (${descriptor.format}): expected ${descriptor.sha256}, got ${actualSha256}`
+      )
+    }
+
+    const fileExt = FORMAT_EXTENSIONS[descriptor.format] || "owl.ttl"
     const rawFileName =
       descriptor.package_path.split("/").pop() || `${pub.name}.${fileExt}`
     const package_path = `${downloadDir}/${pub.namespace}/${pub.name}/${pub.version}/${rawFileName}`
@@ -301,7 +319,7 @@ export async function resolveOhiDependencyTree(
       base_url: pub.base_url,
       url: fileUrl,
       format: descriptor.format,
-      sha256,
+      sha256: actualSha256,
       ontology: pub.package_ref,
     }
 
