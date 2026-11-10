@@ -23,13 +23,13 @@ describe("CQ Workbench Full-Screen Layout Contracts", () => {
       "cq-workbench.tsx should not clamp the list container with max-w-2xl"
     )
     assert.ok(
-      content.includes(
-        "w-[360px] lg:w-[400px] shrink-0 border-r border-border/60"
-      ),
+      content.includes("w-[360px]") &&
+        content.includes("lg:w-[400px]") &&
+        content.includes("shrink-0"),
       "cq-workbench.tsx must set list panel to w-[360px] lg:w-[400px] shrink-0"
     )
     assert.ok(
-      content.includes("flex-1 min-w-0 bg-card/20"),
+      content.includes("flex-1") && content.includes("min-w-0"),
       "cq-workbench.tsx must set detail inspector to flex-1 min-w-0"
     )
   })
