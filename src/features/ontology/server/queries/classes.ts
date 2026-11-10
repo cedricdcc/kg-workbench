@@ -17,8 +17,21 @@ function projectClassWithAttributes(
   cls: OntologyClassSnapshot,
   snapshot: CanonicalOntologySnapshot
 ): OntologyClassWithAttributes {
-  const clsAttrs = (snapshot.attributes ?? [])
-    .filter((attr) => attr.class_id === cls.id)
+  const snapshotAttrs = snapshot.attributes ?? []
+  type CandidateAttr = {
+    id: string
+    name: string
+    data_type?: string
+    required?: boolean
+    description?: string
+  }
+  const rawAttrs =
+    snapshotAttrs.length > 0
+      ? snapshotAttrs.filter((attr) => attr.class_id === cls.id)
+      : (((cls as unknown as { attributes?: CandidateAttr[] }).attributes ??
+          []) as CandidateAttr[])
+
+  const clsAttrs = rawAttrs
     .map((attr) => ({
       id: attr.id,
       class_id: cls.id,

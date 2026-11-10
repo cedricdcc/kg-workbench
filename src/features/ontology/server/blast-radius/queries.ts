@@ -38,10 +38,20 @@ export async function getClassBlastRadius(
     (snapshot.classes ?? []).map((c) => [c.id, c.name])
   )
 
-  // 3. Subclasses (child classes pointing to this class as parent)
-  const subclasses = (snapshot.classes ?? [])
-    .filter((c) => c.parent_class_id === classId)
-    .map((c) => ({ id: c.id, name: c.name }))
+  // 3. Subclasses (transitive child classes pointing to this class as ancestor)
+  const subclasses: Array<{ id: string; name: string }> = []
+  const queue = [classId]
+  const visited = new Set<string>(queue)
+  while (queue.length > 0) {
+    const parentId = queue.shift()!
+    for (const c of snapshot.classes ?? []) {
+      if (c.parent_class_id === parentId && !visited.has(c.id)) {
+        visited.add(c.id)
+        queue.push(c.id)
+        subclasses.push({ id: c.id, name: c.name })
+      }
+    }
+  }
 
   // 4. Inbound and outbound relations
   const rawRelations = (snapshot.relations ?? []).filter(
@@ -169,8 +179,7 @@ export async function getClassBlastRadius(
           )) ?? []
       factsCount = matchedFacts.length
     }
-  } catch (err) {
-    console.error("DEBUG ERR IN BLAST RADIUS:", err)
+  } catch {
     // Entities and facts tables may be empty
   }
 

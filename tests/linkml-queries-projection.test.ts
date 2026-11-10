@@ -141,6 +141,23 @@ const SAMPLE_UI_LAYOUT: OntologyUiLayout = {
 
 const ONTOLOGY_ID = "00000000-0000-0000-0000-000000000001"
 const DOCUMENT_ID = "00000000-0000-0000-0000-000000000002"
+const TRANSITIVE_ONTOLOGY_ID = "00000000-0000-0000-0000-000000000003"
+
+const TRANSITIVE_LINKML_YAML = `
+id: https://kg-workbench.local/ontology/transitive#
+name: TransitiveHierarchyOntology
+classes:
+  Grandparent:
+    description: Top of hierarchy
+  Parent:
+    description: Middle of hierarchy
+    is_a: Grandparent
+  Child:
+    description: Bottom of hierarchy
+    is_a: Parent
+  Independent:
+    description: Unrelated class
+`
 
 function getTableName(table: unknown): string {
   const obj = table as { [key: symbol]: string; _?: { name?: string } }
@@ -168,6 +185,21 @@ const store = {
       ohi_yaml: "",
       ohi_lockfile: null,
       ui_layout: SAMPLE_UI_LAYOUT,
+      compiled_artifacts: null,
+      source_file: null,
+      created_at: new Date().toISOString(),
+    },
+    {
+      id: TRANSITIVE_ONTOLOGY_ID,
+      name: "TransitiveHierarchyOntology",
+      version: "1.0.0",
+      default_language: "en",
+      usecase: "Testing transitive blast radius",
+      group_key: "shared",
+      linkml_yaml: TRANSITIVE_LINKML_YAML,
+      ohi_yaml: "",
+      ohi_lockfile: null,
+      ui_layout: { classPositions: {}, moduleLayouts: {} },
       compiled_artifacts: null,
       source_file: null,
       created_at: new Date().toISOString(),
@@ -612,6 +644,31 @@ describe("LinkML Queries Projection (Slice 3.3)", () => {
       const relReport = await getBlastRadiusData(ONTOLOGY_ID, "works_in")
       assert.equal(relReport.targetType, "relation")
       assert.equal(relReport.targetId, "works_in")
+    })
+
+    it("getClassBlastRadius discovers transitive subclasses (Grandparent -> Parent -> Child)", async () => {
+      const gpReport = await getClassBlastRadius(
+        TRANSITIVE_ONTOLOGY_ID,
+        "Grandparent"
+      )
+      assert.equal(gpReport.targetId, "Grandparent")
+      const gpSubclassIds = gpReport.details.subclasses.map((s) => s.id).sort()
+      assert.deepEqual(gpSubclassIds, ["Child", "Parent"])
+
+      const parentReport = await getClassBlastRadius(
+        TRANSITIVE_ONTOLOGY_ID,
+        "Parent"
+      )
+      assert.equal(parentReport.targetId, "Parent")
+      const parentSubclassIds = parentReport.details.subclasses.map((s) => s.id)
+      assert.deepEqual(parentSubclassIds, ["Child"])
+
+      const childReport = await getClassBlastRadius(
+        TRANSITIVE_ONTOLOGY_ID,
+        "Child"
+      )
+      assert.equal(childReport.targetId, "Child")
+      assert.equal(childReport.details.subclasses.length, 0)
     })
   })
 

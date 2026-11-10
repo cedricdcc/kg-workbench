@@ -1,3 +1,4 @@
+import { cache } from "react"
 import { eq } from "drizzle-orm"
 import { getDb } from "@/server/database"
 import { ontologyDocuments } from "@/server/db/schema"
@@ -42,11 +43,7 @@ const DELETE_ORDER: Record<SymbolKind, number> = {
   module: 4,
 }
 
-/**
- * Loads the canonical ontology snapshot from the database (linkml_yaml + ui_layout),
- * returning a minimal default snapshot if linkml_yaml is not yet initialized.
- */
-export async function loadCanonicalOntology(
+async function fetchAndParseCanonicalOntology(
   ontologyId: string,
   db?: AnyDbClient
 ): Promise<CanonicalOntologySnapshot> {
@@ -99,6 +96,25 @@ export async function loadCanonicalOntology(
   if (row.ui_layout) snapshot.ui_layout = row.ui_layout
 
   return snapshot
+}
+
+const getCachedCanonicalOntology = cache(async (ontologyId: string) => {
+  return fetchAndParseCanonicalOntology(ontologyId)
+})
+
+/**
+ * Loads the canonical ontology snapshot from the database (linkml_yaml + ui_layout),
+ * returning a minimal default snapshot if linkml_yaml is not yet initialized.
+ * When called without an explicit db client, results are request-scoped cached via React cache().
+ */
+export async function loadCanonicalOntology(
+  ontologyId: string,
+  db?: AnyDbClient
+): Promise<CanonicalOntologySnapshot> {
+  if (db) {
+    return fetchAndParseCanonicalOntology(ontologyId, db)
+  }
+  return getCachedCanonicalOntology(ontologyId)
 }
 
 /**

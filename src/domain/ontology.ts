@@ -1,10 +1,5 @@
 import type { DatabaseInsert, DatabaseRow } from "./database"
-import {
-  ontologyCompetencyQuestionModules,
-  ontologyCompetencyQuestions,
-  ontologyCqTriples,
-  ontologyDocuments,
-} from "@/server/db/schema"
+import { ontologyDocuments } from "@/server/db/schema"
 
 export type OntologyDocument = DatabaseRow<typeof ontologyDocuments>
 export type OntologyDocumentInsert = DatabaseInsert<typeof ontologyDocuments>
