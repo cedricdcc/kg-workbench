@@ -20,11 +20,11 @@ The work is divided into **5 self-contained, sequentially executable phases** so
   - Slice 2.2: Implement `ohi.dev` catalog client & transitive dependency resolver `done`
   - Slice 2.3: Implement SHA-256 lockfile verifier, tamper/drift detector & term embedding indexer `done`
   - Slice 2.4: Remove legacy OLS4/LOV/BARTOC/OntoPortal/EU registry scrapers `done`
-- [Phase 3 - Option 2A Canonical LinkML Document Store & Symbol Cascades](./03-phase-3-canonical-store-migration-and-cascades.md) `open`
-  - Slice 3.1: Drizzle schema refactor (drop 13 ontology SQL tables, switch 3 external boundaries to `text` symbol keys) & seed update `open`
-  - Slice 3.2: Implement transactional symbol cascade service (`cascadeSymbolRename`, `cascadeSymbolDelete`, `diffLinkmlAstSymbols`) `open`
-  - Slice 3.3: Refactor ontology server queries (`src/features/ontology/server/queries/*`) to read from `linkml_yaml` + `ui_layout` `open`
-  - Slice 3.4: Refactor ontology & tabular server write actions (`src/features/ontology/server/actions/*`, `commit-dataset-mapping.ts`) `open`
+- [Phase 3 - Option 2A Canonical LinkML Document Store & Symbol Cascades](./03-phase-3-canonical-store-migration-and-cascades.md) `done`
+  - Slice 3.1: Drizzle schema refactor (drop 13 ontology SQL tables, switch 3 external boundaries to `text` symbol keys) & seed update `done`
+  - Slice 3.2: Implement transactional symbol cascade service (`cascadeSymbolRename`, `cascadeSymbolDelete`, `diffLinkmlAstSymbols`) `done`
+  - Slice 3.3: Refactor ontology server queries (`src/features/ontology/server/queries/*`) to read from `linkml_yaml` + `ui_layout` `done`
+  - Slice 3.4: Refactor ontology & tabular server write actions (`src/features/ontology/server/actions/*`, `commit-dataset-mapping.ts`) `done`
 - [Phase 4 - Workbench UI: LinkML & Code Compiler Studio + `ohi.dev` Dependency Browser](./04-phase-4-workbench-ui-and-compiler-studio.md) `open`
   - Slice 4.1: Build `/src/features/ontology/components/compiler-studio-dialog` (SHACL, RDFS, OWL, Pydantic `.py`, LinkML YAML, `ohi.lock.json`) `open`
   - Slice 4.2: Build `/src/features/ontology/components/standards-browser` for `ohi.dev` package search, transitive tree & SHA-256 lock status `open`
