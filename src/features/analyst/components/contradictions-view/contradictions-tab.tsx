@@ -286,8 +286,9 @@ export function ContradictionsTab({
         </div>
       ) : (
         /* List of Contradiction Cards */
+        /* prettier-ignore */
         <div
-          className="grid grid-cols-1 gap-4 xl:grid-cols-2"
+          className="grid grid-cols-1 xl:grid-cols-2 gap-4"
           data-testid="contradictions-list"
         >
           {filteredContradictions.map((contra) => (

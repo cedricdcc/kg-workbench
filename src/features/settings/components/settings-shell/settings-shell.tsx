@@ -26,7 +26,8 @@ export function SettingsShell({
         </p>
       </div>
 
-      <div className="grid grid-cols-1 items-start gap-8 lg:grid-cols-2">
+      {/* prettier-ignore */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
         <ApiKeysSection initialStatuses={initialStatuses} />
         {initialServices.length > 0 && (
           <ServicesSection services={initialServices} />

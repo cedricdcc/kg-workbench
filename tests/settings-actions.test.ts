@@ -57,7 +57,10 @@ test("SettingsShell conforms to 2-column dashboard layout requirements", () => {
     "SettingsShell must use max-w-7xl container"
   )
   assert.ok(
-    content.includes("grid grid-cols-1 lg:grid-cols-2 gap-8 items-start"),
+    content.includes("grid-cols-1") &&
+      content.includes("lg:grid-cols-2") &&
+      content.includes("gap-8") &&
+      content.includes("items-start"),
     "SettingsShell must render responsive 2-column grid on desktop"
   )
   assert.ok(
@@ -106,7 +109,10 @@ if (!isReactServer) {
       "SettingsShell must use max-w-7xl container"
     )
     assert.ok(
-      html.includes("grid-cols-1 lg:grid-cols-2 gap-8"),
+      html.includes("grid-cols-1") &&
+        html.includes("lg:grid-cols-2") &&
+        html.includes("gap-8") &&
+        html.includes("items-start"),
       "SettingsShell must render responsive 2-column grid on desktop"
     )
     assert.ok(

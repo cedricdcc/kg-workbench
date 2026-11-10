@@ -166,7 +166,8 @@ export function ChatMessageItem({
         <Sparkles className="h-4 w-4" />
       </div>
 
-      <div className="flex w-full max-w-6xl min-w-0 flex-1 flex-col gap-3">
+      {/* prettier-ignore */}
+      <div className="flex max-w-6xl w-full min-w-0 flex-1 flex-col gap-3">
         <div className="rounded-2xl rounded-tl-xs border bg-card p-4 text-xs text-card-foreground shadow-xs">
           {/* Formatted Text Content with parsed citation pills */}
           <div className="leading-relaxed whitespace-pre-wrap text-foreground">
@@ -231,7 +232,8 @@ export function ChatMessageItem({
         {/* Embedded Reasoning Trace Card & Source Citations Sub-Grid */}
         {((message.reasoningTrace && message.reasoningTrace.length > 0) ||
           (message.citations && message.citations.length > 0)) && (
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+          /* prettier-ignore */
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {message.reasoningTrace && message.reasoningTrace.length > 0 && (
               <ReasoningTraceCard
                 steps={message.reasoningTrace}

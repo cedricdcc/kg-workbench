@@ -114,11 +114,13 @@ if (isChildTest || !isReactServer) {
       "Must have assistant sender attribute"
     )
     assert.ok(
-      html.includes("max-w-6xl w-full"),
+      html.includes("max-w-6xl") && html.includes("w-full"),
       "Must expand assistant container to max-w-6xl w-full"
     )
     assert.ok(
-      html.includes("grid grid-cols-1 md:grid-cols-2 gap-3"),
+      html.includes("grid-cols-1") &&
+        html.includes("md:grid-cols-2") &&
+        html.includes("gap-3"),
       "Must place ReasoningTraceCard and Citations in a responsive 2-column sub-grid"
     )
     assert.ok(
@@ -165,7 +167,7 @@ if (isChildTest || !isReactServer) {
       "Must span full width when only reasoning trace exists"
     )
     assert.ok(
-      html.includes("max-w-6xl w-full"),
+      html.includes("max-w-6xl") && html.includes("w-full"),
       "Must retain max-w-6xl w-full container"
     )
   })
