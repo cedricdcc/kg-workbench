@@ -1,20 +1,22 @@
-import { eq } from "drizzle-orm"
 import type { OntologyModule } from "@/domain/ontology"
 import {
   assertOntologyDocumentAccess,
   assertOntologyRecordAccess,
 } from "@/server/group-access"
 import { getDb } from "@/server/database"
-import { ontologyModules } from "@/server/db/schema"
+import { loadCanonicalOntology } from "../../linkml/document-store"
 import { normalizeComparableName } from "./shared"
+
 async function getOntologyModuleRows(ontologyId: string) {
   const db = getDb()
   await assertOntologyDocumentAccess(ontologyId, db)
-  return db
-    .select({ id: ontologyModules.id, name: ontologyModules.name })
-    .from(ontologyModules)
-    .where(eq(ontologyModules.ontology_id, ontologyId))
+  const snapshot = await loadCanonicalOntology(ontologyId, db)
+  return (snapshot.modules ?? []).map((module) => ({
+    id: module.id,
+    name: module.name,
+  }))
 }
+
 export async function assertModuleNameAvailable(
   ontologyId: string,
   name: string,
@@ -34,6 +36,7 @@ export async function assertModuleNameAvailable(
     throw new Error(`Module "${trimmedName}" already exists.`)
   return trimmedName
 }
+
 export async function createUniqueModuleName(
   ontologyId: string,
   baseName: string
@@ -50,16 +53,24 @@ export async function createUniqueModuleName(
     candidate = `${trimmedBaseName} ${suffix++}`
   return candidate
 }
+
 export async function getModuleRecord(
-  moduleId: string
+  moduleId: string,
+  explicitOntologyId?: string
 ): Promise<OntologyModule> {
   const db = getDb()
-  await assertOntologyRecordAccess("ontology_modules", moduleId, db)
-  const [row] = await db
-    .select()
-    .from(ontologyModules)
-    .where(eq(ontologyModules.id, moduleId))
-    .limit(1)
-  if (!row) throw new Error("Module not found.")
-  return row
+  const ontologyId =
+    explicitOntologyId ??
+    (await assertOntologyRecordAccess("ontology_modules", moduleId, db))
+  const snapshot = await loadCanonicalOntology(ontologyId, db)
+  const mod = snapshot.modules?.find(
+    (m) => m.id === moduleId || m.name === moduleId
+  )
+  if (!mod) throw new Error("Module not found.")
+  return {
+    id: mod.id,
+    ontology_id: ontologyId,
+    name: mod.name,
+    description: mod.description ?? "",
+  }
 }

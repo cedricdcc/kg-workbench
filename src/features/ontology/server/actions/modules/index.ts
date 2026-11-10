@@ -1,12 +1,8 @@
 "use server"
 
-import { eq } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 
-import type {
-  OntologyLocalizedTextInsert,
-  OntologyModule,
-} from "@/domain/ontology"
+import type { OntologyModule } from "@/domain/ontology"
 import { ModuleTransferSchema } from "@/features/ontology/schemas/module-transfer"
 import { routes } from "@/lib/routes"
 import {
@@ -14,14 +10,9 @@ import {
   assertOntologyRecordAccess,
 } from "@/server/group-access"
 import { getDb } from "@/server/database"
-import {
-  ontologyClasses,
-  ontologyLocalizedTexts,
-  ontologyModules,
-} from "@/server/db/schema"
-
+import { saveCanonicalOntology } from "../../linkml/document-store"
+import type { OntologyModuleSnapshot } from "../../linkml/types"
 import { getOntologyClasses, getOntologyRelations } from "../../queries"
-import { buildModuleLocalizedTextInserts } from "./localized-texts"
 import { buildCopyModuleName } from "./shared"
 import {
   assertModuleNameAvailable,
@@ -60,66 +51,134 @@ export async function createModule({
 }: CreateModuleInput): Promise<OntologyModule> {
   const db = getDb()
   await assertOntologyDocumentAccess(ontologyId, db)
-  const [moduleRow] = await db
-    .insert(ontologyModules)
-    .values({
-      ontology_id: ontologyId,
-      name: await assertModuleNameAvailable(ontologyId, name),
-      description: description ?? "",
-    })
-    .returning()
-  if (!moduleRow) throw new Error("Could not create module.")
 
-  const texts: OntologyLocalizedTextInsert[] = buildModuleLocalizedTextInserts({
+  const validatedName = await assertModuleNameAvailable(ontologyId, name)
+  const moduleId = validatedName
+
+  await saveCanonicalOntology(
     ontologyId,
-    moduleId: moduleRow.id,
-    localizedTexts,
-  })
-  if (texts.length) {
-    try {
-      await db.insert(ontologyLocalizedTexts).values(texts)
-    } catch (error) {
-      await db
-        .delete(ontologyModules)
-        .where(eq(ontologyModules.id, moduleRow.id))
-      throw error
-    }
+    (draft) => {
+      draft.modules = draft.modules ?? []
+      const newMod: OntologyModuleSnapshot = {
+        id: moduleId,
+        name: validatedName,
+        description: description ?? "",
+      }
+      draft.modules.push(newMod)
+
+      if (localizedTexts.length > 0) {
+        draft.localized_texts = draft.localized_texts ?? []
+        for (const lt of localizedTexts) {
+          if (lt.value && lt.value.trim()) {
+            draft.localized_texts.push({
+              target_type: "module",
+              target_id: moduleId,
+              field_name: lt.fieldName,
+              language_code: lt.languageCode,
+              value: lt.value.trim(),
+            })
+          }
+        }
+      }
+    },
+    { db }
+  )
+
+  try {
+    revalidatePath(routes.ontology.root)
+  } catch {
+    // Non-Next environment
   }
-  revalidatePath(routes.ontology.root)
-  return moduleRow
+
+  return {
+    id: moduleId,
+    ontology_id: ontologyId,
+    name: validatedName,
+    description: description ?? "",
+  }
 }
 
 export async function updateModule(
   id: string,
-  data: string | { name?: string; description?: string }
+  data: string | { name?: string; description?: string },
+  explicitOntologyId?: string
 ): Promise<OntologyModule> {
-  const ontologyModule = await getModuleRecord(id)
+  const db = getDb()
+  const ontologyId =
+    explicitOntologyId ??
+    (await assertOntologyRecordAccess("ontology_modules", id, db))
+
   const input = typeof data === "string" ? { name: data } : data
-  const name =
+  const newName =
     input.name === undefined
       ? undefined
-      : await assertModuleNameAvailable(
-          ontologyModule.ontology_id,
-          input.name,
-          id
-        )
-  const [row] = await getDb()
-    .update(ontologyModules)
-    .set({
-      ...(name !== undefined && { name }),
-      ...(input.description !== undefined && {
-        description: input.description,
-      }),
-    })
-    .where(eq(ontologyModules.id, id))
-    .returning()
-  if (!row) throw new Error("Module not found.")
-  revalidatePath(routes.ontology.root)
-  return row
+      : await assertModuleNameAvailable(ontologyId, input.name, id)
+
+  let targetMod: OntologyModuleSnapshot | undefined
+  const diffOptions =
+    newName && newName !== id ? { moduleRenames: { [id]: newName } } : undefined
+
+  await saveCanonicalOntology(
+    ontologyId,
+    (draft) => {
+      targetMod = draft.modules?.find((m) => m.id === id || m.name === id)
+      if (!targetMod) throw new Error("Module not found.")
+
+      const oldKey = targetMod.id
+
+      if (newName && newName !== oldKey) {
+        targetMod.id = newName
+        targetMod.name = newName
+
+        // Update classes referencing this module
+        if (draft.classes) {
+          for (const cls of draft.classes) {
+            if (cls.module_id === oldKey) {
+              cls.module_id = newName
+            }
+          }
+        }
+
+        // Update UI layout
+        if (draft.ui_layout?.moduleLayouts?.[oldKey]) {
+          draft.ui_layout.moduleLayouts[newName] =
+            draft.ui_layout.moduleLayouts[oldKey]
+          delete draft.ui_layout.moduleLayouts[oldKey]
+        }
+        if (draft.ui_layout?.classPositions?.[oldKey]) {
+          draft.ui_layout.classPositions[newName] =
+            draft.ui_layout.classPositions[oldKey]
+          delete draft.ui_layout.classPositions[oldKey]
+        }
+      }
+
+      if (input.description !== undefined) {
+        targetMod.description = input.description
+      }
+    },
+    { db, diffOptions }
+  )
+
+  try {
+    revalidatePath(routes.ontology.root)
+  } catch {
+    // Non-Next environment
+  }
+
+  return {
+    id: targetMod?.id ?? newName ?? id,
+    ontology_id: ontologyId,
+    name: targetMod?.name ?? newName ?? id,
+    description: targetMod?.description ?? input.description ?? "",
+  }
 }
 
-export async function renameModule(id: string, name: string) {
-  return updateModule(id, { name })
+export async function renameModule(
+  id: string,
+  name: string,
+  explicitOntologyId?: string
+) {
+  return updateModule(id, { name }, explicitOntologyId)
 }
 
 export async function getModuleDeleteImpact(
@@ -143,12 +202,38 @@ export async function getModuleDeleteImpact(
   }
 }
 
-export async function deleteModule(id: string): Promise<void> {
+export async function deleteModule(
+  id: string,
+  explicitOntologyId?: string
+): Promise<void> {
   const db = getDb()
-  await assertOntologyRecordAccess("ontology_modules", id, db)
-  await db.delete(ontologyClasses).where(eq(ontologyClasses.module_id, id))
-  await db.delete(ontologyModules).where(eq(ontologyModules.id, id))
-  revalidatePath(routes.ontology.root)
+  const ontologyId =
+    explicitOntologyId ??
+    (await assertOntologyRecordAccess("ontology_modules", id, db))
+
+  await saveCanonicalOntology(
+    ontologyId,
+    (draft) => {
+      draft.modules = (draft.modules ?? []).filter(
+        (m) => m.id !== id && m.name !== id
+      )
+      // Delete classes belonging to this module
+      draft.classes = (draft.classes ?? []).filter((c) => c.module_id !== id)
+      if (draft.ui_layout?.moduleLayouts?.[id]) {
+        delete draft.ui_layout.moduleLayouts[id]
+      }
+      if (draft.ui_layout?.classPositions?.[id]) {
+        delete draft.ui_layout.classPositions[id]
+      }
+    },
+    { db }
+  )
+
+  try {
+    revalidatePath(routes.ontology.root)
+  } catch {
+    // Non-Next environment
+  }
 }
 
 export async function buildModuleExport(
@@ -173,7 +258,11 @@ export async function duplicateModule(
     description: exported.payload.description,
     payload: exported.payload,
   })
-  revalidatePath(routes.ontology.root)
+  try {
+    revalidatePath(routes.ontology.root)
+  } catch {
+    // Non-Next environment
+  }
   return {
     module: duplicated.module,
     warnings: [...exported.warnings, ...duplicated.warnings],
@@ -210,7 +299,11 @@ export async function importModuleFromJson({
     localizedTexts,
     payload: parsed,
   })
-  revalidatePath(routes.ontology.root)
+  try {
+    revalidatePath(routes.ontology.root)
+  } catch {
+    // Non-Next environment
+  }
   return {
     status: "imported",
     module: result.module,

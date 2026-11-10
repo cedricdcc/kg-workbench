@@ -1,16 +1,16 @@
 "use server"
 
-import { and, desc, eq, ne, or } from "drizzle-orm"
+import { and, desc, eq } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 import { routes } from "@/lib/routes"
 import { getDb } from "@/server/database"
 import {
-  ontologyClasses,
   referenceOntologies,
   referenceOntologyTerms,
   registryEndpointSnapshots,
   userApiKeys,
 } from "@/server/db/schema"
+import { saveCanonicalOntology } from "@/features/ontology/server/linkml/document-store"
 import {
   assertOntologyDocumentAccess,
   assertOntologyRecordAccess,
@@ -299,58 +299,44 @@ export async function mapClassToStandardParent(
   await assertOntologyRecordAccess("ontology_classes", classId, db)
 
   const parentName = candidate.curie || candidate.label
+  let parentId = ""
 
-  // Find if parent already exists in this ontology (excluding the target class itself)
-  const [existingParent] = await db
-    .select()
-    .from(ontologyClasses)
-    .where(
-      and(
-        eq(ontologyClasses.ontology_id, ontologyId),
-        ne(ontologyClasses.id, classId),
-        or(
-          eq(ontologyClasses.name, parentName),
-          eq(ontologyClasses.name, candidate.curie)
-        )
+  await saveCanonicalOntology(
+    ontologyId,
+    (draft) => {
+      const existingParent = draft.classes.find(
+        (c) =>
+          c.id !== classId &&
+          c.name !== classId &&
+          (c.name === parentName || c.name === candidate.curie)
       )
-    )
-    .limit(1)
 
-  let parentId: string
+      if (existingParent) {
+        parentId = existingParent.name
+      } else {
+        const targetClass = draft.classes.find(
+          (c) => c.id === classId || c.name === classId
+        )
+        parentId = parentName
+        draft.classes.push({
+          id: parentName,
+          name: parentName,
+          module_id: targetClass?.module_id ?? null,
+          description:
+            candidate.description ||
+            `Standard vocabulary class (${candidate.curie})`,
+        })
+      }
 
-  if (existingParent) {
-    parentId = existingParent.id
-  } else {
-    // Get target class to determine module_id
-    const [targetClass] = await db
-      .select()
-      .from(ontologyClasses)
-      .where(eq(ontologyClasses.id, classId))
-      .limit(1)
-
-    const [createdParent] = await db
-      .insert(ontologyClasses)
-      .values({
-        ontology_id: ontologyId,
-        module_id: targetClass?.module_id ?? null,
-        name: parentName,
-        description:
-          candidate.description ||
-          `Standard vocabulary class (${candidate.curie})`,
-      })
-      .returning()
-
-    if (!createdParent) {
-      throw new Error("Failed to create parent standard class.")
-    }
-    parentId = createdParent.id
-  }
-
-  // Update target class parent_class_id
-  await db
-    .update(ontologyClasses)
-    .set({ parent_class_id: parentId })
-    .where(eq(ontologyClasses.id, classId))
+      const target = draft.classes.find(
+        (c) => c.id === classId || c.name === classId
+      )
+      if (target) {
+        target.parent_class_id = parentId
+      }
+    },
+    { db }
+  )
 
   revalidatePath(routes.ontology.document(ontologyId), "layout")
   revalidatePath(routes.ontology.root, "layout")

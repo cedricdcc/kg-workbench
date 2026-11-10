@@ -1,9 +1,8 @@
 "use server"
 
-import { eq } from "drizzle-orm"
 import { getDb } from "@/server/database"
-import { ontologyClasses } from "@/server/db/schema"
 import { assertOntologyDocumentAccess } from "@/server/group-access"
+import { getOntologyClasses } from "@/features/ontology/server/queries/classes"
 import { getActiveReferenceTerms } from "@/features/ontology/server/queries/reference-vocabularies"
 import {
   calculateOntologyAnalysis,
@@ -16,15 +15,13 @@ export async function runFullOntologyAnalysis(
   const db = getDb()
   await assertOntologyDocumentAccess(ontologyId, db)
 
-  const classes = await db
-    .select({
-      id: ontologyClasses.id,
-      name: ontologyClasses.name,
-      description: ontologyClasses.description,
-      parent_class_id: ontologyClasses.parent_class_id,
-    })
-    .from(ontologyClasses)
-    .where(eq(ontologyClasses.ontology_id, ontologyId))
+  const ontologyClassesList = await getOntologyClasses(ontologyId)
+  const classes = ontologyClassesList.map((c) => ({
+    id: c.id,
+    name: c.name,
+    description: c.description,
+    parent_class_id: c.parent_class_id,
+  }))
 
   const activeTerms = await getActiveReferenceTerms()
 

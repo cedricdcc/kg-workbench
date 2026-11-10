@@ -1,7 +1,8 @@
 "use server"
-import { eq, or } from "drizzle-orm"
+
 import { revalidatePath } from "next/cache"
-import type { OntologyExample, OntologyExampleInsert } from "@/domain/ontology"
+
+import type { OntologyExample } from "@/domain/ontology"
 import type { OntologyExampleTarget } from "@/features/ontology/server/queries"
 import { routes } from "@/lib/routes"
 import {
@@ -9,48 +10,32 @@ import {
   assertOntologyRecordAccess,
 } from "@/server/group-access"
 import { getDb } from "@/server/database"
-import {
-  ontologyCompetencyQuestions,
-  ontologyExamples,
-} from "@/server/db/schema"
-type ExampleTargetFields = Pick<
-  OntologyExampleInsert,
-  | "target_class_id"
-  | "target_attribute_id"
-  | "target_relation_id"
-  | "target_relation_attribute_id"
-  | "target_cq_id"
->
-function resolveExampleTarget(
-  target: OntologyExampleTarget
-): ExampleTargetFields {
-  switch (target.type) {
-    case "class":
-      return { target_class_id: target.id }
-    case "attribute":
-      return { target_attribute_id: target.id }
-    case "relation":
-      return { target_relation_id: target.id }
-    case "relation_attribute":
-      return { target_relation_attribute_id: target.id }
-    case "cq":
-      return { target_cq_id: target.id }
+import { saveCanonicalOntology } from "../linkml/document-store"
+import type { OntologyExampleSnapshot } from "../linkml/types"
+
+function projectExample(
+  ex: OntologyExampleSnapshot,
+  ontologyId: string
+): OntologyExample {
+  return {
+    id: ex.id ?? `${ontologyId}-ex-${Date.now()}`,
+    ontology_id: ontologyId,
+    value: ex.value,
+    subject_label: ex.subject_label ?? null,
+    predicate_label: ex.predicate_label ?? null,
+    object_label: ex.object_label ?? null,
+    sort_order: ex.sort_order ?? 0,
+    created_at: new Date(0).toISOString(),
+    is_instance_candidate: Boolean(ex.is_instance_candidate),
+    target_class_id: ex.target_type === "class" ? ex.target_id : null,
+    target_attribute_id: ex.target_type === "attribute" ? ex.target_id : null,
+    target_relation_id: ex.target_type === "relation" ? ex.target_id : null,
+    target_relation_attribute_id:
+      ex.target_type === "relation_attribute" ? ex.target_id : null,
+    target_cq_id: ex.target_type === "cq" ? ex.target_id : null,
   }
 }
-function resolveOntologyRecordType(type: OntologyExampleTarget["type"]) {
-  switch (type) {
-    case "class":
-      return "ontology_classes" as const
-    case "attribute":
-      return "ontology_attributes" as const
-    case "relation":
-      return "ontology_relations" as const
-    case "relation_attribute":
-      return "ontology_relation_attributes" as const
-    case "cq":
-      return "ontology_competency_questions" as const
-  }
-}
+
 export async function createExample(
   ontologyId: string,
   target: OntologyExampleTarget,
@@ -65,28 +50,52 @@ export async function createExample(
 ): Promise<OntologyExample> {
   const db = getDb()
   await assertOntologyDocumentAccess(ontologyId, db)
-  await assertOntologyRecordAccess(
-    resolveOntologyRecordType(target.type),
-    target.id,
-    db
+
+  const newExId = `ex-${Math.random().toString(36).slice(2, 9)}`
+  let created: OntologyExampleSnapshot | undefined
+
+  await saveCanonicalOntology(
+    ontologyId,
+    (draft) => {
+      draft.examples = draft.examples ?? []
+      created = {
+        id: newExId,
+        target_type: target.type,
+        target_id: target.id,
+        value: data.value,
+        subject_label: data.subjectLabel ?? null,
+        predicate_label: data.predicateLabel ?? null,
+        object_label: data.objectLabel ?? null,
+        is_instance_candidate: data.isInstanceCandidate ?? false,
+        sort_order: data.sortOrder ?? 0,
+      }
+      draft.examples.push(created)
+    },
+    { db }
   )
-  const [row] = await db
-    .insert(ontologyExamples)
-    .values({
-      ontology_id: ontologyId,
+
+  try {
+    revalidatePath(routes.ontology.root)
+  } catch {
+    // Non-Next environment
+  }
+
+  return projectExample(
+    created ?? {
+      id: newExId,
+      target_type: target.type,
+      target_id: target.id,
       value: data.value,
       subject_label: data.subjectLabel ?? null,
       predicate_label: data.predicateLabel ?? null,
       object_label: data.objectLabel ?? null,
       is_instance_candidate: data.isInstanceCandidate ?? false,
       sort_order: data.sortOrder ?? 0,
-      ...resolveExampleTarget(target),
-    })
-    .returning()
-  if (!row) throw new Error("Could not create example.")
-  revalidatePath(routes.ontology.root)
-  return row
+    },
+    ontologyId
+  )
 }
+
 export async function updateExample(
   id: string,
   data: {
@@ -96,50 +105,75 @@ export async function updateExample(
     objectLabel?: string | null
     isInstanceCandidate?: boolean
     sortOrder?: number
-  }
+  },
+  explicitOntologyId?: string
 ): Promise<OntologyExample> {
   const db = getDb()
-  await assertOntologyRecordAccess("ontology_examples", id, db)
-  if (data.isInstanceCandidate === false)
-    await db
-      .update(ontologyCompetencyQuestions)
-      .set({
-        subject_example_id: null,
-        object_example_id: null,
-        predicate_example_id: null,
-      })
-      .where(
-        or(
-          eq(ontologyCompetencyQuestions.subject_example_id, id),
-          eq(ontologyCompetencyQuestions.object_example_id, id),
-          eq(ontologyCompetencyQuestions.predicate_example_id, id)
-        )
-      )
-  const [row] = await db
-    .update(ontologyExamples)
-    .set({
-      ...(data.value !== undefined && { value: data.value }),
-      ...(data.subjectLabel !== undefined && {
-        subject_label: data.subjectLabel,
-      }),
-      ...(data.predicateLabel !== undefined && {
-        predicate_label: data.predicateLabel,
-      }),
-      ...(data.objectLabel !== undefined && { object_label: data.objectLabel }),
-      ...(data.isInstanceCandidate !== undefined && {
-        is_instance_candidate: data.isInstanceCandidate,
-      }),
-      ...(data.sortOrder !== undefined && { sort_order: data.sortOrder }),
-    })
-    .where(eq(ontologyExamples.id, id))
-    .returning()
-  if (!row) throw new Error("Example not found.")
-  revalidatePath(routes.ontology.root)
-  return row
+  const ontologyId =
+    explicitOntologyId ??
+    (await assertOntologyRecordAccess("ontology_examples", id, db))
+
+  let targetEx: OntologyExampleSnapshot | undefined
+
+  await saveCanonicalOntology(
+    ontologyId,
+    (draft) => {
+      targetEx = draft.examples?.find((e) => e.id === id)
+      if (!targetEx) {
+        throw new Error("Example not found.")
+      }
+
+      if (data.value !== undefined) targetEx.value = data.value
+      if (data.subjectLabel !== undefined)
+        targetEx.subject_label = data.subjectLabel
+      if (data.predicateLabel !== undefined)
+        targetEx.predicate_label = data.predicateLabel
+      if (data.objectLabel !== undefined)
+        targetEx.object_label = data.objectLabel
+      if (data.isInstanceCandidate !== undefined)
+        targetEx.is_instance_candidate = data.isInstanceCandidate
+      if (data.sortOrder !== undefined) targetEx.sort_order = data.sortOrder
+    },
+    { db }
+  )
+
+  try {
+    revalidatePath(routes.ontology.root)
+  } catch {
+    // Non-Next environment
+  }
+
+  return projectExample(
+    targetEx ?? {
+      id,
+      target_type: "class",
+      target_id: "",
+      value: data.value ?? "",
+    },
+    ontologyId
+  )
 }
-export async function deleteExample(id: string): Promise<void> {
+
+export async function deleteExample(
+  id: string,
+  explicitOntologyId?: string
+): Promise<void> {
   const db = getDb()
-  await assertOntologyRecordAccess("ontology_examples", id, db)
-  await db.delete(ontologyExamples).where(eq(ontologyExamples.id, id))
-  revalidatePath(routes.ontology.root)
+  const ontologyId =
+    explicitOntologyId ??
+    (await assertOntologyRecordAccess("ontology_examples", id, db))
+
+  await saveCanonicalOntology(
+    ontologyId,
+    (draft) => {
+      draft.examples = (draft.examples ?? []).filter((e) => e.id !== id)
+    },
+    { db }
+  )
+
+  try {
+    revalidatePath(routes.ontology.root)
+  } catch {
+    // Non-Next environment
+  }
 }

@@ -1,9 +1,8 @@
-﻿"use server"
+"use server"
 
 import { revalidatePath } from "next/cache"
-import { eq } from "drizzle-orm"
 
-import type { OntologyNote, OntologyNoteInsert } from "@/domain/ontology"
+import type { OntologyNote } from "@/domain/ontology"
 import type { OntologyMetadataTarget } from "@/features/ontology/server/queries"
 import { routes } from "@/lib/routes"
 import {
@@ -11,54 +10,29 @@ import {
   assertOntologyRecordAccess,
 } from "@/server/group-access"
 import { getDb } from "@/server/database"
-import { ontologyNotes } from "@/server/db/schema"
+import { saveCanonicalOntology } from "../linkml/document-store"
+import type { OntologyNoteSnapshot } from "../linkml/types"
 
-type NoteTargetFields = Pick<
-  OntologyNoteInsert,
-  | "target_ontology_id"
-  | "target_module_id"
-  | "target_class_id"
-  | "target_relation_id"
-  | "target_attribute_id"
-  | "target_relation_attribute_id"
-  | "target_cq_id"
->
-
-function resolveNoteTarget(target: OntologyMetadataTarget): NoteTargetFields {
-  switch (target.type) {
-    case "ontology":
-      return { target_ontology_id: target.id }
-    case "module":
-      return { target_module_id: target.id }
-    case "class":
-      return { target_class_id: target.id }
-    case "relation":
-      return { target_relation_id: target.id }
-    case "attribute":
-      return { target_attribute_id: target.id }
-    case "relation_attribute":
-      return { target_relation_attribute_id: target.id }
-    case "cq":
-      return { target_cq_id: target.id }
-  }
-}
-
-function resolveOntologyRecordType(targetType: OntologyMetadataTarget["type"]) {
-  switch (targetType) {
-    case "ontology":
-      return "ontology_documents" as const
-    case "module":
-      return "ontology_modules" as const
-    case "class":
-      return "ontology_classes" as const
-    case "relation":
-      return "ontology_relations" as const
-    case "attribute":
-      return "ontology_attributes" as const
-    case "relation_attribute":
-      return "ontology_relation_attributes" as const
-    case "cq":
-      return "ontology_competency_questions" as const
+function projectNote(
+  note: OntologyNoteSnapshot,
+  ontologyId: string
+): OntologyNote {
+  return {
+    id: note.id ?? `${ontologyId}-note-${Date.now()}`,
+    ontology_id: ontologyId,
+    body: note.body,
+    author_name: note.author_name ?? "",
+    sort_order: note.sort_order ?? 0,
+    created_at: new Date(0).toISOString(),
+    target_ontology_id: note.target_type === "ontology" ? note.target_id : null,
+    target_module_id: note.target_type === "module" ? note.target_id : null,
+    target_class_id: note.target_type === "class" ? note.target_id : null,
+    target_relation_id: note.target_type === "relation" ? note.target_id : null,
+    target_attribute_id:
+      note.target_type === "attribute" ? note.target_id : null,
+    target_relation_attribute_id:
+      note.target_type === "relation_attribute" ? note.target_id : null,
+    target_cq_id: note.target_type === "cq" ? note.target_id : null,
   }
 }
 
@@ -71,49 +45,111 @@ export async function createNote(
 ): Promise<OntologyNote> {
   const db = getDb()
   await assertOntologyDocumentAccess(ontologyId, db)
-  await assertOntologyRecordAccess(
-    resolveOntologyRecordType(target.type),
-    target.id,
-    db
+
+  const newNoteId = `note-${Math.random().toString(36).slice(2, 9)}`
+  let created: OntologyNoteSnapshot | undefined
+
+  await saveCanonicalOntology(
+    ontologyId,
+    (draft) => {
+      draft.notes = draft.notes ?? []
+      created = {
+        id: newNoteId,
+        target_type: target.type,
+        target_id: target.id,
+        body,
+        author_name: authorName,
+        sort_order: sortOrder ?? 0,
+      }
+      draft.notes.push(created)
+    },
+    { db }
   )
-  const [data] = await db
-    .insert(ontologyNotes)
-    .values({
-      ontology_id: ontologyId,
+
+  try {
+    revalidatePath(routes.ontology.root)
+  } catch {
+    // Non-Next environment
+  }
+
+  return projectNote(
+    created ?? {
+      id: newNoteId,
+      target_type: target.type,
+      target_id: target.id,
       body,
       author_name: authorName,
       sort_order: sortOrder ?? 0,
-      ...resolveNoteTarget(target),
-    })
-    .returning()
-  if (!data) throw new Error("Failed to create ontology note.")
-  revalidatePath(routes.ontology.root)
-  return data
+    },
+    ontologyId
+  )
 }
 
 export async function updateNote(
   id: string,
-  data: { body?: string; authorName?: string; sortOrder?: number }
+  data: { body?: string; authorName?: string; sortOrder?: number },
+  explicitOntologyId?: string
 ): Promise<OntologyNote> {
   const db = getDb()
-  await assertOntologyRecordAccess("ontology_notes", id, db)
-  const [row] = await db
-    .update(ontologyNotes)
-    .set({
-      ...(data.body !== undefined && { body: data.body }),
-      ...(data.authorName !== undefined && { author_name: data.authorName }),
-      ...(data.sortOrder !== undefined && { sort_order: data.sortOrder }),
-    })
-    .where(eq(ontologyNotes.id, id))
-    .returning()
-  if (!row) throw new Error("Ontology note was not found.")
-  revalidatePath(routes.ontology.root)
-  return row
+  const ontologyId =
+    explicitOntologyId ??
+    (await assertOntologyRecordAccess("ontology_notes", id, db))
+
+  let targetNote: OntologyNoteSnapshot | undefined
+
+  await saveCanonicalOntology(
+    ontologyId,
+    (draft) => {
+      targetNote = draft.notes?.find((n) => n.id === id)
+      if (!targetNote) {
+        throw new Error("Ontology note was not found.")
+      }
+
+      if (data.body !== undefined) targetNote.body = data.body
+      if (data.authorName !== undefined)
+        targetNote.author_name = data.authorName
+      if (data.sortOrder !== undefined) targetNote.sort_order = data.sortOrder
+    },
+    { db }
+  )
+
+  try {
+    revalidatePath(routes.ontology.root)
+  } catch {
+    // Non-Next environment
+  }
+
+  return projectNote(
+    targetNote ?? {
+      id,
+      target_type: "ontology",
+      target_id: ontologyId,
+      body: data.body ?? "",
+    },
+    ontologyId
+  )
 }
 
-export async function deleteNote(id: string): Promise<void> {
+export async function deleteNote(
+  id: string,
+  explicitOntologyId?: string
+): Promise<void> {
   const db = getDb()
-  await assertOntologyRecordAccess("ontology_notes", id, db)
-  await db.delete(ontologyNotes).where(eq(ontologyNotes.id, id))
-  revalidatePath(routes.ontology.root)
+  const ontologyId =
+    explicitOntologyId ??
+    (await assertOntologyRecordAccess("ontology_notes", id, db))
+
+  await saveCanonicalOntology(
+    ontologyId,
+    (draft) => {
+      draft.notes = (draft.notes ?? []).filter((n) => n.id !== id)
+    },
+    { db }
+  )
+
+  try {
+    revalidatePath(routes.ontology.root)
+  } catch {
+    // Non-Next environment
+  }
 }

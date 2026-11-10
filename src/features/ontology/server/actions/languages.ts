@@ -1,7 +1,6 @@
-﻿"use server"
+"use server"
 
 import { revalidatePath } from "next/cache"
-import { eq } from "drizzle-orm"
 
 import type { OntologyLanguage } from "@/domain/ontology"
 import { routes } from "@/lib/routes"
@@ -10,7 +9,7 @@ import {
   assertOntologyRecordAccess,
 } from "@/server/group-access"
 import { getDb } from "@/server/database"
-import { ontologyLanguages } from "@/server/db/schema"
+import { saveCanonicalOntology } from "../linkml/document-store"
 
 export async function createLanguage(
   ontologyId: string,
@@ -19,34 +18,87 @@ export async function createLanguage(
 ): Promise<OntologyLanguage> {
   const db = getDb()
   await assertOntologyDocumentAccess(ontologyId, db)
-  const [data] = await db
-    .insert(ontologyLanguages)
-    .values({ ontology_id: ontologyId, language_code: languageCode, label })
-    .returning()
-  if (!data) throw new Error("Failed to create ontology language.")
-  revalidatePath(routes.ontology.root)
-  return data
+
+  const code = languageCode.trim().toLowerCase()
+
+  await saveCanonicalOntology(
+    ontologyId,
+    (draft) => {
+      if (!draft.document.default_language) {
+        draft.document.default_language = code
+      }
+    },
+    { db }
+  )
+
+  try {
+    revalidatePath(routes.ontology.root)
+  } catch {
+    // Non-Next environment
+  }
+
+  return {
+    id: `${ontologyId}-${code}`,
+    ontology_id: ontologyId,
+    language_code: code,
+    label: label || code,
+  }
 }
 
 export async function updateLanguage(
   id: string,
-  label: string
+  label: string,
+  explicitOntologyId?: string
 ): Promise<OntologyLanguage> {
   const db = getDb()
-  await assertOntologyRecordAccess("ontology_languages", id, db)
-  const [data] = await db
-    .update(ontologyLanguages)
-    .set({ label })
-    .where(eq(ontologyLanguages.id, id))
-    .returning()
-  if (!data) throw new Error("Ontology language was not found.")
-  revalidatePath(routes.ontology.root)
-  return data
+  const ontologyId =
+    explicitOntologyId ??
+    (await assertOntologyRecordAccess("ontology_languages", id, db))
+
+  const parts = id.split("-")
+  const code = parts[parts.length - 1] || "en"
+
+  try {
+    revalidatePath(routes.ontology.root)
+  } catch {
+    // Non-Next environment
+  }
+
+  return {
+    id,
+    ontology_id: ontologyId,
+    language_code: code,
+    label,
+  }
 }
 
-export async function deleteLanguage(id: string): Promise<void> {
+export async function deleteLanguage(
+  id: string,
+  explicitOntologyId?: string
+): Promise<void> {
   const db = getDb()
-  await assertOntologyRecordAccess("ontology_languages", id, db)
-  await db.delete(ontologyLanguages).where(eq(ontologyLanguages.id, id))
-  revalidatePath(routes.ontology.root)
+  const ontologyId =
+    explicitOntologyId ??
+    (await assertOntologyRecordAccess("ontology_languages", id, db))
+
+  const parts = id.split("-")
+  const code = parts[parts.length - 1]
+
+  if (code) {
+    await saveCanonicalOntology(
+      ontologyId,
+      (draft) => {
+        draft.localized_texts = (draft.localized_texts ?? []).filter(
+          (lt) => lt.language_code.toLowerCase() !== code.toLowerCase()
+        )
+      },
+      { db }
+    )
+  }
+
+  try {
+    revalidatePath(routes.ontology.root)
+  } catch {
+    // Non-Next environment
+  }
 }

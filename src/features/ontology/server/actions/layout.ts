@@ -1,14 +1,8 @@
-﻿"use server"
+"use server"
 
-import {
-  assertOntologyDocumentAccess,
-  assertOntologyRecordAccess,
-} from "@/server/group-access"
+import { assertOntologyDocumentAccess } from "@/server/group-access"
 import { getDb } from "@/server/database"
-import {
-  ontologyClassPositions,
-  ontologyModuleLayout,
-} from "@/server/db/schema"
+import { saveCanonicalOntology } from "../linkml/document-store"
 
 export async function saveModuleLayout(
   ontologyId: string,
@@ -20,21 +14,19 @@ export async function saveModuleLayout(
 ): Promise<void> {
   const db = getDb()
   await assertOntologyDocumentAccess(ontologyId, db)
-  await assertOntologyRecordAccess("ontology_modules", moduleId, db)
-  await db
-    .insert(ontologyModuleLayout)
-    .values({
-      ontology_id: ontologyId,
-      module_id: moduleId,
-      x,
-      y,
-      width,
-      height,
-    })
-    .onConflictDoUpdate({
-      target: ontologyModuleLayout.module_id,
-      set: { ontology_id: ontologyId, x, y, width, height },
-    })
+
+  await saveCanonicalOntology(
+    ontologyId,
+    (draft) => {
+      draft.ui_layout = draft.ui_layout ?? {
+        classPositions: {},
+        moduleLayouts: {},
+      }
+      draft.ui_layout.moduleLayouts = draft.ui_layout.moduleLayouts ?? {}
+      draft.ui_layout.moduleLayouts[moduleId] = { x, y, width, height }
+    },
+    { db, recompile: false }
+  )
 }
 
 export async function saveClassPosition(
@@ -46,22 +38,68 @@ export async function saveClassPosition(
 ): Promise<void> {
   const db = getDb()
   await assertOntologyDocumentAccess(ontologyId, db)
-  await assertOntologyRecordAccess("ontology_classes", classId, db)
-  await assertOntologyRecordAccess("ontology_modules", moduleId, db)
-  await db
-    .insert(ontologyClassPositions)
-    .values({
-      ontology_id: ontologyId,
-      class_id: classId,
-      module_id: moduleId,
-      x,
-      y,
-    })
-    .onConflictDoUpdate({
-      target: [
-        ontologyClassPositions.class_id,
-        ontologyClassPositions.module_id,
-      ],
-      set: { ontology_id: ontologyId, x, y },
-    })
+
+  await saveCanonicalOntology(
+    ontologyId,
+    (draft) => {
+      draft.ui_layout = draft.ui_layout ?? {
+        classPositions: {},
+        moduleLayouts: {},
+      }
+      draft.ui_layout.classPositions = draft.ui_layout.classPositions ?? {}
+      draft.ui_layout.classPositions[moduleId] =
+        draft.ui_layout.classPositions[moduleId] ?? {}
+      draft.ui_layout.classPositions[moduleId][classId] = { x, y }
+    },
+    { db, recompile: false }
+  )
+}
+
+export async function saveModuleLayoutsAction(
+  ontologyId: string,
+  layouts: Record<
+    string,
+    { x: number; y: number; width: number; height: number }
+  >
+): Promise<void> {
+  const db = getDb()
+  await assertOntologyDocumentAccess(ontologyId, db)
+
+  await saveCanonicalOntology(
+    ontologyId,
+    (draft) => {
+      draft.ui_layout = draft.ui_layout ?? {
+        classPositions: {},
+        moduleLayouts: {},
+      }
+      draft.ui_layout.moduleLayouts = {
+        ...(draft.ui_layout.moduleLayouts ?? {}),
+        ...layouts,
+      }
+    },
+    { db, recompile: false }
+  )
+}
+
+export async function saveClassPositionsAction(
+  ontologyId: string,
+  positions: Record<string, Record<string, { x: number; y: number }>>
+): Promise<void> {
+  const db = getDb()
+  await assertOntologyDocumentAccess(ontologyId, db)
+
+  await saveCanonicalOntology(
+    ontologyId,
+    (draft) => {
+      draft.ui_layout = draft.ui_layout ?? {
+        classPositions: {},
+        moduleLayouts: {},
+      }
+      draft.ui_layout.classPositions = {
+        ...(draft.ui_layout.classPositions ?? {}),
+        ...positions,
+      }
+    },
+    { db, recompile: false }
+  )
 }

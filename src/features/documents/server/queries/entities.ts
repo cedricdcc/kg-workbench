@@ -5,11 +5,7 @@ import { asc, eq } from "drizzle-orm"
 import type { EntityWithAttributes } from "@/domain/documents"
 import { assertDocumentAccess } from "@/server/group-access"
 import { getDb } from "@/server/database"
-import {
-  documentEntities,
-  entityAttributeValues,
-  ontologyAttributes,
-} from "@/server/db/schema"
+import { documentEntities, entityAttributeValues } from "@/server/db/schema"
 
 export async function getDocumentEntities(
   documentId: string
@@ -28,17 +24,11 @@ export async function getDocumentEntities(
         id: entityAttributeValues.id,
         attribute_id: entityAttributeValues.attribute_id,
         value: entityAttributeValues.value,
-        attribute_name: ontologyAttributes.name,
-        data_type: ontologyAttributes.data_type,
       })
       .from(entityAttributeValues)
       .innerJoin(
         documentEntities,
         eq(entityAttributeValues.entity_id, documentEntities.id)
-      )
-      .leftJoin(
-        ontologyAttributes,
-        eq(entityAttributeValues.attribute_id, ontologyAttributes.id)
       )
       .where(eq(documentEntities.document_id, documentId)),
   ])
@@ -48,11 +38,13 @@ export async function getDocumentEntities(
   >()
   for (const attribute of attributeRows) {
     const values = attributesByEntity.get(attribute.entity_id) ?? []
+    const attrName =
+      attribute.attribute_id.split(".").pop() || attribute.attribute_id
     values.push({
       id: attribute.id,
       attribute_id: attribute.attribute_id,
-      attribute_name: attribute.attribute_name ?? "",
-      data_type: attribute.data_type ?? "",
+      attribute_name: attrName,
+      data_type: "xsd:string",
       value: attribute.value,
     })
     attributesByEntity.set(attribute.entity_id, values)

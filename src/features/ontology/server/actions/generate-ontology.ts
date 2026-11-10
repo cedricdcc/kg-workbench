@@ -7,14 +7,14 @@ import { routes } from "@/lib/routes"
 import { assertOntologyDocumentAccess } from "@/server/group-access"
 import { getDb } from "@/server/database"
 import {
-  ontologyAttributes,
-  ontologyClasses,
   ontologyCompetencyQuestionModules,
   ontologyCompetencyQuestions,
   ontologyCqTriples,
-  ontologyModules,
-  ontologyRelations,
 } from "@/server/db/schema"
+import {
+  loadCanonicalOntology,
+  saveCanonicalOntology,
+} from "../linkml/document-store"
 import {
   addReferenceOntology,
   syncReferenceOntology,
@@ -250,10 +250,11 @@ export async function applyOntologyDraft(
   const db = getDb()
   await assertOntologyDocumentAccess(trimmedId, db)
 
-  const existingClassesBefore = await db
-    .select({ id: ontologyClasses.id, name: ontologyClasses.name })
-    .from(ontologyClasses)
-    .where(eq(ontologyClasses.ontology_id, trimmedId))
+  const initialSnapshot = await loadCanonicalOntology(trimmedId, db)
+  const existingClassesBefore = (initialSnapshot.classes ?? []).map((cls) => ({
+    id: cls.id,
+    name: cls.name,
+  }))
 
   const { draft, healedIssues } = autoHealOntologyDraft(
     parsedDraft,
@@ -271,291 +272,271 @@ export async function applyOntologyDraft(
   let createdRelations = 0
   let updatedCQs = 0
 
+  const moduleMap = new Map<string, string>()
+  const classMap = new Map<string, string>()
+  const relationNameMap = new Map<string, string>()
+
   try {
-    await db.transaction(async (tx) => {
-      // 1. Process Modules
-      const existingModules = await tx
-        .select()
-        .from(ontologyModules)
-        .where(eq(ontologyModules.ontology_id, trimmedId))
+    await saveCanonicalOntology(
+      trimmedId,
+      (snapshotDraft) => {
+        snapshotDraft.modules = snapshotDraft.modules ?? []
+        snapshotDraft.classes = snapshotDraft.classes ?? []
+        snapshotDraft.attributes = snapshotDraft.attributes ?? []
+        snapshotDraft.relations = snapshotDraft.relations ?? []
 
-      const moduleMap = new Map<string, string>()
-      for (const mod of existingModules) {
-        moduleMap.set(mod.name.toLowerCase(), mod.id)
-      }
+        // 1. Process Modules
+        for (const mod of snapshotDraft.modules) {
+          moduleMap.set(mod.name.toLowerCase(), mod.id)
+        }
 
-      for (const mod of draft.modules) {
-        const lower = mod.name.toLowerCase()
-        if (!moduleMap.has(lower)) {
-          const [inserted] = await tx
-            .insert(ontologyModules)
-            .values({
-              ontology_id: trimmedId,
+        for (const mod of draft.modules) {
+          const lower = mod.name.toLowerCase()
+          if (!moduleMap.has(lower)) {
+            const modId = mod.name
+            snapshotDraft.modules.push({
+              id: modId,
               name: mod.name,
               description: mod.description || "",
             })
-            .returning()
-          if (inserted) {
-            moduleMap.set(lower, inserted.id)
+            moduleMap.set(lower, modId)
             createdModules++
           }
         }
-      }
 
-      // 2. Process Classes & Attributes
-      const existingClasses = await tx
-        .select()
-        .from(ontologyClasses)
-        .where(eq(ontologyClasses.ontology_id, trimmedId))
+        // 2. Process Classes & Attributes
+        for (const cls of snapshotDraft.classes) {
+          classMap.set(cls.name.toLowerCase(), cls.id)
+        }
 
-      const classMap = new Map<string, string>()
-      for (const cls of existingClasses) {
-        classMap.set(cls.name.toLowerCase(), cls.id)
-      }
+        for (const cls of draft.classes) {
+          const lower = cls.name.toLowerCase()
+          const targetModuleId =
+            moduleMap.get(cls.moduleName.toLowerCase()) ?? null
 
-      for (const cls of draft.classes) {
-        const lower = cls.name.toLowerCase()
-        const targetModuleId =
-          moduleMap.get(cls.moduleName.toLowerCase()) ?? null
-
-        if (!classMap.has(lower)) {
-          const [inserted] = await tx
-            .insert(ontologyClasses)
-            .values({
-              ontology_id: trimmedId,
-              module_id: targetModuleId,
+          if (!classMap.has(lower)) {
+            const classId = cls.name
+            snapshotDraft.classes.push({
+              id: classId,
               name: cls.name,
+              module_id: targetModuleId,
               description: cls.description || "",
+              parent_class_id: null,
+              instance_policy: "open",
             })
-            .returning()
-
-          if (inserted) {
-            classMap.set(lower, inserted.id)
+            classMap.set(lower, classId)
             createdClasses++
 
-            // Insert attributes if any
+            // Insert attributes
             if (cls.attributes && cls.attributes.length > 0) {
-              await tx.insert(ontologyAttributes).values(
-                cls.attributes.map((attr) => ({
-                  class_id: inserted.id,
+              for (const attr of cls.attributes) {
+                snapshotDraft.attributes.push({
+                  id: `${classId}.${attr.name}`,
+                  class_id: classId,
                   name: attr.name,
                   data_type: normalizeOntologyDataTypeOrDefault(attr.dataType),
                   description: attr.description || "",
-                }))
-              )
+                })
+              }
             }
           }
         }
-      }
 
-      // Option B Contextual Graph Closure: Incorporate selected suggestedContext parent classes
-      if (draft.suggestedContext && draft.suggestedContext.length > 0) {
-        for (const ctx of draft.suggestedContext) {
-          if (ctx.type === "parentClass") {
-            const name = ctx.label || ctx.curie
-            const lower = name.toLowerCase()
-            const curieLower = ctx.curie.toLowerCase()
-            if (!classMap.has(lower) && !classMap.has(curieLower)) {
-              const [inserted] = await tx
-                .insert(ontologyClasses)
-                .values({
-                  ontology_id: trimmedId,
-                  module_id: null,
+        // Option B Contextual Graph Closure: Incorporate selected suggestedContext parent classes
+        if (draft.suggestedContext && draft.suggestedContext.length > 0) {
+          for (const ctx of draft.suggestedContext) {
+            if (ctx.type === "parentClass") {
+              const name = ctx.label || ctx.curie
+              const lower = name.toLowerCase()
+              const curieLower = ctx.curie.toLowerCase()
+              if (!classMap.has(lower) && !classMap.has(curieLower)) {
+                snapshotDraft.classes.push({
+                  id: name,
                   name,
+                  module_id: null,
                   description: `Standard parent class (${ctx.curie})`,
+                  parent_class_id: null,
+                  instance_policy: "open",
                 })
-                .returning()
-
-              if (inserted) {
-                classMap.set(lower, inserted.id)
-                classMap.set(curieLower, inserted.id)
+                classMap.set(lower, name)
+                classMap.set(curieLower, name)
                 createdClasses++
               }
             }
           }
         }
-      }
 
-      // Wire parent class relationships if parentClassName was provided
-      for (const cls of draft.classes) {
-        if (cls.parentClassName) {
-          const parentId = classMap.get(cls.parentClassName.toLowerCase())
-          const classId = classMap.get(cls.name.toLowerCase())
-          if (parentId && classId && parentId !== classId) {
-            await tx
-              .update(ontologyClasses)
-              .set({ parent_class_id: parentId })
-              .where(eq(ontologyClasses.id, classId))
+        // Wire parent class relationships if parentClassName was provided
+        for (const cls of draft.classes) {
+          if (cls.parentClassName) {
+            const parentId = classMap.get(cls.parentClassName.toLowerCase())
+            const classId = classMap.get(cls.name.toLowerCase())
+            if (parentId && classId && parentId !== classId) {
+              const found = snapshotDraft.classes.find(
+                (c) => c.id === classId || c.name === classId
+              )
+              if (found) {
+                found.parent_class_id = parentId
+              }
+            }
           }
         }
-      }
 
-      // 3. Process Relations
-      const existingRelations = await tx
-        .select()
-        .from(ontologyRelations)
-        .where(eq(ontologyRelations.ontology_id, trimmedId))
+        // 3. Process Relations
+        const relationKeyMap = new Map<string, string>()
+        for (const rel of snapshotDraft.relations) {
+          const key = `${rel.name.toLowerCase()}:${rel.domain_class_id}:${rel.range_class_id}`
+          relationKeyMap.set(key, rel.id)
+          relationNameMap.set(rel.name.toLowerCase(), rel.id)
+        }
 
-      const relationKeyMap = new Map<string, string>()
-      const relationNameMap = new Map<string, string>()
+        for (const rel of draft.relations) {
+          const domainId = classMap.get(rel.domainClassName.toLowerCase())
+          const rangeId = classMap.get(rel.rangeClassName.toLowerCase())
 
-      for (const rel of existingRelations) {
-        const key = `${rel.name.toLowerCase()}:${rel.domain_class_id}:${rel.range_class_id}`
-        relationKeyMap.set(key, rel.id)
-        relationNameMap.set(rel.name.toLowerCase(), rel.id)
-      }
-
-      for (const rel of draft.relations) {
-        const domainId = classMap.get(rel.domainClassName.toLowerCase())
-        const rangeId = classMap.get(rel.rangeClassName.toLowerCase())
-
-        if (domainId && rangeId) {
-          const key = `${rel.name.toLowerCase()}:${domainId}:${rangeId}`
-          if (!relationKeyMap.has(key)) {
-            const [inserted] = await tx
-              .insert(ontologyRelations)
-              .values({
-                ontology_id: trimmedId,
+          if (domainId && rangeId) {
+            const key = `${rel.name.toLowerCase()}:${domainId}:${rangeId}`
+            if (!relationKeyMap.has(key)) {
+              snapshotDraft.relations.push({
+                id: rel.name,
                 name: rel.name,
                 domain_class_id: domainId,
                 range_class_id: rangeId,
                 description: rel.description || "",
+                instance_policy: "open",
               })
-              .returning()
-
-            if (inserted) {
-              relationKeyMap.set(key, inserted.id)
-              relationNameMap.set(rel.name.toLowerCase(), inserted.id)
+              relationKeyMap.set(key, rel.name)
+              relationNameMap.set(rel.name.toLowerCase(), rel.name)
               createdRelations++
             }
           }
         }
-      }
 
-      // Option B: Establish subClassOf relations for classes mapped via subClassOf
-      for (const cls of draft.classes) {
-        if (cls.alignment?.mode === "subClassOf" && cls.alignment.targetCurie) {
-          const domainId = classMap.get(cls.name.toLowerCase())
-          const targetCurieLower = cls.alignment.targetCurie.toLowerCase()
-          const rangeId =
-            classMap.get(targetCurieLower) ||
-            classMap.get(
-              (cls.alignment.targetCurie.split(":")[1] || "").toLowerCase()
-            )
+        // Establish subClassOf relations for classes mapped via subClassOf
+        for (const cls of draft.classes) {
+          if (
+            cls.alignment?.mode === "subClassOf" &&
+            cls.alignment.targetCurie
+          ) {
+            const domainId = classMap.get(cls.name.toLowerCase())
+            const targetCurieLower = cls.alignment.targetCurie.toLowerCase()
+            const rangeId =
+              classMap.get(targetCurieLower) ||
+              classMap.get(
+                (cls.alignment.targetCurie.split(":")[1] || "").toLowerCase()
+              )
 
-          if (domainId && rangeId) {
-            const key = `subclassof:${domainId}:${rangeId}`
-            if (!relationKeyMap.has(key)) {
-              const [inserted] = await tx
-                .insert(ontologyRelations)
-                .values({
-                  ontology_id: trimmedId,
+            if (domainId && rangeId) {
+              const key = `subclassof:${domainId}:${rangeId}`
+              if (!relationKeyMap.has(key)) {
+                snapshotDraft.relations.push({
+                  id: "subClassOf",
                   name: "subClassOf",
                   domain_class_id: domainId,
                   range_class_id: rangeId,
                   description: `Inherits from standard vocabulary class ${cls.alignment.targetCurie}`,
+                  instance_policy: "open",
                 })
-                .returning()
-
-              if (inserted) {
-                relationKeyMap.set(key, inserted.id)
-                relationNameMap.set("subclassof", inserted.id)
+                relationKeyMap.set(key, "subClassOf")
+                relationNameMap.set("subclassof", "subClassOf")
                 createdRelations++
               }
             }
           }
         }
+      },
+      { db }
+    )
+
+    // 4. Update CQ Mappings
+    const existingCQs = await db
+      .select({ id: ontologyCompetencyQuestions.id })
+      .from(ontologyCompetencyQuestions)
+      .where(eq(ontologyCompetencyQuestions.ontology_id, trimmedId))
+
+    const existingCqIdSet = new Set(existingCQs.map((cq) => cq.id))
+
+    for (const mapping of draft.cqMappings) {
+      if (!existingCqIdSet.has(mapping.cqId)) {
+        continue
       }
 
-      // 4. Update CQ Mappings
-      const existingCQs = await tx
-        .select({ id: ontologyCompetencyQuestions.id })
-        .from(ontologyCompetencyQuestions)
-        .where(eq(ontologyCompetencyQuestions.ontology_id, trimmedId))
+      await db
+        .delete(ontologyCqTriples)
+        .where(eq(ontologyCqTriples.cq_id, mapping.cqId))
 
-      const existingCqIdSet = new Set(existingCQs.map((cq) => cq.id))
+      let order = 0
+      let firstSubId: string | null = null
+      let firstPredId: string | null = null
+      let firstObjId: string | null = null
 
-      for (const mapping of draft.cqMappings) {
-        // Skip mappings pointing to CQs that do not exist in this ontology
-        if (!existingCqIdSet.has(mapping.cqId)) {
-          continue
+      for (const t of mapping.triples ?? []) {
+        const subId = classMap.get(t.subjectClassName.toLowerCase()) ?? null
+        const predId =
+          relationNameMap.get(t.predicateRelationName.toLowerCase()) ?? null
+        const objId = classMap.get(t.objectClassName.toLowerCase()) ?? null
+
+        if (order === 0) {
+          firstSubId = subId
+          firstPredId = predId
+          firstObjId = objId
         }
 
-        // Delete previous triples for this CQ
-        await tx
-          .delete(ontologyCqTriples)
-          .where(eq(ontologyCqTriples.cq_id, mapping.cqId))
-
-        let order = 0
-        let firstSubId: string | null = null
-        let firstPredId: string | null = null
-        let firstObjId: string | null = null
-
-        for (const t of mapping.triples ?? []) {
-          const subId = classMap.get(t.subjectClassName.toLowerCase()) ?? null
-          const predId =
-            relationNameMap.get(t.predicateRelationName.toLowerCase()) ?? null
-          const objId = classMap.get(t.objectClassName.toLowerCase()) ?? null
-
-          if (order === 0) {
-            firstSubId = subId
-            firstPredId = predId
-            firstObjId = objId
-          }
-
-          if (subId || predId || objId) {
-            await tx.insert(ontologyCqTriples).values({
-              cq_id: mapping.cqId,
-              sort_order: order,
-              subject_class_id: subId,
-              predicate_relation_id: predId,
-              object_class_id: objId,
-            })
-            order++
-          }
+        if (subId || predId || objId) {
+          await db.insert(ontologyCqTriples).values({
+            cq_id: mapping.cqId,
+            sort_order: order,
+            subject_class_id: subId,
+            predicate_relation_id: predId,
+            object_class_id: objId,
+          })
+          order++
         }
+      }
 
-        if (firstSubId || firstPredId || firstObjId) {
-          await tx
-            .update(ontologyCompetencyQuestions)
-            .set({
-              subject_class_id: firstSubId,
-              predicate_relation_id: firstPredId,
-              object_class_id: firstObjId,
-            })
-            .where(
-              and(
-                eq(ontologyCompetencyQuestions.id, mapping.cqId),
-                eq(ontologyCompetencyQuestions.ontology_id, trimmedId)
-              )
+      if (firstSubId || firstPredId || firstObjId) {
+        await db
+          .update(ontologyCompetencyQuestions)
+          .set({
+            subject_class_id: firstSubId,
+            predicate_relation_id: firstPredId,
+            object_class_id: firstObjId,
+          })
+          .where(
+            and(
+              eq(ontologyCompetencyQuestions.id, mapping.cqId),
+              eq(ontologyCompetencyQuestions.ontology_id, trimmedId)
             )
-          updatedCQs++
-        }
+          )
+        updatedCQs++
+      }
 
-        // Link modules
-        if (mapping.moduleNames && mapping.moduleNames.length > 0) {
-          for (const modName of mapping.moduleNames) {
-            const modId = moduleMap.get(modName.toLowerCase())
-            if (modId) {
-              await tx
-                .insert(ontologyCompetencyQuestionModules)
-                .values({
-                  cq_id: mapping.cqId,
-                  module_id: modId,
-                })
-                .onConflictDoNothing()
-            }
+      if (mapping.moduleNames && mapping.moduleNames.length > 0) {
+        for (const modName of mapping.moduleNames) {
+          const modId = moduleMap.get(modName.toLowerCase())
+          if (modId) {
+            await db
+              .insert(ontologyCompetencyQuestionModules)
+              .values({
+                cq_id: mapping.cqId,
+                module_id: modId,
+              })
+              .onConflictDoNothing()
           }
         }
       }
-    })
+    }
   } catch (error) {
     console.error("applyOntologyDraft failed:", error)
     throw error
   }
 
-  revalidatePath(routes.ontology.document(trimmedId))
-  revalidatePath(routes.ontology.root)
+  try {
+    revalidatePath(routes.ontology.document(trimmedId))
+    revalidatePath(routes.ontology.root)
+  } catch {
+    // Non-Next environment
+  }
 
   return {
     createdModules,

@@ -1,7 +1,7 @@
-﻿"use server"
+"use server"
 
 import { revalidatePath } from "next/cache"
-import { and, asc, eq, inArray } from "drizzle-orm"
+import { eq } from "drizzle-orm"
 
 import type { Document } from "@/domain/documents"
 import { routes } from "@/lib/routes"
@@ -27,13 +27,8 @@ import type {
   InternalExtractionRequest,
 } from "@/server/external/extraction-api"
 import { getDb } from "@/server/database"
-import {
-  documents,
-  extractionRuns,
-  ontologyAttributes,
-  ontologyClasses,
-  ontologyRelations,
-} from "@/server/db/schema"
+import { documents, extractionRuns } from "@/server/db/schema"
+import { loadCanonicalOntology } from "@/features/ontology/server/linkml/document-store"
 import { createStorageProvider } from "@/server/storage"
 import { buildOntologyExportInternal } from "@/features/ontology/server/actions/ontology-transfer/build-ontology-export"
 import {
@@ -124,43 +119,61 @@ async function buildInternalExtractionOptions({
     throw new Error("An API key is required for the selected provider.")
   }
 
-  const [classes, relations] = await Promise.all([
-    db
-      .select()
-      .from(ontologyClasses)
-      .where(
-        and(
-          eq(ontologyClasses.ontology_id, ontologyId),
-          classIds?.length ? inArray(ontologyClasses.id, classIds) : undefined
-        )
-      )
-      .orderBy(asc(ontologyClasses.name)),
-    db
-      .select()
-      .from(ontologyRelations)
-      .where(
-        and(
-          eq(ontologyRelations.ontology_id, ontologyId),
-          relationIds?.length
-            ? inArray(ontologyRelations.id, relationIds)
-            : undefined
-        )
-      )
-      .orderBy(asc(ontologyRelations.name)),
-  ])
+  const snapshot = await loadCanonicalOntology(ontologyId, db)
 
-  const attributes =
-    classes.length === 0
-      ? []
-      : await db
-          .select()
-          .from(ontologyAttributes)
-          .where(
-            inArray(
-              ontologyAttributes.class_id,
-              classes.map((ontologyClass) => ontologyClass.id)
-            )
-          )
+  const selectedClassIds = classIds?.length ? new Set(classIds) : null
+  const selectedRelationIds = relationIds?.length ? new Set(relationIds) : null
+
+  const classes = (snapshot.classes ?? [])
+    .filter(
+      (c) =>
+        !selectedClassIds ||
+        selectedClassIds.has(c.id) ||
+        selectedClassIds.has(c.name)
+    )
+    .map((c) => ({
+      id: c.id,
+      ontology_id: ontologyId,
+      name: c.name,
+      description: c.description ?? "",
+      parent_class_id: c.parent_class_id ?? null,
+      module_id: c.module_id ?? null,
+      instance_policy: c.instance_policy ?? "open",
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name))
+
+  const relations = (snapshot.relations ?? [])
+    .filter(
+      (r) =>
+        !selectedRelationIds ||
+        selectedRelationIds.has(r.id) ||
+        selectedRelationIds.has(r.name)
+    )
+    .map((r) => ({
+      id: r.id,
+      ontology_id: ontologyId,
+      name: r.name,
+      domain_class_id: r.domain_class_id,
+      range_class_id: r.range_class_id,
+      description: r.description ?? "",
+      inverse_name: r.inverse_name ?? null,
+      cardinality: r.cardinality ?? null,
+      instance_policy: r.instance_policy ?? "open",
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name))
+
+  const classKeySet = new Set(classes.map((c) => c.id))
+  const attributes = (snapshot.attributes ?? [])
+    .filter((a) => classKeySet.has(a.class_id))
+    .map((a) => ({
+      id: a.id,
+      class_id: a.class_id,
+      name: a.name,
+      data_type: a.data_type ?? "string",
+      required: a.required ?? false,
+      description: a.description ?? "",
+    }))
+
   const attributesByClassId = new Map<string, typeof attributes>()
   for (const attribute of attributes) {
     const classAttributes = attributesByClassId.get(attribute.class_id) ?? []

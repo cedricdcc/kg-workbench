@@ -20,19 +20,8 @@ import {
   extractionRuns,
   factRelationAttributeValues,
   facts,
-  ontologyAttributes,
-  ontologyClassPositions,
-  ontologyClasses,
   ontologyCompetencyQuestions,
   ontologyDocuments,
-  ontologyExamples,
-  ontologyLanguages,
-  ontologyLocalizedTexts,
-  ontologyModuleLayout,
-  ontologyModules,
-  ontologyNotes,
-  ontologyRelationAttributes,
-  ontologyRelations,
 } from "@/server/db/schema"
 
 type ServerDb = ReturnType<typeof getDb>
@@ -127,92 +116,59 @@ export async function assertDocumentAccess(
   return documentId
 }
 
-async function selectOntologyId(
-  db: ServerDb,
-  table:
-    | typeof ontologyModules
-    | typeof ontologyClasses
-    | typeof ontologyRelations
-    | typeof ontologyCompetencyQuestions
-    | typeof ontologyLanguages
-    | typeof ontologyNotes
-    | typeof ontologyLocalizedTexts
-    | typeof ontologyExamples,
-  id: string
-): Promise<string | null> {
-  const [row] = await db
-    .select({ ontology_id: table.ontology_id })
-    .from(table)
-    .where(eq(table.id, id))
-    .limit(1)
-  return row?.ontology_id ?? null
-}
-
 async function resolveOntologyIdForRecord(
   recordType: OntologyScopedRecord,
   id: string,
   db: ServerDb
 ): Promise<string | null> {
-  switch (recordType) {
-    case "ontology_documents":
-      return id
-    case "ontology_modules":
-      return selectOntologyId(db, ontologyModules, id)
-    case "ontology_classes":
-      return selectOntologyId(db, ontologyClasses, id)
-    case "ontology_relations":
-      return selectOntologyId(db, ontologyRelations, id)
-    case "ontology_competency_questions":
-      return selectOntologyId(db, ontologyCompetencyQuestions, id)
-    case "ontology_languages":
-      return selectOntologyId(db, ontologyLanguages, id)
-    case "ontology_notes":
-      return selectOntologyId(db, ontologyNotes, id)
-    case "ontology_localized_texts":
-      return selectOntologyId(db, ontologyLocalizedTexts, id)
-    case "ontology_examples":
-      return selectOntologyId(db, ontologyExamples, id)
-    case "ontology_attributes": {
-      const [row] = await db
-        .select({ ontology_id: ontologyClasses.ontology_id })
-        .from(ontologyAttributes)
-        .innerJoin(
-          ontologyClasses,
-          eq(ontologyAttributes.class_id, ontologyClasses.id)
-        )
-        .where(eq(ontologyAttributes.id, id))
-        .limit(1)
-      return row?.ontology_id ?? null
+  if (recordType === "ontology_documents") {
+    return id
+  }
+  if (recordType === "ontology_competency_questions") {
+    const [row] = await db
+      .select({ ontology_id: ontologyCompetencyQuestions.ontology_id })
+      .from(ontologyCompetencyQuestions)
+      .where(eq(ontologyCompetencyQuestions.id, id))
+      .limit(1)
+    return row?.ontology_id ?? null
+  }
+
+  // Check if id directly matches an ontology document
+  const [directDoc] = await db
+    .select({ id: ontologyDocuments.id })
+    .from(ontologyDocuments)
+    .where(eq(ontologyDocuments.id, id))
+    .limit(1)
+  if (directDoc) {
+    return directDoc.id
+  }
+
+  // Otherwise, search ontology documents where linkml_yaml or ui_layout contains the symbol key
+  const docs = (await db
+    .select({
+      id: ontologyDocuments.id,
+      linkml_yaml: ontologyDocuments.linkml_yaml,
+      ui_layout: ontologyDocuments.ui_layout,
+    })
+    .from(ontologyDocuments)) as Array<{
+    id: string
+    linkml_yaml: string | null
+    ui_layout: unknown
+  }>
+
+  for (const row of docs) {
+    if (row.linkml_yaml && row.linkml_yaml.includes(id)) {
+      return row.id
     }
-    case "ontology_relation_attributes": {
-      const [row] = await db
-        .select({ ontology_id: ontologyRelations.ontology_id })
-        .from(ontologyRelationAttributes)
-        .innerJoin(
-          ontologyRelations,
-          eq(ontologyRelationAttributes.relation_id, ontologyRelations.id)
-        )
-        .where(eq(ontologyRelationAttributes.id, id))
-        .limit(1)
-      return row?.ontology_id ?? null
-    }
-    case "ontology_module_layout": {
-      const [row] = await db
-        .select({ ontology_id: ontologyModuleLayout.ontology_id })
-        .from(ontologyModuleLayout)
-        .where(eq(ontologyModuleLayout.module_id, id))
-        .limit(1)
-      return row?.ontology_id ?? null
-    }
-    case "ontology_class_positions": {
-      const [row] = await db
-        .select({ ontology_id: ontologyClassPositions.ontology_id })
-        .from(ontologyClassPositions)
-        .where(eq(ontologyClassPositions.class_id, id))
-        .limit(1)
-      return row?.ontology_id ?? null
+    if (row.ui_layout) {
+      const layoutStr = JSON.stringify(row.ui_layout)
+      if (layoutStr.includes(id)) {
+        return row.id
+      }
     }
   }
+
+  return null
 }
 
 async function selectDocumentId(

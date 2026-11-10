@@ -10,8 +10,8 @@ import {
   ontologyCompetencyQuestionModules,
   ontologyCompetencyQuestions,
   ontologyCqTriples,
-  ontologyModules,
 } from "@/server/db/schema"
+import { getOntologyModules } from "./modules"
 import type { OntologyCqTriple } from "@/domain/ontology"
 import type { OntologyCQWithModules } from "./types"
 
@@ -22,17 +22,17 @@ async function withModulesAndTriples(
   const db = getDb()
   const cqIds = cqs.map((cq) => cq.id)
 
-  const [links, triples] = await Promise.all([
+  const ontologyId = cqs[0]?.ontology_id
+  const modules = ontologyId ? await getOntologyModules(ontologyId) : []
+  const moduleMap = new Map(modules.map((m) => [m.id, m]))
+
+  const [linkRows, triples] = await Promise.all([
     db
       .select({
         cq_id: ontologyCompetencyQuestionModules.cq_id,
-        module: { id: ontologyModules.id, name: ontologyModules.name },
+        module_id: ontologyCompetencyQuestionModules.module_id,
       })
       .from(ontologyCompetencyQuestionModules)
-      .innerJoin(
-        ontologyModules,
-        eq(ontologyCompetencyQuestionModules.module_id, ontologyModules.id)
-      )
       .where(inArray(ontologyCompetencyQuestionModules.cq_id, cqIds)),
     db
       .select()
@@ -40,6 +40,16 @@ async function withModulesAndTriples(
       .where(inArray(ontologyCqTriples.cq_id, cqIds))
       .orderBy(asc(ontologyCqTriples.sort_order)),
   ])
+
+  const links = linkRows.map((r) => ({
+    cq_id: r.cq_id,
+    module: moduleMap.get(r.module_id) ?? {
+      id: r.module_id,
+      ontology_id: ontologyId ?? "",
+      name: r.module_id,
+      description: "",
+    },
+  }))
 
   const modulesByCq = new Map<string, Pick<OntologyModule, "id" | "name">[]>()
   for (const link of links) {

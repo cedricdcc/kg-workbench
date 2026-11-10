@@ -1,14 +1,10 @@
 "use server"
 
-import { and, desc, eq, inArray, isNotNull } from "drizzle-orm"
+import { and, desc, eq, isNotNull } from "drizzle-orm"
 import { getEffectiveApiKey } from "@/server/api-keys"
 import { getDb } from "@/server/database"
-import {
-  datasetSources,
-  ontologyAttributes,
-  ontologyClasses,
-  ontologyRelations,
-} from "@/server/db/schema"
+import { datasetSources } from "@/server/db/schema"
+import { loadCanonicalOntology } from "@/features/ontology/server/linkml/document-store"
 import { getCurrentGroupKeyOrThrow } from "@/server/group-access"
 import {
   buildAiMappingPrompt,
@@ -72,43 +68,40 @@ export async function synthesizeOntologyMappingsAction(
   const db = getDb()
 
   // 1. Fetch active ontology classes and their attributes
-  const classesList = await db
-    .select()
-    .from(ontologyClasses)
-    .where(eq(ontologyClasses.ontology_id, input.ontologyId))
+  let snapshot: Awaited<ReturnType<typeof loadCanonicalOntology>> = {
+    document: { id: input.ontologyId, name: "", version: "1.0.0" },
+    modules: [],
+    classes: [],
+    relations: [],
+    attributes: [],
+    relation_attributes: [],
+  }
+  try {
+    snapshot = await loadCanonicalOntology(input.ontologyId, db)
+  } catch {
+    // Graceful fallback for mock environments or empty databases
+  }
 
-  const classIds = classesList.map((c) => c.id)
-  const attributesList =
-    classIds.length > 0
-      ? await db
-          .select()
-          .from(ontologyAttributes)
-          .where(inArray(ontologyAttributes.class_id, classIds))
-      : []
-
-  const existingClasses = classesList.map((c) => ({
+  const existingClasses = (snapshot.classes ?? []).map((c) => ({
     id: c.id,
     name: c.name,
-    description: c.description,
-    attributes: attributesList
+    description: c.description ?? "",
+    attributes: (snapshot.attributes ?? [])
       .filter((a) => a.class_id === c.id)
-      .map((a) => ({ name: a.name, dataType: a.data_type })),
+      .map((a) => ({ name: a.name, dataType: a.data_type ?? "string" })),
   }))
 
   // 2. Fetch active relations
-  const relationsList = await db
-    .select()
-    .from(ontologyRelations)
-    .where(eq(ontologyRelations.ontology_id, input.ontologyId))
-
-  const existingRelations = relationsList.map((r) => {
-    const domainClass = classesList.find((c) => c.id === r.domain_class_id)
-    const rangeClass = classesList.find((c) => c.id === r.range_class_id)
+  const existingRelations = (snapshot.relations ?? []).map((r) => {
+    const domainClass = snapshot.classes?.find(
+      (c) => c.id === r.domain_class_id
+    )
+    const rangeClass = snapshot.classes?.find((c) => c.id === r.range_class_id)
     return {
       id: r.id,
       name: r.name,
-      domainClassName: domainClass?.name,
-      rangeClassName: rangeClass?.name,
+      domainClassName: domainClass?.name ?? r.domain_class_id,
+      rangeClassName: rangeClass?.name ?? r.range_class_id,
     }
   })
 

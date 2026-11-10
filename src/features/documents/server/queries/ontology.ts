@@ -11,8 +11,6 @@ import {
   extractionRuns,
   ontologyCompetencyQuestionModules,
   ontologyCompetencyQuestions,
-  ontologyExamples,
-  ontologyModules,
 } from "@/server/db/schema"
 import {
   loadCanonicalOntology,
@@ -119,57 +117,42 @@ export async function getOntologyForDocument(
     ),
   ]
 
-  let examples: Array<{ id: string; value: string }> = []
   let links: Array<{
     cq_id: string
     module: { id: string; name: string }
   }> = []
 
   // Examples from snapshot
-  const snapshotExamples = (snapshot.examples ?? [])
+  const examples = (snapshot.examples ?? [])
     .filter((ex) => ex.id && exampleIds.includes(ex.id))
     .map((ex) => ({ id: ex.id!, value: ex.value }))
 
-  if (exampleIds.length > 0) {
-    try {
-      const dbExamples = await database
-        .select({ id: ontologyExamples.id, value: ontologyExamples.value })
-        .from(ontologyExamples)
-        .where(inArray(ontologyExamples.id, exampleIds))
-        .orderBy(asc(ontologyExamples.sort_order))
-      const combined = [...snapshotExamples, ...(dbExamples ?? [])]
-      const seen = new Set<string>()
-      examples = combined.filter((ex) => {
-        if (seen.has(ex.id)) return false
-        seen.add(ex.id)
-        return true
-      })
-    } catch {
-      examples = snapshotExamples
-    }
-  } else {
-    examples = snapshotExamples
-  }
+  const moduleMap = new Map(
+    (snapshot.modules ?? []).map((m) => [m.id, { id: m.id, name: m.name }])
+  )
 
   if (cqs.length > 0) {
     try {
-      links =
+      const rows =
         (await database
           .select({
             cq_id: ontologyCompetencyQuestionModules.cq_id,
-            module: { id: ontologyModules.id, name: ontologyModules.name },
+            module_id: ontologyCompetencyQuestionModules.module_id,
           })
           .from(ontologyCompetencyQuestionModules)
-          .innerJoin(
-            ontologyModules,
-            eq(ontologyCompetencyQuestionModules.module_id, ontologyModules.id)
-          )
           .where(
             inArray(
               ontologyCompetencyQuestionModules.cq_id,
               cqs.map((cq) => cq.id)
             )
           )) ?? []
+      links = rows.map((r) => ({
+        cq_id: r.cq_id,
+        module: moduleMap.get(r.module_id) ?? {
+          id: r.module_id,
+          name: r.module_id,
+        },
+      }))
     } catch {
       links = []
     }

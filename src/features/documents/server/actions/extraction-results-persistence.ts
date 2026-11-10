@@ -1,4 +1,4 @@
-import { and, eq, ilike, inArray } from "drizzle-orm"
+import { and, eq, ilike } from "drizzle-orm"
 import type { ExtractionResultsResponse } from "@/server/external/extraction-api"
 import { getDb } from "@/server/database"
 import {
@@ -10,10 +10,8 @@ import {
   extractionRuns,
   factAnchors,
   facts,
-  ontologyAttributes,
-  ontologyClasses,
-  ontologyRelations,
 } from "@/server/db/schema"
+import { loadCanonicalOntology } from "@/features/ontology/server/linkml/document-store"
 const norm = (value: string) => value.trim().toLowerCase()
 export async function persistExtractionResults(
   runId: string,
@@ -28,34 +26,14 @@ export async function persistExtractionResults(
     .limit(1)
   if (!run?.ontology_id)
     throw new Error("Extraction run has no associated ontology")
-  const [classes, relations] = await Promise.all([
-    db
-      .select({ id: ontologyClasses.id, name: ontologyClasses.name })
-      .from(ontologyClasses)
-      .where(eq(ontologyClasses.ontology_id, run.ontology_id)),
-    db
-      .select({ id: ontologyRelations.id, name: ontologyRelations.name })
-      .from(ontologyRelations)
-      .where(eq(ontologyRelations.ontology_id, run.ontology_id)),
-  ])
+  const snapshot = await loadCanonicalOntology(run.ontology_id, db)
+  const classes = snapshot.classes ?? []
+  const relations = snapshot.relations ?? []
+  const attributes = snapshot.attributes ?? []
+
   const classIdByName = new Map(classes.map((row) => [norm(row.name), row.id])),
     classNameById = new Map(classes.map((row) => [row.id, row.name])),
     relationIdByName = new Map(relations.map((row) => [row.name, row.id]))
-  const attributes = classes.length
-    ? await db
-        .select({
-          id: ontologyAttributes.id,
-          name: ontologyAttributes.name,
-          class_id: ontologyAttributes.class_id,
-        })
-        .from(ontologyAttributes)
-        .where(
-          inArray(
-            ontologyAttributes.class_id,
-            classes.map((row) => row.id)
-          )
-        )
-    : []
   const attributeIds = new Map<string, Map<string, string>>()
   for (const attribute of attributes) {
     const values =

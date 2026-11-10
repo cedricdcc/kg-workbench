@@ -1,24 +1,16 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
-import { and, eq, notInArray } from "drizzle-orm"
 
-import type {
-  OntologyClass,
-  OntologyLocalizedTextInsert,
-} from "@/domain/ontology"
+import type { OntologyClass } from "@/domain/ontology"
 import { routes } from "@/lib/routes"
 import {
   assertOntologyDocumentAccess,
   assertOntologyRecordAccess,
 } from "@/server/group-access"
 import { getDb } from "@/server/database"
-import {
-  ontologyAttributes,
-  ontologyClasses,
-  ontologyLocalizedTexts,
-  ontologyRelations,
-} from "@/server/db/schema"
+import { saveCanonicalOntology } from "../linkml/document-store"
+import type { OntologyClassSnapshot } from "../linkml/types"
 import {
   ReconcileAndAdoptClassInputSchema,
   type ReconcileAndAdoptClassInput,
@@ -40,42 +32,65 @@ export async function createClass(
 ): Promise<OntologyClass> {
   const db = getDb()
   await assertOntologyDocumentAccess(ontologyId, db)
-  await assertOntologyRecordAccess("ontology_modules", moduleId, db)
-  const [row] = await db
-    .insert(ontologyClasses)
-    .values({
-      ontology_id: ontologyId,
-      module_id: moduleId,
-      name: data.name,
-      description: data.description ?? "",
-      parent_class_id: data.parentClassId ?? null,
-    })
-    .returning()
-  if (!row) throw new Error("Failed to create ontology class.")
 
-  const localizedTextInserts: OntologyLocalizedTextInsert[] = (
-    data.localizedTexts ?? []
+  const newClassId = data.name.trim()
+
+  await saveCanonicalOntology(
+    ontologyId,
+    (draft) => {
+      // Check for duplicate class
+      const exists = draft.classes.some(
+        (c) => c.name.toLowerCase() === newClassId.toLowerCase()
+      )
+      if (exists) {
+        throw new Error(`Class "${newClassId}" already exists.`)
+      }
+
+      const newCls: OntologyClassSnapshot = {
+        id: newClassId,
+        name: newClassId,
+        description: data.description ?? "",
+        module_id: moduleId || null,
+        parent_class_id: data.parentClassId ?? null,
+        instance_policy: "open",
+        attributes: [],
+      }
+
+      draft.classes.push(newCls)
+
+      if (data.localizedTexts && data.localizedTexts.length > 0) {
+        draft.localized_texts = draft.localized_texts ?? []
+        for (const lt of data.localizedTexts) {
+          if (lt.value && lt.value.trim()) {
+            draft.localized_texts.push({
+              target_type: "class",
+              target_id: newClassId,
+              field_name: lt.fieldName,
+              language_code: lt.languageCode,
+              value: lt.value.trim(),
+            })
+          }
+        }
+      }
+    },
+    { db }
   )
-    .map((localizedText) => ({
-      ontology_id: ontologyId,
-      target_class_id: row.id,
-      field_name: localizedText.fieldName,
-      language_code: localizedText.languageCode,
-      value: localizedText.value.trim(),
-    }))
-    .filter((localizedText) => Boolean(localizedText.value))
 
-  if (localizedTextInserts.length > 0) {
-    try {
-      await db.insert(ontologyLocalizedTexts).values(localizedTextInserts)
-    } catch (error) {
-      await db.delete(ontologyClasses).where(eq(ontologyClasses.id, row.id))
-      throw error
-    }
+  try {
+    revalidatePath(routes.ontology.root)
+  } catch {
+    // Non-Next environment
   }
 
-  revalidatePath(routes.ontology.root)
-  return row
+  return {
+    id: newClassId,
+    ontology_id: ontologyId,
+    module_id: moduleId || null,
+    name: newClassId,
+    description: data.description ?? "",
+    parent_class_id: data.parentClassId ?? null,
+    instance_policy: "open",
+  }
 }
 
 export async function updateClass(
@@ -86,38 +101,143 @@ export async function updateClass(
     moduleId?: string | null
     parentClassId?: string | null
     instancePolicy?: string
-  }
+  },
+  explicitOntologyId?: string
 ): Promise<OntologyClass> {
   const db = getDb()
-  await assertOntologyRecordAccess("ontology_classes", id, db)
-  if (data.moduleId) {
-    await assertOntologyRecordAccess("ontology_modules", data.moduleId, db)
+  const ontologyId =
+    explicitOntologyId ??
+    (await assertOntologyRecordAccess("ontology_classes", id, db))
+
+  let targetClass: OntologyClassSnapshot | undefined
+  const newName = data.name?.trim()
+
+  const diffOptions =
+    newName && newName !== id ? { classRenames: { [id]: newName } } : undefined
+
+  await saveCanonicalOntology(
+    ontologyId,
+    (draft) => {
+      targetClass = draft.classes.find((c) => c.id === id || c.name === id)
+      if (!targetClass) {
+        throw new Error(`Ontology class "${id}" was not found.`)
+      }
+
+      const oldKey = targetClass.id
+
+      if (newName && newName !== oldKey) {
+        targetClass.id = newName
+        targetClass.name = newName
+
+        // Update attributes belonging to this class
+        if (draft.attributes) {
+          for (const attr of draft.attributes) {
+            if (attr.class_id === oldKey) {
+              attr.class_id = newName
+              attr.id = `${newName}.${attr.name}`
+            }
+          }
+        }
+
+        // Update relations referencing this class
+        if (draft.relations) {
+          for (const rel of draft.relations) {
+            if (rel.domain_class_id === oldKey) rel.domain_class_id = newName
+            if (rel.range_class_id === oldKey) rel.range_class_id = newName
+          }
+        }
+
+        // Update child classes
+        for (const cls of draft.classes) {
+          if (cls.parent_class_id === oldKey) cls.parent_class_id = newName
+        }
+
+        // Update UI layout
+        if (draft.ui_layout?.classPositions) {
+          for (const modId of Object.keys(draft.ui_layout.classPositions)) {
+            const modPositions = draft.ui_layout.classPositions[modId]
+            if (modPositions && modPositions[oldKey]) {
+              modPositions[newName] = modPositions[oldKey]
+              delete modPositions[oldKey]
+            }
+          }
+        }
+      }
+
+      if (data.description !== undefined) {
+        targetClass.description = data.description
+      }
+      if (data.moduleId !== undefined) {
+        targetClass.module_id = data.moduleId
+      }
+      if (data.parentClassId !== undefined) {
+        targetClass.parent_class_id = data.parentClassId
+      }
+      if (data.instancePolicy !== undefined) {
+        targetClass.instance_policy = data.instancePolicy
+      }
+    },
+    { db, diffOptions }
+  )
+
+  try {
+    revalidatePath(routes.ontology.root, "layout")
+  } catch {
+    // Non-Next environment
   }
-  const [row] = await db
-    .update(ontologyClasses)
-    .set({
-      ...(data.name !== undefined && { name: data.name }),
-      ...(data.description !== undefined && { description: data.description }),
-      ...(data.moduleId !== undefined && { module_id: data.moduleId }),
-      ...(data.parentClassId !== undefined && {
-        parent_class_id: data.parentClassId,
-      }),
-      ...(data.instancePolicy !== undefined && {
-        instance_policy: data.instancePolicy,
-      }),
-    })
-    .where(eq(ontologyClasses.id, id))
-    .returning()
-  if (!row) throw new Error("Ontology class was not found.")
-  revalidatePath(routes.ontology.root, "layout")
-  return row
+
+  return {
+    id: targetClass?.id ?? newName ?? id,
+    ontology_id: ontologyId,
+    module_id: targetClass?.module_id ?? data.moduleId ?? null,
+    name: targetClass?.name ?? newName ?? id,
+    description: targetClass?.description ?? data.description ?? "",
+    parent_class_id: targetClass?.parent_class_id ?? data.parentClassId ?? null,
+    instance_policy:
+      targetClass?.instance_policy ?? data.instancePolicy ?? "open",
+  }
 }
 
-export async function deleteClass(id: string): Promise<void> {
+export async function deleteClass(
+  id: string,
+  explicitOntologyId?: string
+): Promise<void> {
   const db = getDb()
-  await assertOntologyRecordAccess("ontology_classes", id, db)
-  await db.delete(ontologyClasses).where(eq(ontologyClasses.id, id))
-  revalidatePath(routes.ontology.root, "layout")
+  const ontologyId =
+    explicitOntologyId ??
+    (await assertOntologyRecordAccess("ontology_classes", id, db))
+
+  await saveCanonicalOntology(
+    ontologyId,
+    (draft) => {
+      draft.classes = draft.classes.filter((c) => c.id !== id && c.name !== id)
+      draft.attributes = (draft.attributes ?? []).filter(
+        (a) => a.class_id !== id
+      )
+      draft.relations = (draft.relations ?? []).filter(
+        (r) => r.domain_class_id !== id && r.range_class_id !== id
+      )
+      for (const c of draft.classes) {
+        if (c.parent_class_id === id) {
+          c.parent_class_id = null
+        }
+      }
+      if (draft.ui_layout?.classPositions) {
+        for (const modId of Object.keys(draft.ui_layout.classPositions)) {
+          if (draft.ui_layout.classPositions[modId]) {
+            delete draft.ui_layout.classPositions[modId][id]
+          }
+        }
+      }
+    },
+    { db }
+  )
+
+  try {
+    revalidatePath(routes.ontology.root, "layout")
+  } catch {
+    // Non-Next environment
+  }
 }
 
 export async function reconcileAndAdoptClass(
@@ -130,65 +250,72 @@ export async function reconcileAndAdoptClass(
   const input = ReconcileAndAdoptClassInputSchema.parse(rawInput)
   const db = getDb()
   await assertOntologyDocumentAccess(input.ontologyId, db)
-  await assertOntologyRecordAccess("ontology_classes", input.classId, db)
 
-  return await db.transaction(async (tx) => {
-    // 1. Update the class identity in-place
-    await tx
-      .update(ontologyClasses)
-      .set({
-        name: input.standardTerm.curie || input.standardTerm.label,
-        description: input.standardTerm.description ?? "",
-      })
-      .where(eq(ontologyClasses.id, input.classId))
+  let updatedRelations = 0
+  let deletedRelations = 0
 
-    // 2. Prune unselected attributes
-    if (input.retainedAttributeIds.length > 0) {
-      await tx
-        .delete(ontologyAttributes)
-        .where(
-          and(
-            eq(ontologyAttributes.class_id, input.classId),
-            notInArray(ontologyAttributes.id, input.retainedAttributeIds)
-          )
+  await saveCanonicalOntology(
+    input.ontologyId,
+    (draft) => {
+      const cls = draft.classes.find(
+        (c) => c.id === input.classId || c.name === input.classId
+      )
+      if (!cls) {
+        throw new Error(
+          `Class "${input.classId}" not found for reconciliation.`
         )
-    } else {
-      await tx
-        .delete(ontologyAttributes)
-        .where(eq(ontologyAttributes.class_id, input.classId))
-    }
-
-    // 3. Process relation decisions
-    let updatedRelations = 0
-    let deletedRelations = 0
-
-    for (const decision of input.relationDecisions) {
-      if (decision.action === "delete") {
-        await tx
-          .delete(ontologyRelations)
-          .where(eq(ontologyRelations.id, decision.relationId))
-        deletedRelations++
-      } else if (decision.action === "remap" && decision.remappedName) {
-        await tx
-          .update(ontologyRelations)
-          .set({
-            name: decision.remappedName,
-            ...(decision.remappedDescription !== undefined && {
-              description: decision.remappedDescription,
-            }),
-          })
-          .where(eq(ontologyRelations.id, decision.relationId))
-        updatedRelations++
       }
-    }
 
+      // 1. Update class identity in-place
+      cls.description = input.standardTerm.description ?? cls.description
+
+      // 2. Prune unselected attributes
+      const retainedSet = new Set(input.retainedAttributeIds)
+      draft.attributes = (draft.attributes ?? []).filter((attr) => {
+        if (attr.class_id !== cls.id && attr.class_id !== cls.name) {
+          return true
+        }
+        return (
+          retainedSet.has(attr.id) ||
+          retainedSet.has(attr.name) ||
+          retainedSet.has(`${cls.name}.${attr.name}`)
+        )
+      })
+
+      // 3. Process relation decisions
+      for (const decision of input.relationDecisions) {
+        const relIdx = (draft.relations ?? []).findIndex(
+          (r) => r.id === decision.relationId || r.name === decision.relationId
+        )
+        if (relIdx !== -1) {
+          if (decision.action === "delete") {
+            draft.relations.splice(relIdx, 1)
+            deletedRelations++
+          } else if (decision.action === "remap" && decision.remappedName) {
+            draft.relations[relIdx].id = decision.remappedName
+            draft.relations[relIdx].name = decision.remappedName
+            if (decision.remappedDescription !== undefined) {
+              draft.relations[relIdx].description = decision.remappedDescription
+            }
+            updatedRelations++
+          }
+        }
+      }
+    },
+    { db }
+  )
+
+  try {
     revalidatePath(routes.ontology.root, "layout")
-    return {
-      classId: input.classId,
-      updatedRelations,
-      deletedRelations,
-    }
-  })
+  } catch {
+    // Non-Next environment
+  }
+
+  return {
+    classId: input.classId,
+    updatedRelations,
+    deletedRelations,
+  }
 }
 
 export async function suggestRelationRemappingsAction(input: {

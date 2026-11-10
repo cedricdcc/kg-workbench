@@ -1,4 +1,4 @@
-﻿"use server"
+"use server"
 
 import type { OntologyDocument } from "@/domain/ontology"
 import { desc, eq } from "drizzle-orm"
@@ -7,7 +7,8 @@ import {
   getCurrentGroupKeyOrThrow,
 } from "@/server/group-access"
 import { getDb } from "@/server/database"
-import { ontologyDocuments, ontologyModules } from "@/server/db/schema"
+import { ontologyDocuments } from "@/server/db/schema"
+import { getOntologyModules } from "./modules"
 
 import type { OntologyDocumentWithModules } from "./types"
 
@@ -49,9 +50,6 @@ export async function getOntologyDocument(
     .where(eq(ontologyDocuments.id, id))
     .limit(1)
   if (!doc) throw new Error("Ontology document was not found.")
-  const modules = await db
-    .select()
-    .from(ontologyModules)
-    .where(eq(ontologyModules.ontology_id, id))
+  const modules = await getOntologyModules(id)
   return { ...doc, modules }
 }

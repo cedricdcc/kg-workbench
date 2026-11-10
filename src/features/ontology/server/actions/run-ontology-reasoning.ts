@@ -1,8 +1,6 @@
 "use server"
 
-import { eq } from "drizzle-orm"
 import { getDb } from "@/server/db"
-import { ontologyClassDisjointness } from "@/server/db/schema"
 import { getServiceRegistryStatuses } from "@/server/events/services"
 import { publishDomainEvent } from "@/server/events/outbox"
 import { fastPathAwaitJob } from "@/server/events/queue"
@@ -12,6 +10,7 @@ import {
   getOntologyExamplesByOntology,
   getOntologyRelations,
 } from "../queries"
+import { loadCanonicalOntology } from "../linkml/document-store"
 import { normalizeOntologyDataTypeOrDefault } from "@/features/ontology/utils/data-types"
 import { buildShaclShapes } from "../shacl/generator"
 import { serializeOntologyTurtle } from "../shacl/serialize-ontology-turtle"
@@ -73,22 +72,22 @@ export async function requestOntologyReasoningAction(
     return {
       status: "offline",
       message: "Reasoner microservice is currently offline or unreachable.",
-      composeCommand: "bash deploy/scripts/deploy.sh postgres up --profile reasoner",
+      composeCommand:
+        "bash deploy/scripts/deploy.sh postgres up --profile reasoner",
     }
   }
 
   // 2. Fetch full ontology data
-  const [classes, relations, ontologyDoc, disjointnessRows, examples] =
+  const [classes, relations, ontologyDoc, snapshot, examples] =
     await Promise.all([
       getOntologyClasses(ontologyId),
       getOntologyRelations(ontologyId),
       getOntologyDocument(ontologyId),
-      db
-        .select()
-        .from(ontologyClassDisjointness)
-        .where(eq(ontologyClassDisjointness.ontology_id, ontologyId)),
+      loadCanonicalOntology(ontologyId),
       getOntologyExamplesByOntology(ontologyId),
     ])
+
+  const disjointnessRows = snapshot.disjointness ?? []
 
   const baseIri = "http://example.org/onto#"
 

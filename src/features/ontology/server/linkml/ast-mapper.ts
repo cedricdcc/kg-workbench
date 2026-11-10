@@ -1249,7 +1249,16 @@ export function importOntologyToSnapshot(
     })
   )
 
-  const defaultModuleId = modules[0]?.id || "default-module"
+  const moduleIds = new Set(modules.map((m) => m.id))
+  for (const cls of ontology.classes || []) {
+    const mod = cls.moduleId || cls.module
+    if (mod && !moduleIds.has(mod)) {
+      modules.push({ id: mod, name: mod, description: "" })
+      moduleIds.add(mod)
+    }
+  }
+
+  const defaultModuleId = modules[0]?.id ?? null
 
   const classKeyById = new Map<string, string>()
   for (const c of ontology.classes || []) {
@@ -1399,7 +1408,7 @@ export function importOntologyToSnapshot(
       Record<string, { x: number; y: number }>
     > = {}
     for (const cp of ontology.visual.classPositions || []) {
-      const mod = cp.moduleId || cp.module || defaultModuleId
+      const mod = cp.moduleId || cp.module || defaultModuleId || "default"
       if (!classPositions[mod]) classPositions[mod] = {}
       classPositions[mod][cp.classId] = { x: cp.x, y: cp.y }
     }
@@ -1408,7 +1417,7 @@ export function importOntologyToSnapshot(
       { x: number; y: number; width: number; height: number }
     > = {}
     for (const ml of ontology.visual.moduleLayouts || []) {
-      const mod = ml.moduleId || ml.module || defaultModuleId
+      const mod = ml.moduleId || ml.module || defaultModuleId || "default"
       moduleLayouts[mod] = {
         x: ml.x,
         y: ml.y,
