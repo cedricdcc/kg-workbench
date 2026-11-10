@@ -156,8 +156,8 @@ if (isChildTest || !isReactServer) {
       "Must render distinct kinds in footer legend"
     )
     assert.ok(
-      html.includes("min-h-[500px]"),
-      "Must render min-h-[500px] for full canvas height"
+      html.includes("min-h-0") && html.includes("md:min-h-[400px]"),
+      "Must render min-h-0 and md:min-h-[400px] for canvas height"
     )
     assert.ok(html.includes("Close"), "Must render close button in footer")
   })
@@ -363,9 +363,10 @@ test("AnalystSubgraphModal conforms to fullscreen viewport layout requirements",
   )
   assert.ok(
     modalContent.includes("flex-1") &&
-      modalContent.includes("min-h-[500px]") &&
+      modalContent.includes("min-h-0") &&
+      modalContent.includes("md:min-h-[400px]") &&
       modalContent.includes("h-full"),
-    "AnalystSubgraphModal must expand canvas with flex-1 h-full min-h-[500px]"
+    "AnalystSubgraphModal must expand canvas with flex-1 h-full min-h-0 md:min-h-[400px]"
   )
 })
 

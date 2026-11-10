@@ -130,8 +130,8 @@ function ResolveDialogForm({
   }
 
   return (
-    <div className="flex flex-col gap-4 text-left">
-      <div className="flex flex-col gap-1.5">
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden text-left">
+      <div className="flex shrink-0 flex-col gap-1.5 pb-4">
         <div className="flex items-center gap-2 text-foreground">
           <AlertCircle className="h-4 w-4 text-amber-500" />
           <h2 className="text-sm font-semibold tracking-tight">
@@ -147,171 +147,174 @@ function ResolveDialogForm({
         </p>
       </div>
 
-      {/* Side-by-Side Statements Grid */}
-      {/* prettier-ignore */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Statement A */}
-        <div className="flex flex-col gap-2 rounded-lg border bg-muted/20 p-3.5">
-          <div className="flex items-center justify-between gap-2">
-            <Badge variant="secondary" className="text-[11px] font-semibold">
-              Statement A
-            </Badge>
-            <div
-              className="flex max-w-[200px] items-center gap-1.5 truncate text-muted-foreground"
-              title={factASource}
-            >
-              <FileText className="h-3 w-3 shrink-0" />
-              <span className="truncate text-[11px] font-medium">
-                {factASource}
-              </span>
+      {/* Scrollable comparison body */}
+      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto pr-1">
+        {/* Side-by-Side Statements Grid */}
+        {/* prettier-ignore */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Statement A */}
+          <div className="flex flex-col gap-2 rounded-lg border bg-muted/20 p-3.5">
+            <div className="flex items-center justify-between gap-2">
+              <Badge variant="secondary" className="text-[11px] font-semibold">
+                Statement A
+              </Badge>
+              <div
+                className="flex max-w-[200px] items-center gap-1.5 truncate text-muted-foreground"
+                title={factASource}
+              >
+                <FileText className="h-3 w-3 shrink-0" />
+                <span className="truncate text-[11px] font-medium">
+                  {factASource}
+                </span>
+              </div>
             </div>
+
+            <div className="text-xs font-semibold text-foreground">
+              {factAValue || "—"}
+            </div>
+
+            {factAQuote && (
+              <blockquote className="mt-1 rounded-r-md border-l-2 border-primary/40 bg-muted/30 px-3 py-1.5 text-[11px] leading-relaxed text-muted-foreground italic">
+                &quot;{factAQuote}&quot;
+              </blockquote>
+            )}
           </div>
 
-          <div className="text-xs font-semibold text-foreground">
-            {factAValue || "—"}
-          </div>
+          {/* Statement B */}
+          <div className="flex flex-col gap-2 rounded-lg border bg-muted/20 p-3.5">
+            <div className="flex items-center justify-between gap-2">
+              <Badge variant="secondary" className="text-[11px] font-semibold">
+                Statement B
+              </Badge>
+              <div
+                className="flex max-w-[200px] items-center gap-1.5 truncate text-muted-foreground"
+                title={factBSource}
+              >
+                <FileText className="h-3 w-3 shrink-0" />
+                <span className="truncate text-[11px] font-medium">
+                  {factBSource}
+                </span>
+              </div>
+            </div>
 
-          {factAQuote && (
-            <blockquote className="mt-1 rounded-r-md border-l-2 border-primary/40 bg-muted/30 px-3 py-1.5 text-[11px] leading-relaxed text-muted-foreground italic">
-              &quot;{factAQuote}&quot;
-            </blockquote>
-          )}
+            <div className="text-xs font-semibold text-foreground">
+              {factBValue || "—"}
+            </div>
+
+            {factBQuote && (
+              <blockquote className="mt-1 rounded-r-md border-l-2 border-primary/40 bg-muted/30 px-3 py-1.5 text-[11px] leading-relaxed text-muted-foreground italic">
+                &quot;{factBQuote}&quot;
+              </blockquote>
+            )}
+          </div>
         </div>
 
-        {/* Statement B */}
-        <div className="flex flex-col gap-2 rounded-lg border bg-muted/20 p-3.5">
-          <div className="flex items-center justify-between gap-2">
-            <Badge variant="secondary" className="text-[11px] font-semibold">
-              Statement B
-            </Badge>
-            <div
-              className="flex max-w-[200px] items-center gap-1.5 truncate text-muted-foreground"
-              title={factBSource}
+        {/* Strategies Radio Group */}
+        <div className="flex flex-col gap-2">
+          <Label className="text-xs font-medium">Resolution Strategy</Label>
+          <RadioGroup
+            value={strategy}
+            onValueChange={(val) => setStrategy(val as ResolutionStrategy)}
+            className="gap-2"
+          >
+            {/* Strategy: keep_a */}
+            <label
+              htmlFor="strat-keep-a"
+              className={cn(
+                "flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors",
+                strategy === "keep_a"
+                  ? "border-primary bg-primary/5"
+                  : "border-border hover:bg-muted/30"
+              )}
             >
-              <FileText className="h-3 w-3 shrink-0" />
-              <span className="truncate text-[11px] font-medium">
-                {factBSource}
-              </span>
-            </div>
-          </div>
+              <RadioGroupItem
+                value="keep_a"
+                id="strat-keep-a"
+                className="mt-0.5"
+              />
+              <div className="flex flex-col gap-0.5">
+                <span className="text-xs font-medium text-foreground">
+                  Keep Statement A (Mark B as invalid)
+                </span>
+                {factAValue && (
+                  <span className="text-[11px] text-muted-foreground">
+                    Statement A value: &quot;{factAValue}&quot;
+                  </span>
+                )}
+              </div>
+            </label>
 
-          <div className="text-xs font-semibold text-foreground">
-            {factBValue || "—"}
-          </div>
+            {/* Strategy: keep_b */}
+            <label
+              htmlFor="strat-keep-b"
+              className={cn(
+                "flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors",
+                strategy === "keep_b"
+                  ? "border-primary bg-primary/5"
+                  : "border-border hover:bg-muted/30"
+              )}
+            >
+              <RadioGroupItem
+                value="keep_b"
+                id="strat-keep-b"
+                className="mt-0.5"
+              />
+              <div className="flex flex-col gap-0.5">
+                <span className="text-xs font-medium text-foreground">
+                  Keep Statement B (Mark A as invalid)
+                </span>
+                {factBValue && (
+                  <span className="text-[11px] text-muted-foreground">
+                    Statement B value: &quot;{factBValue}&quot;
+                  </span>
+                )}
+              </div>
+            </label>
 
-          {factBQuote && (
-            <blockquote className="mt-1 rounded-r-md border-l-2 border-primary/40 bg-muted/30 px-3 py-1.5 text-[11px] leading-relaxed text-muted-foreground italic">
-              &quot;{factBQuote}&quot;
-            </blockquote>
-          )}
+            {/* Strategy: dismiss */}
+            <label
+              htmlFor="strat-dismiss"
+              className={cn(
+                "flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors",
+                strategy === "dismiss"
+                  ? "border-primary bg-primary/5"
+                  : "border-border hover:bg-muted/30"
+              )}
+            >
+              <RadioGroupItem
+                value="dismiss"
+                id="strat-dismiss"
+                className="mt-0.5"
+              />
+              <div className="flex flex-col gap-0.5">
+                <span className="text-xs font-medium text-foreground">
+                  Dismiss as Compatible (Both valid in context)
+                </span>
+                <span className="text-[11px] text-muted-foreground">
+                  Retain both assertions without flagging semantic drift.
+                </span>
+              </div>
+            </label>
+          </RadioGroup>
+        </div>
+
+        {/* Resolution Notes Textarea */}
+        <div className="flex flex-col gap-1.5 pb-2">
+          <Label htmlFor="resolve-notes" className="text-xs font-medium">
+            Resolution Notes (Optional)
+          </Label>
+          <Textarea
+            id="resolve-notes"
+            value={customNotes}
+            onChange={(e) => setCustomNotes(e.target.value)}
+            placeholder="Add rationale, source verification notes, or audit commentary..."
+            className="min-h-[70px] resize-none text-xs"
+          />
         </div>
       </div>
 
-      {/* Strategies Radio Group */}
-      <div className="flex flex-col gap-2">
-        <Label className="text-xs font-medium">Resolution Strategy</Label>
-        <RadioGroup
-          value={strategy}
-          onValueChange={(val) => setStrategy(val as ResolutionStrategy)}
-          className="gap-2"
-        >
-          {/* Strategy: keep_a */}
-          <label
-            htmlFor="strat-keep-a"
-            className={cn(
-              "flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors",
-              strategy === "keep_a"
-                ? "border-primary bg-primary/5"
-                : "border-border hover:bg-muted/30"
-            )}
-          >
-            <RadioGroupItem
-              value="keep_a"
-              id="strat-keep-a"
-              className="mt-0.5"
-            />
-            <div className="flex flex-col gap-0.5">
-              <span className="text-xs font-medium text-foreground">
-                Keep Statement A (Mark B as invalid)
-              </span>
-              {factAValue && (
-                <span className="text-[11px] text-muted-foreground">
-                  Statement A value: &quot;{factAValue}&quot;
-                </span>
-              )}
-            </div>
-          </label>
-
-          {/* Strategy: keep_b */}
-          <label
-            htmlFor="strat-keep-b"
-            className={cn(
-              "flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors",
-              strategy === "keep_b"
-                ? "border-primary bg-primary/5"
-                : "border-border hover:bg-muted/30"
-            )}
-          >
-            <RadioGroupItem
-              value="keep_b"
-              id="strat-keep-b"
-              className="mt-0.5"
-            />
-            <div className="flex flex-col gap-0.5">
-              <span className="text-xs font-medium text-foreground">
-                Keep Statement B (Mark A as invalid)
-              </span>
-              {factBValue && (
-                <span className="text-[11px] text-muted-foreground">
-                  Statement B value: &quot;{factBValue}&quot;
-                </span>
-              )}
-            </div>
-          </label>
-
-          {/* Strategy: dismiss */}
-          <label
-            htmlFor="strat-dismiss"
-            className={cn(
-              "flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors",
-              strategy === "dismiss"
-                ? "border-primary bg-primary/5"
-                : "border-border hover:bg-muted/30"
-            )}
-          >
-            <RadioGroupItem
-              value="dismiss"
-              id="strat-dismiss"
-              className="mt-0.5"
-            />
-            <div className="flex flex-col gap-0.5">
-              <span className="text-xs font-medium text-foreground">
-                Dismiss as Compatible (Both valid in context)
-              </span>
-              <span className="text-[11px] text-muted-foreground">
-                Retain both assertions without flagging semantic drift.
-              </span>
-            </div>
-          </label>
-        </RadioGroup>
-      </div>
-
-      {/* Resolution Notes Textarea */}
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="resolve-notes" className="text-xs font-medium">
-          Resolution Notes (Optional)
-        </Label>
-        <Textarea
-          id="resolve-notes"
-          value={customNotes}
-          onChange={(e) => setCustomNotes(e.target.value)}
-          placeholder="Add rationale, source verification notes, or audit commentary..."
-          className="min-h-[70px] resize-none text-xs"
-        />
-      </div>
-
-      {/* Action Buttons */}
-      <div className="flex items-center justify-end gap-2 border-t pt-3">
+      {/* Pinned Action Buttons Footer */}
+      <div className="mt-auto flex shrink-0 items-center justify-end gap-2 border-t pt-3">
         <Button
           type="button"
           variant="outline"
@@ -395,14 +398,12 @@ export function ResolveDialog({
             Choose an authoritative resolution strategy for this conflict.
           </DialogDescription>
         </DialogHeader>
-        <div className="flex-1 overflow-y-auto">
-          <ResolveDialogForm
-            key={contradiction.id}
-            contradiction={contradiction}
-            onOpenChange={onOpenChange}
-            onResolved={onResolved}
-          />
-        </div>
+        <ResolveDialogForm
+          key={contradiction.id}
+          contradiction={contradiction}
+          onOpenChange={onOpenChange}
+          onResolved={onResolved}
+        />
       </DialogContent>
     </Dialog>
   )

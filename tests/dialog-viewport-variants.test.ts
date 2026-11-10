@@ -41,7 +41,7 @@ if (isChildTest || !isReactServer) {
     )
     assert.ok(
       dialogViewportVariants.fullscreen.includes(
-        "max-w-none max-h-none -translate-x-0 -translate-y-0"
+        "max-w-none max-h-none translate-x-0 translate-y-0"
       ),
       "fullscreen must reset max constraints and translations"
     )
@@ -103,7 +103,7 @@ if (isChildTest || !isReactServer) {
     )
     assert.ok(
       contentElement.props.className?.includes(
-        "max-w-none max-h-none -translate-x-0 -translate-y-0"
+        "max-w-none max-h-none translate-x-0 translate-y-0"
       ),
       "Must include reset constraints"
     )

@@ -141,11 +141,11 @@ export function AnalystSubgraphModal({
           {headerContent}
         </div>
 
-        <div className="h-full min-h-[500px] w-full flex-1">
+        <div className="h-full min-h-0 w-full flex-1 md:min-h-[400px]">
           <SubgraphFlowView
             nodes={nodes}
             edges={edges}
-            className="h-full min-h-[500px] w-full"
+            className="h-full min-h-0 w-full md:min-h-[400px]"
           />
         </div>
 
@@ -196,11 +196,11 @@ export function AnalystSubgraphModal({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="h-full min-h-[500px] w-full flex-1">
+        <div className="h-full min-h-0 w-full flex-1 md:min-h-[400px]">
           <SubgraphFlowView
             nodes={nodes}
             edges={edges}
-            className="h-full min-h-[500px] w-full"
+            className="h-full min-h-0 w-full md:min-h-[400px]"
           />
         </div>
 
