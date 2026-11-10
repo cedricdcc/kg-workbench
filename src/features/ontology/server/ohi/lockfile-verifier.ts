@@ -41,23 +41,25 @@ export class OhiLockfileDriftError extends Error {
 /**
  * Searches stored artifacts for a given locked file using package_path, path, or url.
  */
-function findArtifactContent(
+export function findArtifactContent(
   storedArtifacts: Record<string, string> | Map<string, string>,
   file: OhiLockedFile
 ): string | undefined {
   const isMap = storedArtifacts instanceof Map
+  const normPkg = file.package_path
+    ? file.package_path.replace(/\\/g, "/")
+    : undefined
+  const normPath = file.path ? file.path.replace(/\\/g, "/") : undefined
 
   const candidateKeys = [
     file.package_path,
     file.path,
     file.url,
-    file.package_path ? file.package_path.replace(/\\/g, "/") : undefined,
-    file.path ? file.path.replace(/\\/g, "/") : undefined,
-    file.package_path
-      ? file.package_path.replace(/^\.?\/?\.?ohi\//, "")
-      : undefined,
-    file.package_path ? file.package_path.split("/").pop() : undefined,
-    file.path ? file.path.split("/").pop() : undefined,
+    normPkg,
+    normPath,
+    normPkg ? normPkg.replace(/^\.?\/?\.?ohi\//, "") : undefined,
+    normPkg ? normPkg.split("/").pop() : undefined,
+    normPath ? normPath.split("/").pop() : undefined,
   ].filter((k): k is string => Boolean(k && k.length > 0))
 
   for (const key of candidateKeys) {

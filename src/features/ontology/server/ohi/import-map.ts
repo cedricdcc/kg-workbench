@@ -1,41 +1,7 @@
 import YAML from "yaml"
 import { parsePackageRef } from "./builtin-publications"
+import { findArtifactContent } from "./lockfile-verifier"
 import type { OhiLockedFile, OhiLockfileV2 } from "./types"
-
-/**
- * Searches stored artifacts for a given locked file using package_path, path, or url.
- */
-function findArtifactContent(
-  storedArtifacts: Record<string, string> | Map<string, string>,
-  file: OhiLockedFile
-): string | undefined {
-  const isMap = storedArtifacts instanceof Map
-
-  const candidateKeys = [
-    file.package_path,
-    file.path,
-    file.url,
-    file.package_path ? file.package_path.replace(/\\/g, "/") : undefined,
-    file.path ? file.path.replace(/\\/g, "/") : undefined,
-    file.package_path
-      ? file.package_path.replace(/^\.?\/?\.?ohi\//, "")
-      : undefined,
-    file.package_path ? file.package_path.split("/").pop() : undefined,
-    file.path ? file.path.split("/").pop() : undefined,
-  ].filter((k): k is string => Boolean(k && k.length > 0))
-
-  for (const key of candidateKeys) {
-    if (isMap) {
-      if (storedArtifacts.has(key)) {
-        return storedArtifacts.get(key)
-      }
-    } else if (Object.prototype.hasOwnProperty.call(storedArtifacts, key)) {
-      return storedArtifacts[key]
-    }
-  }
-
-  return undefined
-}
 
 /**
  * Injects CURIE aliases into LinkML YAML (e.g. `prov:Activity: is_a: Activity`)
