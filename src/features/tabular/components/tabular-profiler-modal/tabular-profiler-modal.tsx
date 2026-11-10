@@ -208,7 +208,7 @@ export function TabularProfilerModal({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-3xl">
+      <DialogContent viewport="fullscreen" className="p-6">
         <DialogHeader>
           <div className="flex items-center justify-between pr-6">
             <DialogTitle className="flex items-center gap-2 text-lg">
@@ -248,227 +248,247 @@ export function TabularProfilerModal({
           </DialogDescription>
         </DialogHeader>
 
-        {isLoading && (
-          <div className="flex flex-col items-center justify-center gap-3 py-12 text-sm text-muted-foreground">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            <span>Running DuckDB analytical dataset profiling...</span>
-          </div>
-        )}
-
-        {isOffline && (
-          <div className="space-y-3 rounded-lg border border-amber-500/40 bg-amber-500/10 p-4">
-            <div className="flex items-center gap-2 text-sm font-medium text-amber-600 dark:text-amber-400">
-              <AlertTriangle className="h-4 w-4" />
-              <span>
-                {offlineMessage || "Tabular worker service is offline"}
-              </span>
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          {isLoading && (
+            <div className="flex flex-1 flex-col items-center justify-center gap-3 py-12 text-sm text-muted-foreground">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <span>Running DuckDB analytical dataset profiling...</span>
             </div>
-            <p className="text-xs text-muted-foreground">
-              To enable high-performance DuckDB dataset profiling and schema
-              induction, start the tabular worker:
-            </p>
-            <div className="flex items-center justify-between rounded bg-muted/60 px-3 py-2 font-mono text-xs text-foreground">
-              <span className="flex items-center gap-2">
-                <Terminal className="h-3.5 w-3.5 text-muted-foreground" />
-                {composeCommand}
-              </span>
-              <Button
-                size="icon"
-                variant="ghost"
-                className="h-6 w-6"
-                onClick={handleCopy}
-              >
-                {copied ? (
-                  <Check className="h-3.5 w-3.5 text-emerald-500" />
-                ) : (
-                  <Copy className="h-3.5 w-3.5" />
-                )}
-              </Button>
-            </div>
-          </div>
-        )}
+          )}
 
-        {errorMessage && !isLoading && !isOffline && (
-          <div className="space-y-2 rounded-lg border border-destructive/40 bg-destructive/10 p-4">
-            <div className="flex items-center gap-2 text-sm font-medium text-destructive">
-              <XCircle className="h-4 w-4" />
-              <span>Dataset Profiling Failed</span>
-            </div>
-            <p className="text-xs text-muted-foreground">{errorMessage}</p>
-          </div>
-        )}
-
-        {/* Source Selection Tabs when no active result exists */}
-        {!isLoading && !isOffline && !activeResult && (
-          <Tabs
-            value={sourceTab}
-            onValueChange={(v) => setSourceTab(v as "upload" | "database")}
-            className="w-full"
-          >
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="upload" className="flex items-center gap-2">
-                <Upload className="h-3.5 w-3.5" />
-                Upload File
-              </TabsTrigger>
-              <TabsTrigger value="database" className="flex items-center gap-2">
-                <Database className="h-3.5 w-3.5" />
-                Remote Database
-              </TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="upload" className="space-y-3 pt-3">
-              <div
-                onClick={() => fileInputRef.current?.click()}
-                className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-muted-foreground/25 p-8 text-center transition-colors hover:border-primary/50 hover:bg-muted/30"
-              >
-                <div className="rounded-full bg-primary/10 p-3 text-primary">
-                  <Upload className="h-6 w-6" />
-                </div>
-                <div className="text-sm font-medium">
-                  Click to select CSV, Parquet, or Excel file
-                </div>
-                <div className="text-xs text-muted-foreground">
-                  Supports .csv, .tsv, .parquet, .pq, .xlsx, .xls
-                </div>
+          {isOffline && (
+            <div className="space-y-3 rounded-lg border border-amber-500/40 bg-amber-500/10 p-4">
+              <div className="flex items-center gap-2 text-sm font-medium text-amber-600 dark:text-amber-400">
+                <AlertTriangle className="h-4 w-4" />
+                <span>
+                  {offlineMessage || "Tabular worker service is offline"}
+                </span>
               </div>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".csv,.tsv,.parquet,.pq,.xlsx,.xls"
-                className="hidden"
-                onChange={handleFileChange}
-              />
-            </TabsContent>
-
-            <TabsContent value="database" className="pt-3">
-              <RemoteDatabaseTab
-                ontologyId={ontologyId || ""}
-                onProfileComplete={handleProfileComplete}
-              />
-            </TabsContent>
-          </Tabs>
-        )}
-
-        {/* Profiler Result Tabs */}
-        {!isLoading && !isOffline && activeResult && (
-          <div className="space-y-3">
-            <div className="flex items-center justify-between pb-1">
-              <span className="text-xs font-semibold text-foreground">
-                Dataset:{" "}
-                <code className="text-primary">{activeResult.fileName}</code>
-              </span>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-6 gap-1 px-2 text-[11px]"
-                onClick={() => {
-                  setInternalResult(null)
-                  setConnectionConfig(null)
-                  setIsDismissed(true)
-                }}
-              >
-                <ArrowLeft className="h-3 w-3" />
-                Choose Another Source
-              </Button>
+              <p className="text-xs text-muted-foreground">
+                To enable high-performance DuckDB dataset profiling and schema
+                induction, start the tabular worker:
+              </p>
+              <div className="flex items-center justify-between rounded bg-muted/60 px-3 py-2 font-mono text-xs text-foreground">
+                <span className="flex items-center gap-2">
+                  <Terminal className="h-3.5 w-3.5 text-muted-foreground" />
+                  {composeCommand}
+                </span>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-6 w-6"
+                  onClick={handleCopy}
+                >
+                  {copied ? (
+                    <Check className="h-3.5 w-3.5 text-emerald-500" />
+                  ) : (
+                    <Copy className="h-3.5 w-3.5" />
+                  )}
+                </Button>
+              </div>
             </div>
+          )}
 
-            <Tabs defaultValue="schema" className="w-full">
-              <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="schema">
-                  Schema ({activeResult.columnCount})
+          {errorMessage && !isLoading && !isOffline && (
+            <div className="space-y-2 rounded-lg border border-destructive/40 bg-destructive/10 p-4">
+              <div className="flex items-center gap-2 text-sm font-medium text-destructive">
+                <XCircle className="h-4 w-4" />
+                <span>Dataset Profiling Failed</span>
+              </div>
+              <p className="text-xs text-muted-foreground">{errorMessage}</p>
+            </div>
+          )}
+
+          {/* Source Selection Tabs when no active result exists */}
+          {!isLoading && !isOffline && !activeResult && (
+            <Tabs
+              value={sourceTab}
+              onValueChange={(v) => setSourceTab(v as "upload" | "database")}
+              className="flex min-h-0 w-full flex-1 flex-col"
+            >
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="upload" className="flex items-center gap-2">
+                  <Upload className="h-3.5 w-3.5" />
+                  Upload File
                 </TabsTrigger>
-                <TabsTrigger value="preview">
-                  Data Preview ({activeResult.previewRows.length})
-                </TabsTrigger>
-                <TabsTrigger value="keys">
-                  Candidate Keys ({activeResult.candidateKeys.length})
+                <TabsTrigger
+                  value="database"
+                  className="flex items-center gap-2"
+                >
+                  <Database className="h-3.5 w-3.5" />
+                  Remote Database
                 </TabsTrigger>
               </TabsList>
 
-              <TabsContent value="schema" className="pt-2">
-                <TabularSchemaTab columns={activeResult.columns} />
-              </TabsContent>
-
-              <TabsContent value="preview" className="pt-2">
-                <TabularPreviewTab
-                  rows={activeResult.previewRows}
-                  columns={activeResult.columns}
+              <TabsContent value="upload" className="flex-1 space-y-3 pt-3">
+                <div
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-muted-foreground/25 p-8 text-center transition-colors hover:border-primary/50 hover:bg-muted/30"
+                >
+                  <div className="rounded-full bg-primary/10 p-3 text-primary">
+                    <Upload className="h-6 w-6" />
+                  </div>
+                  <div className="text-sm font-medium">
+                    Click to select CSV, Parquet, or Excel file
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    Supports .csv, .tsv, .parquet, .pq, .xlsx, .xls
+                  </div>
+                </div>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".csv,.tsv,.parquet,.pq,.xlsx,.xls"
+                  className="hidden"
+                  onChange={handleFileChange}
                 />
               </TabsContent>
 
-              <TabsContent value="keys" className="pt-2">
-                <div className="space-y-3 p-2">
-                  <div className="text-xs text-muted-foreground">
-                    Identified candidate unique keys based on non-null
-                    uniqueness across all{" "}
-                    {activeResult.rowCount.toLocaleString()} rows:
-                  </div>
-                  {activeResult.candidateKeys.length > 0 ? (
-                    <div className="flex flex-wrap gap-2">
-                      {activeResult.candidateKeys.map((keyGroup, idx) => (
-                        <div
-                          key={idx}
-                          className="flex items-center gap-1.5 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 text-xs text-emerald-600 dark:text-emerald-400"
-                        >
-                          <Key className="h-3.5 w-3.5" />
-                          <span className="font-mono font-semibold">
-                            {keyGroup.join(" + ")}
-                          </span>
-                          <span className="text-[10px] text-muted-foreground">
-                            (Primary key candidate)
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-2 rounded-md border border-border bg-muted/20 p-3 text-xs text-muted-foreground">
-                      <Layers className="h-4 w-4" />
-                      <span>
-                        No single column satisfies unique non-null constraint.
-                        Consider composite key identification or surrogate ID
-                        induction.
-                      </span>
-                    </div>
-                  )}
-                </div>
+              <TabsContent
+                value="database"
+                className="min-h-0 flex-1 overflow-y-auto pt-3"
+              >
+                <RemoteDatabaseTab
+                  ontologyId={ontologyId || ""}
+                  onProfileComplete={handleProfileComplete}
+                />
               </TabsContent>
-
-              <div className="mt-3 flex items-center justify-between border-t pt-3">
-                <div className="text-[11px] text-muted-foreground">
-                  Dataset profiled via DuckDB analytical sidecar
-                </div>
-                <div className="flex items-center gap-2">
-                  {(onSaveToArchive || ontologyId) && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-8 gap-1.5 text-xs"
-                      onClick={handleSave}
-                      disabled={isSaving}
-                    >
-                      {isSaving ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      ) : (
-                        <Bookmark className="h-3.5 w-3.5" />
-                      )}
-                      Save to Archive
-                    </Button>
-                  )}
-                  {onMapToKg && (
-                    <Button
-                      size="sm"
-                      className="h-8 gap-1.5 text-xs"
-                      onClick={handleMap}
-                    >
-                      <Network className="h-3.5 w-3.5" />
-                      Map to KG
-                    </Button>
-                  )}
-                </div>
-              </div>
             </Tabs>
-          </div>
-        )}
+          )}
+
+          {/* Profiler Result Tabs */}
+          {!isLoading && !isOffline && activeResult && (
+            <div className="flex min-h-0 flex-1 flex-col space-y-3">
+              <div className="flex items-center justify-between pb-1">
+                <span className="text-xs font-semibold text-foreground">
+                  Dataset:{" "}
+                  <code className="text-primary">{activeResult.fileName}</code>
+                </span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 gap-1 px-2 text-[11px]"
+                  onClick={() => {
+                    setInternalResult(null)
+                    setConnectionConfig(null)
+                    setIsDismissed(true)
+                  }}
+                >
+                  <ArrowLeft className="h-3 w-3" />
+                  Choose Another Source
+                </Button>
+              </div>
+
+              <Tabs
+                defaultValue="schema"
+                className="flex min-h-0 w-full flex-1 flex-col"
+              >
+                <TabsList className="grid w-full grid-cols-3">
+                  <TabsTrigger value="schema">
+                    Schema ({activeResult.columnCount})
+                  </TabsTrigger>
+                  <TabsTrigger value="preview">
+                    Data Preview ({activeResult.previewRows.length})
+                  </TabsTrigger>
+                  <TabsTrigger value="keys">
+                    Candidate Keys ({activeResult.candidateKeys.length})
+                  </TabsTrigger>
+                </TabsList>
+
+                <TabsContent
+                  value="schema"
+                  className="min-h-0 flex-1 overflow-y-auto pt-2"
+                >
+                  <TabularSchemaTab columns={activeResult.columns} />
+                </TabsContent>
+
+                <TabsContent
+                  value="preview"
+                  className="min-h-0 w-full flex-1 overflow-x-auto overflow-y-auto pt-2"
+                >
+                  <TabularPreviewTab
+                    rows={activeResult.previewRows}
+                    columns={activeResult.columns}
+                  />
+                </TabsContent>
+
+                <TabsContent
+                  value="keys"
+                  className="min-h-0 flex-1 overflow-y-auto pt-2"
+                >
+                  <div className="space-y-3 p-2">
+                    <div className="text-xs text-muted-foreground">
+                      Identified candidate unique keys based on non-null
+                      uniqueness across all{" "}
+                      {activeResult.rowCount.toLocaleString()} rows:
+                    </div>
+                    {activeResult.candidateKeys.length > 0 ? (
+                      <div className="flex flex-wrap gap-2">
+                        {activeResult.candidateKeys.map((keyGroup, idx) => (
+                          <div
+                            key={idx}
+                            className="flex items-center gap-1.5 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 text-xs text-emerald-600 dark:text-emerald-400"
+                          >
+                            <Key className="h-3.5 w-3.5" />
+                            <span className="font-mono font-semibold">
+                              {keyGroup.join(" + ")}
+                            </span>
+                            <span className="text-[10px] text-muted-foreground">
+                              (Primary key candidate)
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2 rounded-md border border-border bg-muted/20 p-3 text-xs text-muted-foreground">
+                        <Layers className="h-4 w-4" />
+                        <span>
+                          No single column satisfies unique non-null constraint.
+                          Consider composite key identification or surrogate ID
+                          induction.
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </TabsContent>
+
+                <div className="mt-auto flex items-center justify-between border-t pt-3">
+                  <div className="text-[11px] text-muted-foreground">
+                    Dataset profiled via DuckDB analytical sidecar
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {(onSaveToArchive || ontologyId) && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 gap-1.5 text-xs"
+                        onClick={handleSave}
+                        disabled={isSaving}
+                      >
+                        {isSaving ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Bookmark className="h-3.5 w-3.5" />
+                        )}
+                        Save to Archive
+                      </Button>
+                    )}
+                    {onMapToKg && (
+                      <Button
+                        size="sm"
+                        className="h-8 gap-1.5 text-xs"
+                        onClick={handleMap}
+                      >
+                        <Network className="h-3.5 w-3.5" />
+                        Map to KG
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </Tabs>
+            </div>
+          )}
+        </div>
       </DialogContent>
     </Dialog>
   )

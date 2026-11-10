@@ -137,7 +137,7 @@ export function DatasetMappingModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-3xl">
+      <DialogContent viewport="fullscreen" className="p-6">
         <DialogHeader>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -156,7 +156,7 @@ export function DatasetMappingModal({
         </DialogHeader>
 
         {/* Step progress pills */}
-        <div className="grid grid-cols-3 gap-2 border-b pb-3 text-xs font-medium">
+        <div className="grid shrink-0 grid-cols-3 gap-2 border-b pb-3 text-xs font-medium">
           <div
             className={`flex items-center gap-2 rounded-md p-2 ${
               currentStep === "entity"
@@ -198,7 +198,7 @@ export function DatasetMappingModal({
         </div>
 
         {/* Wizard Step Content */}
-        <div className="min-h-[300px]">
+        <div className="min-h-0 flex-1 overflow-y-auto py-2">
           {currentStep === "entity" && (
             <StepEntitySelection
               dataset={dataset}
@@ -224,7 +224,7 @@ export function DatasetMappingModal({
         </div>
 
         {/* Footer actions */}
-        <div className="flex items-center justify-between border-t pt-3">
+        <div className="mt-auto flex shrink-0 items-center justify-between border-t pt-3">
           <Button
             variant="outline"
             size="sm"

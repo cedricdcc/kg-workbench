@@ -4,7 +4,7 @@ import { useState } from "react"
 import { Bot, Key, Loader2, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { ScrollArea } from "@/components/ui/scroll-area"
+import { Badge } from "@/components/ui/badge"
 import { synthesizeOntologyMappingsAction } from "@/features/tabular/server/actions/synthesize-mappings"
 import type { ColumnPrivacyConfig } from "@/features/tabular/server/services/pii-masker"
 import type { ArchivedDatasetSource } from "@/features/tabular/types"
@@ -131,85 +131,167 @@ export function StepAttributeMapping({
         </Button>
       </div>
 
-      {/* Column mapping table */}
-      <div className="overflow-hidden rounded-md border">
-        <div className="grid grid-cols-12 gap-2 border-b bg-muted/50 p-2 text-[11px] font-semibold text-muted-foreground">
-          <div className="col-span-3">Dataset Column</div>
-          <div className="col-span-2">Type</div>
-          <div className="col-span-2">Target Kind</div>
-          <div className="col-span-3">Target Property Name</div>
-          <div className="col-span-2">Target Data Type / Class</div>
-        </div>
+      {/* Column mapping cards in responsive multi-column grid */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-3">
+        {wizardState.columnMappings.map((col, idx) => {
+          const isPk = col.columnName === wizardState.primaryKeyColumn
+          const privacyConfig = wizardState.privacyConfigs?.find(
+            (c) => c.columnName === col.columnName
+          ) || {
+            columnName: col.columnName,
+            isMasked: false,
+            maskingStrategy: "none" as const,
+          }
+          const sampleValue =
+            dataset.sampleRows?.[0]?.[col.columnName] ??
+            dataset.profileSummary?.columns?.find(
+              (c) => c.name === col.columnName
+            )?.sampleValues?.[0]
 
-        <ScrollArea className="h-64">
-          <div className="divide-y">
-            {wizardState.columnMappings.map((col, idx) => {
-              const isPk = col.columnName === wizardState.primaryKeyColumn
-              const privacyConfig = wizardState.privacyConfigs?.find(
-                (c) => c.columnName === col.columnName
-              ) || {
-                columnName: col.columnName,
-                isMasked: false,
-                maskingStrategy: "none" as const,
-              }
-              const sampleValue =
-                dataset.sampleRows?.[0]?.[col.columnName] ??
-                dataset.profileSummary?.columns?.find(
-                  (c) => c.name === col.columnName
-                )?.sampleValues?.[0]
-
-              return (
-                <div
-                  key={col.columnName}
-                  className={`grid grid-cols-12 items-center gap-2 p-2 text-xs ${
-                    col.targetKind === "ignore" ? "bg-muted/10 opacity-50" : ""
-                  }`}
-                >
-                  {/* Column Name & Privacy Pill */}
-                  <div className="col-span-3 flex items-center justify-between gap-1 pr-1">
-                    <div className="flex items-center gap-1 truncate font-mono font-medium">
-                      {isPk && (
-                        <Key className="h-3 w-3 shrink-0 text-emerald-500" />
-                      )}
-                      <span title={col.columnName} className="truncate">
-                        {col.columnName}
-                      </span>
-                    </div>
-                    <ColumnPrivacyPopover
-                      config={privacyConfig}
-                      onChange={handlePrivacyConfigChange}
-                      sampleValue={sampleValue}
-                    />
-                  </div>
-
-                  {/* Inferred Type */}
-                  <div className="col-span-2 text-[11px] text-muted-foreground capitalize">
-                    {col.inferredType}
-                  </div>
-
-                  {/* Target Kind */}
-                  <div className="col-span-2">
-                    <select
-                      className="h-7 w-full rounded border border-input bg-background px-1.5 text-xs"
-                      value={col.targetKind}
-                      onChange={(e) =>
-                        updateColumnMapping(idx, {
-                          targetKind: e.target.value as
-                            "attribute" | "relation" | "ignore",
-                        })
-                      }
+          return (
+            <div
+              key={col.columnName}
+              className={`flex flex-col justify-between rounded-lg border bg-card p-3 shadow-xs transition-colors ${
+                col.targetKind === "ignore"
+                  ? "border-muted/60 bg-muted/15 opacity-60"
+                  : "border-border hover:border-primary/40"
+              }`}
+            >
+              <div>
+                {/* Header: Column Name, Inferred Type, PK Badge, and Privacy Popover */}
+                <div className="flex items-center justify-between gap-1.5 border-b pb-2">
+                  <div className="flex min-w-0 items-center gap-1.5">
+                    {isPk && (
+                      <Key className="h-3.5 w-3.5 shrink-0 text-emerald-500" />
+                    )}
+                    <span
+                      title={col.columnName}
+                      className="truncate font-mono text-xs font-semibold text-foreground"
                     >
-                      <option value="attribute">Attribute</option>
-                      <option value="relation">Relation</option>
-                      <option value="ignore">Ignore</option>
-                    </select>
+                      {col.columnName}
+                    </span>
+                    <Badge
+                      variant="outline"
+                      className="shrink-0 px-1.5 py-0 font-mono text-[10px] capitalize"
+                    >
+                      {col.inferredType}
+                    </Badge>
+                  </div>
+                  <ColumnPrivacyPopover
+                    config={privacyConfig}
+                    onChange={handlePrivacyConfigChange}
+                    sampleValue={sampleValue}
+                  />
+                </div>
+
+                {/* Sample Value */}
+                {sampleValue !== undefined && sampleValue !== null && (
+                  <div className="mt-2 flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                    <span className="shrink-0 font-medium text-foreground/70">
+                      Sample:
+                    </span>
+                    <span
+                      className="max-w-[220px] truncate rounded bg-muted/50 px-1.5 py-0.5 font-mono text-[10px]"
+                      title={String(sampleValue)}
+                    >
+                      {String(sampleValue)}
+                    </span>
+                  </div>
+                )}
+
+                {/* Mapping Controls */}
+                <div className="mt-3 space-y-2">
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[10px] font-medium text-muted-foreground uppercase">
+                        Target Kind
+                      </label>
+                      <select
+                        className="mt-0.5 h-8 w-full rounded border border-input bg-background px-2 text-xs"
+                        value={col.targetKind}
+                        onChange={(e) =>
+                          updateColumnMapping(idx, {
+                            targetKind: e.target.value as
+                              "attribute" | "relation" | "ignore",
+                          })
+                        }
+                      >
+                        <option value="attribute">Attribute</option>
+                        <option value="relation">Relation</option>
+                        <option value="ignore">Ignore</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      {col.targetKind === "attribute" && (
+                        <div>
+                          <label className="text-[10px] font-medium text-muted-foreground uppercase">
+                            Data Type
+                          </label>
+                          <select
+                            className="mt-0.5 h-8 w-full rounded border border-input bg-background px-1.5 font-mono text-[11px]"
+                            value={col.targetDataType || "xsd:string"}
+                            onChange={(e) =>
+                              updateColumnMapping(idx, {
+                                targetDataType: e.target.value,
+                              })
+                            }
+                          >
+                            <option value="xsd:string">xsd:string</option>
+                            <option value="xsd:integer">xsd:integer</option>
+                            <option value="xsd:decimal">xsd:decimal</option>
+                            <option value="xsd:boolean">xsd:boolean</option>
+                            <option value="xsd:dateTime">xsd:dateTime</option>
+                          </select>
+                        </div>
+                      )}
+
+                      {col.targetKind === "relation" && (
+                        <div>
+                          <label className="text-[10px] font-medium text-muted-foreground uppercase">
+                            Target Class
+                          </label>
+                          <select
+                            className="mt-0.5 h-8 w-full rounded border border-input bg-background px-1.5 text-xs"
+                            value={col.targetClassId || ""}
+                            onChange={(e) =>
+                              updateColumnMapping(idx, {
+                                targetClassId: e.target.value,
+                              })
+                            }
+                          >
+                            <option value="">-- Class --</option>
+                            {existingClasses.map((c) => (
+                              <option key={c.id} value={c.id}>
+                                {c.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+
+                      {col.targetKind === "ignore" && (
+                        <div>
+                          <label className="text-[10px] font-medium text-muted-foreground uppercase">
+                            Status
+                          </label>
+                          <div className="mt-0.5 flex h-8 items-center px-1 text-xs text-muted-foreground italic">
+                            Ignored
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
 
-                  {/* Property Name */}
-                  <div className="col-span-3">
-                    {col.targetKind !== "ignore" && (
+                  {col.targetKind !== "ignore" && (
+                    <div>
+                      <label className="text-[10px] font-medium text-muted-foreground uppercase">
+                        {col.targetKind === "relation"
+                          ? "Target Relation Name"
+                          : "Target Property Name"}
+                      </label>
                       <Input
-                        className="h-7 font-mono text-xs"
+                        className="mt-0.5 h-8 font-mono text-xs"
                         value={
                           col.targetKind === "relation"
                             ? col.targetRelationName || ""
@@ -229,53 +311,13 @@ export function StepAttributeMapping({
                             : "attributeName"
                         }
                       />
-                    )}
-                  </div>
-
-                  {/* Target Data Type / Class */}
-                  <div className="col-span-2">
-                    {col.targetKind === "attribute" && (
-                      <select
-                        className="h-7 w-full rounded border border-input bg-background px-1 font-mono text-[11px]"
-                        value={col.targetDataType || "xsd:string"}
-                        onChange={(e) =>
-                          updateColumnMapping(idx, {
-                            targetDataType: e.target.value,
-                          })
-                        }
-                      >
-                        <option value="xsd:string">xsd:string</option>
-                        <option value="xsd:integer">xsd:integer</option>
-                        <option value="xsd:decimal">xsd:decimal</option>
-                        <option value="xsd:boolean">xsd:boolean</option>
-                        <option value="xsd:dateTime">xsd:dateTime</option>
-                      </select>
-                    )}
-
-                    {col.targetKind === "relation" && (
-                      <select
-                        className="h-7 w-full rounded border border-input bg-background px-1 text-[11px]"
-                        value={col.targetClassId || ""}
-                        onChange={(e) =>
-                          updateColumnMapping(idx, {
-                            targetClassId: e.target.value,
-                          })
-                        }
-                      >
-                        <option value="">-- Target Class --</option>
-                        {existingClasses.map((c) => (
-                          <option key={c.id} value={c.id}>
-                            {c.name}
-                          </option>
-                        ))}
-                      </select>
-                    )}
-                  </div>
+                    </div>
+                  )}
                 </div>
-              )
-            })}
-          </div>
-        </ScrollArea>
+              </div>
+            </div>
+          )
+        })}
       </div>
     </div>
   )

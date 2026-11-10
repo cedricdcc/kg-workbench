@@ -1,4 +1,6 @@
 import assert from "node:assert/strict"
+import fs from "node:fs"
+import path from "node:path"
 import { test } from "node:test"
 import {
   validateMappingSpecBeforeCommit,
@@ -179,4 +181,111 @@ test("initializeWizardState produces distinct states for different datasets with
     stateB.columnMappings.map((m) => m.columnName),
     ["user_id", "email"]
   )
+})
+
+test("DatasetMappingModal conforms to fullscreen Option B layout requirements", () => {
+  const modalPath = path.resolve(
+    process.cwd(),
+    "src/features/tabular/components/dataset-mapping-wizard/dataset-mapping-modal.tsx"
+  )
+  assert.ok(fs.existsSync(modalPath), "dataset-mapping-modal.tsx must exist")
+  const modalContent = fs.readFileSync(modalPath, "utf-8")
+
+  assert.ok(
+    modalContent.includes('viewport="fullscreen"') &&
+      modalContent.includes('className="p-6"'),
+    "DatasetMappingModal must use DialogContent with viewport='fullscreen' and className='p-6'"
+  )
+})
+
+test("Dataset mapping wizard steps 2 and 3 render responsive multi-column layouts", () => {
+  const step2Path = path.resolve(
+    process.cwd(),
+    "src/features/tabular/components/dataset-mapping-wizard/step-attribute-mapping.tsx"
+  )
+  assert.ok(fs.existsSync(step2Path), "step-attribute-mapping.tsx must exist")
+  const step2Content = fs.readFileSync(step2Path, "utf-8")
+  assert.ok(
+    step2Content.includes("grid-cols-1") &&
+      step2Content.includes("lg:grid-cols-2") &&
+      step2Content.includes("xl:grid-cols-3") &&
+      step2Content.includes("gap-4"),
+    "Step 2 (Attributes mapping) must render responsive multi-column layout (grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4)"
+  )
+
+  const step3Path = path.resolve(
+    process.cwd(),
+    "src/features/tabular/components/dataset-mapping-wizard/step-ai-synthesis-review.tsx"
+  )
+  assert.ok(fs.existsSync(step3Path), "step-ai-synthesis-review.tsx must exist")
+  const step3Content = fs.readFileSync(step3Path, "utf-8")
+  assert.ok(
+    step3Content.includes("grid-cols-1") &&
+      step3Content.includes("lg:grid-cols-2") &&
+      step3Content.includes("xl:grid-cols-3") &&
+      step3Content.includes("gap-4"),
+    "Step 3 (Review & commit) must render responsive multi-column layout (grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4)"
+  )
+})
+
+test("StepAiSynthesisReview renders multi-column summary cards in DOM", async () => {
+  const React = (await import("react")).default
+  const { renderToStaticMarkup } = await import("react-dom/server")
+  const { StepAiSynthesisReview } =
+    await import("../src/features/tabular/components/dataset-mapping-wizard/step-ai-synthesis-review")
+
+  const markup = renderToStaticMarkup(
+    React.createElement(StepAiSynthesisReview, {
+      wizardState: {
+        targetClassName: "Customer",
+        primaryKeyColumn: "customer_id",
+        privacyConfigs: [],
+        columnMappings: [
+          {
+            columnName: "customer_id",
+            inferredType: "string",
+            targetKind: "attribute",
+            targetAttributeName: "customerId",
+            targetDataType: "xsd:string",
+            isPrimaryKey: true,
+          },
+          {
+            columnName: "company_id",
+            inferredType: "string",
+            targetKind: "relation",
+            targetRelationName: "hasCompany",
+            targetClassId: "cls-1",
+          },
+        ],
+        synthesizedElements: {
+          classes: [{ name: "Company", description: "Company entity" }],
+          attributes: [
+            {
+              className: "Customer",
+              name: "creditScore",
+              dataType: "xsd:integer",
+            },
+          ],
+          relations: [
+            {
+              sourceClass: "Customer",
+              name: "worksAt",
+              targetClass: "Company",
+            },
+          ],
+        },
+      },
+    })
+  )
+
+  assert.ok(
+    markup.includes("grid-cols-1") &&
+      markup.includes("lg:grid-cols-2") &&
+      markup.includes("xl:grid-cols-3"),
+    "Must render responsive grid classes in markup"
+  )
+  assert.ok(markup.includes("Customer"), "Must render target class")
+  assert.ok(markup.includes("customer_id"), "Must render primary key column")
+  assert.ok(markup.includes("Company"), "Must render synthesized class")
+  assert.ok(markup.includes("worksAt"), "Must render synthesized relation")
 })
