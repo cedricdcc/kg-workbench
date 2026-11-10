@@ -119,7 +119,6 @@ export function diffLinkmlSnapshots(
   const matchedOldModules = new Set<string>()
   const matchedNewModules = new Set<string>()
 
-  // Module matching heuristics
   for (const oldMod of candidateDeletedModules) {
     if (options?.moduleRenames?.[oldMod.id]) {
       const explicitNew = options.moduleRenames[oldMod.id]
@@ -153,14 +152,16 @@ export function diffLinkmlSnapshots(
         score += 8
       }
 
+      // Bonus only if there is already positive evidence
       if (
+        score > 0 &&
         candidateDeletedModules.length === 1 &&
         candidateAddedModules.length === 1
       ) {
-        score += 5
+        score += 2
       }
 
-      if (score > bestScore && score >= 4) {
+      if (score > bestScore && score >= 6) {
         bestScore = score
         bestMatch = newMod
       }
@@ -209,7 +210,6 @@ export function diffLinkmlSnapshots(
   const matchedOldClasses = new Set<string>()
   const matchedNewClasses = new Set<string>()
 
-  // Class matching heuristics
   for (const oldCls of candidateDeletedClasses) {
     if (options?.classRenames?.[oldCls.id]) {
       const explicitNew = options.classRenames[oldCls.id]
@@ -276,14 +276,16 @@ export function diffLinkmlSnapshots(
         if (newAttrNames.has(name)) score += 4
       }
 
+      // Bonus only if there is already positive evidence
       if (
+        score > 0 &&
         candidateDeletedClasses.length === 1 &&
         candidateAddedClasses.length === 1
       ) {
-        score += 5
+        score += 2
       }
 
-      if (score > bestScore && score >= 4) {
+      if (score > bestScore && score >= 6) {
         bestScore = score
         bestMatch = newCls
       }
@@ -336,7 +338,6 @@ export function diffLinkmlSnapshots(
   const matchedOldRelations = new Set<string>()
   const matchedNewRelations = new Set<string>()
 
-  // Relation matching heuristics
   for (const oldRel of candidateDeletedRelations) {
     if (options?.relationRenames?.[oldRel.id]) {
       const explicitNew = options.relationRenames[oldRel.id]
@@ -364,14 +365,17 @@ export function diffLinkmlSnapshots(
       if (newRel.range_class_id === mappedRange) score += 6
       if (oldRel.description && oldRel.description === newRel.description)
         score += 4
+
+      // Bonus only if there is already positive evidence
       if (
+        score > 0 &&
         candidateDeletedRelations.length === 1 &&
         candidateAddedRelations.length === 1
       ) {
-        score += 5
+        score += 2
       }
 
-      if (score > bestScore && score >= 4) {
+      if (score > bestScore && score >= 6) {
         bestScore = score
         bestMatch = newRel
       }
@@ -420,7 +424,6 @@ export function diffLinkmlSnapshots(
   const matchedOldAttrs = new Set<string>()
   const matchedNewAttrs = new Set<string>()
 
-  // Attribute matching heuristics
   for (const oldAttr of candidateDeletedAttrs) {
     if (options?.attributeRenames?.[oldAttr.id]) {
       const explicitNew = options.attributeRenames[oldAttr.id]
@@ -443,19 +446,20 @@ export function diffLinkmlSnapshots(
       const isSameOrMappedClass = newAttr.class_id === mappedClassId
 
       if (isSameOrMappedClass) {
-        score += 8
-        if (oldAttr.data_type === newAttr.data_type) score += 4
         if (oldAttr.name === newAttr.name) score += 10
+        if (oldAttr.data_type === newAttr.data_type) score += 4
+        if (oldAttr.description && oldAttr.description === newAttr.description)
+          score += 2
+        if (
+          score > 0 &&
+          candidateDeletedAttrs.length === 1 &&
+          candidateAddedAttrs.length === 1
+        ) {
+          score += 2
+        }
       }
 
-      if (
-        candidateDeletedAttrs.length === 1 &&
-        candidateAddedAttrs.length === 1
-      ) {
-        score += 5
-      }
-
-      if (score > bestScore && score >= 4) {
+      if (score > bestScore && score >= 6) {
         bestScore = score
         bestMatch = newAttr
       }
@@ -479,15 +483,10 @@ export function diffLinkmlSnapshots(
     }
   }
 
-  // Unified renames / deletions / additions
+  // Renames ordered: ATTRIBUTES FIRST, then RELATIONS, then CLASSES, then MODULES
   const renames: SymbolRenameItem[] = [
-    ...renamedModules.map((r) => ({
-      kind: "module" as const,
-      oldKey: r.oldKey,
-      newKey: r.newKey,
-    })),
-    ...renamedClasses.map((r) => ({
-      kind: "class" as const,
+    ...renamedAttributes.map((r) => ({
+      kind: "attribute" as const,
       oldKey: r.oldKey,
       newKey: r.newKey,
     })),
@@ -496,8 +495,13 @@ export function diffLinkmlSnapshots(
       oldKey: r.oldKey,
       newKey: r.newKey,
     })),
-    ...renamedAttributes.map((r) => ({
-      kind: "attribute" as const,
+    ...renamedClasses.map((r) => ({
+      kind: "class" as const,
+      oldKey: r.oldKey,
+      newKey: r.newKey,
+    })),
+    ...renamedModules.map((r) => ({
+      kind: "module" as const,
       oldKey: r.oldKey,
       newKey: r.newKey,
     })),
@@ -536,9 +540,44 @@ export function diffLinkmlSnapshots(
   }
 }
 
+async function getScopedRunAndEntityIds(
+  tx: DbTransaction,
+  ontologyId: string
+): Promise<{ runIds: string[]; entityIds: string[] }> {
+  const runs = await tx
+    .select({ id: extractionRuns.id })
+    .from(extractionRuns)
+    .where(eq(extractionRuns.ontology_id, ontologyId))
+  const runIds = runs.map((r: { id: string }) => r.id)
+
+  if (runIds.length === 0) {
+    return { runIds: [], entityIds: [] }
+  }
+
+  const entities = await tx
+    .select({ id: documentEntities.id })
+    .from(documentEntities)
+    .where(inArray(documentEntities.extraction_run_id, runIds))
+  const entityIds = entities.map((e: { id: string }) => e.id)
+
+  return { runIds, entityIds }
+}
+
+async function getScopedCqIds(
+  tx: DbTransaction,
+  ontologyId: string
+): Promise<string[]> {
+  const cqs = await tx
+    .select({ id: ontologyCompetencyQuestions.id })
+    .from(ontologyCompetencyQuestions)
+    .where(eq(ontologyCompetencyQuestions.ontology_id, ontologyId))
+  return cqs.map((q: { id: string }) => q.id)
+}
+
 /**
  * Transactionally cascades a renamed symbol key across external tables
- * (document_entities, entity_attribute_values, facts, CQ triples, dataset_sources).
+ * (document_entities, entity_attribute_values, facts, CQ triples, dataset_sources),
+ * strictly scoped to the specified ontology.
  */
 export async function cascadeSymbolRename(
   tx: DbTransaction,
@@ -551,13 +590,12 @@ export async function cascadeSymbolRename(
 
   switch (kind) {
     case "class": {
-      // 1. document_entities.class_id
-      const runs = await tx
-        .select({ id: extractionRuns.id })
-        .from(extractionRuns)
-        .where(eq(extractionRuns.ontology_id, ontologyId))
-      const runIds = runs.map((r: { id: string }) => r.id)
+      const { runIds, entityIds } = await getScopedRunAndEntityIds(
+        tx,
+        ontologyId
+      )
 
+      // 1. document_entities.class_id (only if this ontology has extraction runs)
       if (runIds.length > 0) {
         await tx
           .update(documentEntities)
@@ -568,72 +606,91 @@ export async function cascadeSymbolRename(
               inArray(documentEntities.extraction_run_id, runIds)
             )
           )
-      } else {
-        await tx
-          .update(documentEntities)
-          .set({ class_id: newKey })
-          .where(eq(documentEntities.class_id, oldKey))
       }
 
-      // 2. entity_attribute_values.attribute_id prefix replacement: "Person.age" -> "Individual.age"
-      await tx
-        .update(entityAttributeValues)
-        .set({
-          attribute_id: sql`${newKey} || substring(${entityAttributeValues.attribute_id} from ${oldKey.length + 1})`,
-        })
-        .where(like(entityAttributeValues.attribute_id, `${oldKey}.%`))
-
-      // 3. ontology_competency_questions subject / object
-      await tx
-        .update(ontologyCompetencyQuestions)
-        .set({ subject_class_id: newKey })
-        .where(
-          and(
-            eq(ontologyCompetencyQuestions.ontology_id, ontologyId),
-            eq(ontologyCompetencyQuestions.subject_class_id, oldKey)
-          )
-        )
-      await tx
-        .update(ontologyCompetencyQuestions)
-        .set({ object_class_id: newKey })
-        .where(
-          and(
-            eq(ontologyCompetencyQuestions.ontology_id, ontologyId),
-            eq(ontologyCompetencyQuestions.object_class_id, oldKey)
-          )
-        )
-
-      // 4. ontology_cq_triples subject / object
-      await tx
-        .update(ontologyCqTriples)
-        .set({ subject_class_id: newKey })
-        .where(eq(ontologyCqTriples.subject_class_id, oldKey))
-      await tx
-        .update(ontologyCqTriples)
-        .set({ object_class_id: newKey })
-        .where(eq(ontologyCqTriples.object_class_id, oldKey))
-
-      // 5. dataset_sources mapping_spec JSONB
-      try {
+      // 2. entity_attribute_values.attribute_id prefix replacement (only for entities of this ontology)
+      if (entityIds.length > 0) {
         await tx
-          .update(datasetSources)
+          .update(entityAttributeValues)
           .set({
-            mapping_spec: sql`jsonb_set(coalesce(${datasetSources.mapping_spec}, '{}'::jsonb), '{targetClassId}', to_jsonb(${newKey}::text))`,
+            attribute_id: sql`${newKey} || substring(${entityAttributeValues.attribute_id} from ${oldKey.length + 1})`,
           })
           .where(
             and(
-              eq(datasetSources.ontology_id, ontologyId),
-              sql`${datasetSources.mapping_spec}->>'targetClassId' = ${oldKey}`
+              inArray(entityAttributeValues.entity_id, entityIds),
+              like(entityAttributeValues.attribute_id, `${oldKey}.%`)
             )
           )
-      } catch {
-        // Fallback for mocks/non-PostgreSQL environments
+      }
+
+      // 3. ontology_competency_questions and cq_triples (only if this ontology has CQs)
+      const cqIds = await getScopedCqIds(tx, ontologyId)
+      if (cqIds.length > 0) {
+        await tx
+          .update(ontologyCompetencyQuestions)
+          .set({ subject_class_id: newKey })
+          .where(
+            and(
+              eq(ontologyCompetencyQuestions.ontology_id, ontologyId),
+              eq(ontologyCompetencyQuestions.subject_class_id, oldKey)
+            )
+          )
+        await tx
+          .update(ontologyCompetencyQuestions)
+          .set({ object_class_id: newKey })
+          .where(
+            and(
+              eq(ontologyCompetencyQuestions.ontology_id, ontologyId),
+              eq(ontologyCompetencyQuestions.object_class_id, oldKey)
+            )
+          )
+
+        await tx
+          .update(ontologyCqTriples)
+          .set({ subject_class_id: newKey })
+          .where(
+            and(
+              inArray(ontologyCqTriples.cq_id, cqIds),
+              eq(ontologyCqTriples.subject_class_id, oldKey)
+            )
+          )
+        await tx
+          .update(ontologyCqTriples)
+          .set({ object_class_id: newKey })
+          .where(
+            and(
+              inArray(ontologyCqTriples.cq_id, cqIds),
+              eq(ontologyCqTriples.object_class_id, oldKey)
+            )
+          )
+      }
+
+      // 4. dataset_sources mapping_spec JSONB (only if dataset_sources exist for this ontology)
+      const ds = await tx
+        .select({ id: datasetSources.id })
+        .from(datasetSources)
+        .where(eq(datasetSources.ontology_id, ontologyId))
+      if (ds.length > 0) {
+        try {
+          await tx
+            .update(datasetSources)
+            .set({
+              mapping_spec: sql`jsonb_set(coalesce(${datasetSources.mapping_spec}, '{}'::jsonb), '{targetClassId}', to_jsonb(${newKey}::text))`,
+            })
+            .where(
+              and(
+                eq(datasetSources.ontology_id, ontologyId),
+                sql`${datasetSources.mapping_spec}->>'targetClassId' = ${oldKey}`
+              )
+            )
+        } catch {
+          // Fallback for mocks/non-PostgreSQL environments
+        }
       }
       break
     }
 
     case "relation": {
-      // 1. facts.relation_type_id
       const runs = await tx
         .select({ id: extractionRuns.id })
         .from(extractionRuns)
@@ -641,6 +698,7 @@ export async function cascadeSymbolRename(
       const runIds = runs.map((r: { id: string }) => r.id)
 
       if (runIds.length > 0) {
+        // 1. facts.relation_type_id
         await tx
           .update(facts)
           .set({ relation_type_id: newKey })
@@ -650,74 +708,125 @@ export async function cascadeSymbolRename(
               inArray(facts.extraction_run_id, runIds)
             )
           )
-      } else {
-        await tx
-          .update(facts)
-          .set({ relation_type_id: newKey })
-          .where(eq(facts.relation_type_id, oldKey))
+
+        // 2. fact_relation_attribute_values.relation_attribute_id prefix replacement
+        const ontologyFacts = await tx
+          .select({ id: facts.id })
+          .from(facts)
+          .where(inArray(facts.extraction_run_id, runIds))
+        const factIds = ontologyFacts.map((f: { id: string }) => f.id)
+
+        if (factIds.length > 0) {
+          await tx
+            .update(factRelationAttributeValues)
+            .set({
+              relation_attribute_id: sql`${newKey} || substring(${factRelationAttributeValues.relation_attribute_id} from ${oldKey.length + 1})`,
+            })
+            .where(
+              and(
+                inArray(factRelationAttributeValues.fact_id, factIds),
+                like(
+                  factRelationAttributeValues.relation_attribute_id,
+                  `${oldKey}.%`
+                )
+              )
+            )
+        }
       }
 
-      // 2. fact_relation_attribute_values.relation_attribute_id prefix replacement
-      await tx
-        .update(factRelationAttributeValues)
-        .set({
-          relation_attribute_id: sql`${newKey} || substring(${factRelationAttributeValues.relation_attribute_id} from ${oldKey.length + 1})`,
-        })
-        .where(
-          like(factRelationAttributeValues.relation_attribute_id, `${oldKey}.%`)
-        )
-
-      // 3. ontology_competency_questions predicate_relation_id
-      await tx
-        .update(ontologyCompetencyQuestions)
-        .set({ predicate_relation_id: newKey })
-        .where(
-          and(
-            eq(ontologyCompetencyQuestions.ontology_id, ontologyId),
-            eq(ontologyCompetencyQuestions.predicate_relation_id, oldKey)
+      // 3. ontology_competency_questions & cq_triples (only if this ontology has CQs)
+      const cqIds = await getScopedCqIds(tx, ontologyId)
+      if (cqIds.length > 0) {
+        await tx
+          .update(ontologyCompetencyQuestions)
+          .set({ predicate_relation_id: newKey })
+          .where(
+            and(
+              eq(ontologyCompetencyQuestions.ontology_id, ontologyId),
+              eq(ontologyCompetencyQuestions.predicate_relation_id, oldKey)
+            )
           )
-        )
 
-      // 4. ontology_cq_triples predicate_relation_id
-      await tx
-        .update(ontologyCqTriples)
-        .set({ predicate_relation_id: newKey })
-        .where(eq(ontologyCqTriples.predicate_relation_id, oldKey))
+        await tx
+          .update(ontologyCqTriples)
+          .set({ predicate_relation_id: newKey })
+          .where(
+            and(
+              inArray(ontologyCqTriples.cq_id, cqIds),
+              eq(ontologyCqTriples.predicate_relation_id, oldKey)
+            )
+          )
+      }
       break
     }
 
     case "attribute": {
-      // 1. entity_attribute_values.attribute_id exact match
-      await tx
-        .update(entityAttributeValues)
-        .set({ attribute_id: newKey })
-        .where(eq(entityAttributeValues.attribute_id, oldKey))
+      const { entityIds, runIds } = await getScopedRunAndEntityIds(
+        tx,
+        ontologyId
+      )
 
-      // 2. fact_relation_attribute_values.relation_attribute_id exact match
-      await tx
-        .update(factRelationAttributeValues)
-        .set({ relation_attribute_id: newKey })
-        .where(eq(factRelationAttributeValues.relation_attribute_id, oldKey))
+      // 1. entity_attribute_values.attribute_id exact match (scoped to entities of this ontology)
+      if (entityIds.length > 0) {
+        await tx
+          .update(entityAttributeValues)
+          .set({ attribute_id: newKey })
+          .where(
+            and(
+              inArray(entityAttributeValues.entity_id, entityIds),
+              eq(entityAttributeValues.attribute_id, oldKey)
+            )
+          )
+      }
+
+      // 2. fact_relation_attribute_values.relation_attribute_id exact match (scoped to facts of this ontology)
+      if (runIds.length > 0) {
+        const ontologyFacts = await tx
+          .select({ id: facts.id })
+          .from(facts)
+          .where(inArray(facts.extraction_run_id, runIds))
+        const factIds = ontologyFacts.map((f: { id: string }) => f.id)
+
+        if (factIds.length > 0) {
+          await tx
+            .update(factRelationAttributeValues)
+            .set({ relation_attribute_id: newKey })
+            .where(
+              and(
+                inArray(factRelationAttributeValues.fact_id, factIds),
+                eq(factRelationAttributeValues.relation_attribute_id, oldKey)
+              )
+            )
+        }
+      }
       break
     }
 
     case "module": {
-      // 1. ontology_competency_questions.module_id
-      await tx
-        .update(ontologyCompetencyQuestions)
-        .set({ module_id: newKey })
-        .where(
-          and(
-            eq(ontologyCompetencyQuestions.ontology_id, ontologyId),
-            eq(ontologyCompetencyQuestions.module_id, oldKey)
+      const cqIds = await getScopedCqIds(tx, ontologyId)
+      if (cqIds.length > 0) {
+        // 1. ontology_competency_questions.module_id
+        await tx
+          .update(ontologyCompetencyQuestions)
+          .set({ module_id: newKey })
+          .where(
+            and(
+              eq(ontologyCompetencyQuestions.ontology_id, ontologyId),
+              eq(ontologyCompetencyQuestions.module_id, oldKey)
+            )
           )
-        )
 
-      // 2. ontology_competency_question_modules.module_id
-      await tx
-        .update(ontologyCompetencyQuestionModules)
-        .set({ module_id: newKey })
-        .where(eq(ontologyCompetencyQuestionModules.module_id, oldKey))
+        // 2. ontology_competency_question_modules.module_id (scoped to this ontology's CQs)
+        await tx
+          .update(ontologyCompetencyQuestionModules)
+          .set({ module_id: newKey })
+          .where(
+            and(
+              inArray(ontologyCompetencyQuestionModules.cq_id, cqIds),
+              eq(ontologyCompetencyQuestionModules.module_id, oldKey)
+            )
+          )
+      }
       break
     }
   }
@@ -725,7 +834,8 @@ export async function cascadeSymbolRename(
 
 /**
  * Transactionally cascades a deleted symbol key across external tables
- * (nulling out references or removing matching rows, mirroring foreign key behavior).
+ * (nulling out references or removing matching rows, mirroring foreign key behavior),
+ * strictly scoped to the specified ontology.
  */
 export async function cascadeSymbolDelete(
   tx: DbTransaction,
@@ -735,13 +845,12 @@ export async function cascadeSymbolDelete(
 ): Promise<void> {
   switch (kind) {
     case "class": {
-      // 1. Null out document_entities.class_id
-      const runs = await tx
-        .select({ id: extractionRuns.id })
-        .from(extractionRuns)
-        .where(eq(extractionRuns.ontology_id, ontologyId))
-      const runIds = runs.map((r: { id: string }) => r.id)
+      const { runIds, entityIds } = await getScopedRunAndEntityIds(
+        tx,
+        ontologyId
+      )
 
+      // 1. Null out document_entities.class_id (strictly scoped to this ontology's extraction runs)
       if (runIds.length > 0) {
         await tx
           .update(documentEntities)
@@ -752,133 +861,215 @@ export async function cascadeSymbolDelete(
               inArray(documentEntities.extraction_run_id, runIds)
             )
           )
-      } else {
-        await tx
-          .update(documentEntities)
-          .set({ class_id: null })
-          .where(eq(documentEntities.class_id, deletedKey))
       }
 
-      // 2. Delete associated entity_attribute_values
-      await tx
-        .delete(entityAttributeValues)
-        .where(
-          or(
-            eq(entityAttributeValues.attribute_id, deletedKey),
-            like(entityAttributeValues.attribute_id, `${deletedKey}.%`)
+      // 2. Delete associated entity_attribute_values (strictly scoped to this ontology's entities)
+      if (entityIds.length > 0) {
+        await tx
+          .delete(entityAttributeValues)
+          .where(
+            and(
+              inArray(entityAttributeValues.entity_id, entityIds),
+              or(
+                eq(entityAttributeValues.attribute_id, deletedKey),
+                like(entityAttributeValues.attribute_id, `${deletedKey}.%`)
+              )
+            )
           )
-        )
+      }
 
-      // 3. Null out ontology_competency_questions subject / object
-      await tx
-        .update(ontologyCompetencyQuestions)
-        .set({ subject_class_id: null })
-        .where(
-          and(
-            eq(ontologyCompetencyQuestions.ontology_id, ontologyId),
-            eq(ontologyCompetencyQuestions.subject_class_id, deletedKey)
+      // 3. Null out ontology_competency_questions & cq_triples (only if this ontology has CQs)
+      const cqIds = await getScopedCqIds(tx, ontologyId)
+      if (cqIds.length > 0) {
+        await tx
+          .update(ontologyCompetencyQuestions)
+          .set({ subject_class_id: null })
+          .where(
+            and(
+              eq(ontologyCompetencyQuestions.ontology_id, ontologyId),
+              eq(ontologyCompetencyQuestions.subject_class_id, deletedKey)
+            )
           )
-        )
-      await tx
-        .update(ontologyCompetencyQuestions)
-        .set({ object_class_id: null })
-        .where(
-          and(
-            eq(ontologyCompetencyQuestions.ontology_id, ontologyId),
-            eq(ontologyCompetencyQuestions.object_class_id, deletedKey)
+        await tx
+          .update(ontologyCompetencyQuestions)
+          .set({ object_class_id: null })
+          .where(
+            and(
+              eq(ontologyCompetencyQuestions.ontology_id, ontologyId),
+              eq(ontologyCompetencyQuestions.object_class_id, deletedKey)
+            )
           )
-        )
 
-      // 4. Null out ontology_cq_triples subject / object
-      await tx
-        .update(ontologyCqTriples)
-        .set({ subject_class_id: null })
-        .where(eq(ontologyCqTriples.subject_class_id, deletedKey))
-      await tx
-        .update(ontologyCqTriples)
-        .set({ object_class_id: null })
-        .where(eq(ontologyCqTriples.object_class_id, deletedKey))
+        await tx
+          .update(ontologyCqTriples)
+          .set({ subject_class_id: null })
+          .where(
+            and(
+              inArray(ontologyCqTriples.cq_id, cqIds),
+              eq(ontologyCqTriples.subject_class_id, deletedKey)
+            )
+          )
+        await tx
+          .update(ontologyCqTriples)
+          .set({ object_class_id: null })
+          .where(
+            and(
+              inArray(ontologyCqTriples.cq_id, cqIds),
+              eq(ontologyCqTriples.object_class_id, deletedKey)
+            )
+          )
+      }
       break
     }
 
     case "relation": {
-      // 1. Delete matching facts
-      await tx.delete(facts).where(eq(facts.relation_type_id, deletedKey))
+      const runs = await tx
+        .select({ id: extractionRuns.id })
+        .from(extractionRuns)
+        .where(eq(extractionRuns.ontology_id, ontologyId))
+      const runIds = runs.map((r: { id: string }) => r.id)
 
-      // 2. Delete associated fact_relation_attribute_values
-      await tx
-        .delete(factRelationAttributeValues)
-        .where(
-          or(
-            eq(factRelationAttributeValues.relation_attribute_id, deletedKey),
-            like(
-              factRelationAttributeValues.relation_attribute_id,
-              `${deletedKey}.%`
+      if (runIds.length > 0) {
+        const ontologyFacts = await tx
+          .select({ id: facts.id })
+          .from(facts)
+          .where(inArray(facts.extraction_run_id, runIds))
+        const factIds = ontologyFacts.map((f: { id: string }) => f.id)
+
+        // 1. Delete associated fact_relation_attribute_values
+        if (factIds.length > 0) {
+          await tx
+            .delete(factRelationAttributeValues)
+            .where(
+              and(
+                inArray(factRelationAttributeValues.fact_id, factIds),
+                or(
+                  eq(
+                    factRelationAttributeValues.relation_attribute_id,
+                    deletedKey
+                  ),
+                  like(
+                    factRelationAttributeValues.relation_attribute_id,
+                    `${deletedKey}.%`
+                  )
+                )
+              )
+            )
+        }
+
+        // 2. Delete matching facts
+        await tx
+          .delete(facts)
+          .where(
+            and(
+              eq(facts.relation_type_id, deletedKey),
+              inArray(facts.extraction_run_id, runIds)
             )
           )
-        )
+      }
 
-      // 3. Null out ontology_competency_questions predicate_relation_id
-      await tx
-        .update(ontologyCompetencyQuestions)
-        .set({ predicate_relation_id: null })
-        .where(
-          and(
-            eq(ontologyCompetencyQuestions.ontology_id, ontologyId),
-            eq(ontologyCompetencyQuestions.predicate_relation_id, deletedKey)
+      // 3. Null out ontology_competency_questions & cq_triples (only if this ontology has CQs)
+      const cqIds = await getScopedCqIds(tx, ontologyId)
+      if (cqIds.length > 0) {
+        await tx
+          .update(ontologyCompetencyQuestions)
+          .set({ predicate_relation_id: null })
+          .where(
+            and(
+              eq(ontologyCompetencyQuestions.ontology_id, ontologyId),
+              eq(ontologyCompetencyQuestions.predicate_relation_id, deletedKey)
+            )
           )
-        )
 
-      // 4. Null out ontology_cq_triples predicate_relation_id
-      await tx
-        .update(ontologyCqTriples)
-        .set({ predicate_relation_id: null })
-        .where(eq(ontologyCqTriples.predicate_relation_id, deletedKey))
+        await tx
+          .update(ontologyCqTriples)
+          .set({ predicate_relation_id: null })
+          .where(
+            and(
+              inArray(ontologyCqTriples.cq_id, cqIds),
+              eq(ontologyCqTriples.predicate_relation_id, deletedKey)
+            )
+          )
+      }
       break
     }
 
     case "attribute": {
-      // 1. Delete entity_attribute_values
-      await tx
-        .delete(entityAttributeValues)
-        .where(
-          or(
-            eq(entityAttributeValues.attribute_id, deletedKey),
-            like(entityAttributeValues.attribute_id, `${deletedKey}.%`)
-          )
-        )
+      const { entityIds, runIds } = await getScopedRunAndEntityIds(
+        tx,
+        ontologyId
+      )
 
-      // 2. Delete fact_relation_attribute_values
-      await tx
-        .delete(factRelationAttributeValues)
-        .where(
-          or(
-            eq(factRelationAttributeValues.relation_attribute_id, deletedKey),
-            like(
-              factRelationAttributeValues.relation_attribute_id,
-              `${deletedKey}.%`
+      // 1. Delete entity_attribute_values (scoped to entities of this ontology)
+      if (entityIds.length > 0) {
+        await tx
+          .delete(entityAttributeValues)
+          .where(
+            and(
+              inArray(entityAttributeValues.entity_id, entityIds),
+              or(
+                eq(entityAttributeValues.attribute_id, deletedKey),
+                like(entityAttributeValues.attribute_id, `${deletedKey}.%`)
+              )
             )
           )
-        )
+      }
+
+      // 2. Delete fact_relation_attribute_values (scoped to facts of this ontology)
+      if (runIds.length > 0) {
+        const ontologyFacts = await tx
+          .select({ id: facts.id })
+          .from(facts)
+          .where(inArray(facts.extraction_run_id, runIds))
+        const factIds = ontologyFacts.map((f: { id: string }) => f.id)
+
+        if (factIds.length > 0) {
+          await tx
+            .delete(factRelationAttributeValues)
+            .where(
+              and(
+                inArray(factRelationAttributeValues.fact_id, factIds),
+                or(
+                  eq(
+                    factRelationAttributeValues.relation_attribute_id,
+                    deletedKey
+                  ),
+                  like(
+                    factRelationAttributeValues.relation_attribute_id,
+                    `${deletedKey}.%`
+                  )
+                )
+              )
+            )
+        }
+      }
       break
     }
 
     case "module": {
-      // 1. Null out ontology_competency_questions.module_id
-      await tx
-        .update(ontologyCompetencyQuestions)
-        .set({ module_id: null })
-        .where(
-          and(
-            eq(ontologyCompetencyQuestions.ontology_id, ontologyId),
-            eq(ontologyCompetencyQuestions.module_id, deletedKey)
+      const cqIds = await getScopedCqIds(tx, ontologyId)
+      if (cqIds.length > 0) {
+        // 1. Null out ontology_competency_questions.module_id
+        await tx
+          .update(ontologyCompetencyQuestions)
+          .set({ module_id: null })
+          .where(
+            and(
+              eq(ontologyCompetencyQuestions.ontology_id, ontologyId),
+              eq(ontologyCompetencyQuestions.module_id, deletedKey)
+            )
           )
-        )
 
-      // 2. Delete ontology_competency_question_modules
-      await tx
-        .delete(ontologyCompetencyQuestionModules)
-        .where(eq(ontologyCompetencyQuestionModules.module_id, deletedKey))
+        // 2. Delete ontology_competency_question_modules (scoped to this ontology's CQs)
+        await tx
+          .delete(ontologyCompetencyQuestionModules)
+          .where(
+            and(
+              inArray(ontologyCompetencyQuestionModules.cq_id, cqIds),
+              eq(ontologyCompetencyQuestionModules.module_id, deletedKey)
+            )
+          )
+      }
       break
     }
   }

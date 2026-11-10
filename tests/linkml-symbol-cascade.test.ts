@@ -18,6 +18,11 @@ import {
 } from "../src/features/ontology/server/linkml/document-store"
 import { snapshotToLinkmlYaml } from "../src/features/ontology/server/linkml/ast-mapper"
 
+function getTableName(table: unknown): string {
+  const obj = table as { [key: symbol]: string; _?: { name?: string } }
+  return obj[Symbol.for("drizzle:Name")] || obj._?.name || ""
+}
+
 describe("diffLinkmlSnapshots AST Diff Engine", () => {
   it("detects renamed class (oldKey: Person, newKey: Individual) and deleted class (Component)", () => {
     const before: CanonicalOntologySnapshot = {
@@ -125,6 +130,64 @@ describe("diffLinkmlSnapshots AST Diff Engine", () => {
 
     assert.equal(diff.deletedClasses.length, 1)
     assert.equal(diff.deletedClasses[0], "Component")
+  })
+
+  it("detects deleting 1 class and adding 1 unrelated class as DELETE + ADD, NOT a rename", () => {
+    const before: CanonicalOntologySnapshot = {
+      document: { id: "ont-1", name: "Test" },
+      modules: [],
+      classes: [
+        {
+          id: "Invoice",
+          name: "Invoice",
+          description: "Billing document",
+        },
+      ],
+      attributes: [
+        {
+          id: "Invoice.amount",
+          class_id: "Invoice",
+          name: "amount",
+          data_type: "xsd:decimal",
+        },
+      ],
+      relations: [],
+      relation_attributes: [],
+    }
+
+    const after: CanonicalOntologySnapshot = {
+      document: { id: "ont-1", name: "Test" },
+      modules: [],
+      classes: [
+        {
+          id: "Vehicle",
+          name: "Vehicle",
+          description: "Motorized transport",
+        },
+      ],
+      attributes: [
+        {
+          id: "Vehicle.vin",
+          class_id: "Vehicle",
+          name: "vin",
+          data_type: "xsd:string",
+        },
+      ],
+      relations: [],
+      relation_attributes: [],
+    }
+
+    const diff = diffLinkmlSnapshots(before, after)
+
+    assert.equal(
+      diff.renamedClasses.length,
+      0,
+      "Must NOT detect unrelated class as rename"
+    )
+    assert.equal(diff.deletedClasses.length, 1)
+    assert.equal(diff.deletedClasses[0], "Invoice")
+    assert.equal(diff.addedClasses.length, 1)
+    assert.equal(diff.addedClasses[0], "Vehicle")
   })
 
   it("detects renamed relation (works_for -> employed_by)", () => {
@@ -340,11 +403,6 @@ describe("cascadeSymbolRename", () => {
     }
   }
 
-  function getTableName(table: unknown): string {
-    const obj = table as { [key: symbol]: string; _?: { name?: string } }
-    return obj[Symbol.for("drizzle:Name")] || obj._?.name || ""
-  }
-
   function createMockTx(
     store: ReturnType<typeof createMockStore>
   ): DbTransaction {
@@ -357,6 +415,14 @@ describe("cascadeSymbolRename", () => {
               return Promise.resolve(
                 store.extractionRuns.map((r) => ({ id: r.id }))
               )
+            }
+            if (tableName === "document_entities") {
+              return Promise.resolve(
+                store.documentEntities.map((e) => ({ id: e.id }))
+              )
+            }
+            if (tableName === "facts") {
+              return Promise.resolve(store.facts.map((f) => ({ id: f.id })))
             }
             if (tableName === "ontology_competency_questions") {
               return Promise.resolve(
@@ -547,19 +613,32 @@ describe("cascadeSymbolDelete", () => {
 
     const mockTx: DbTransaction = {
       select: () => ({
-        from: () => ({
-          where: () => Promise.resolve([{ id: "run-1" }]),
+        from: (table: unknown) => ({
+          where: () => {
+            const tableName = getTableName(table)
+            if (tableName === "extraction_runs") {
+              return Promise.resolve(
+                store.extractionRuns.map((r) => ({ id: r.id }))
+              )
+            }
+            if (tableName === "document_entities") {
+              return Promise.resolve(
+                store.documentEntities.map((e) => ({ id: e.id }))
+              )
+            }
+            if (tableName === "ontology_competency_questions") {
+              return Promise.resolve(
+                store.ontologyCompetencyQuestions.map((q) => ({ id: q.id }))
+              )
+            }
+            return Promise.resolve([])
+          },
         }),
       }),
       update: (table: unknown) => ({
         set: (values: Record<string, unknown>) => ({
           where: () => {
-            const obj = table as {
-              [key: symbol]: string
-              _?: { name?: string }
-            }
-            const tableName =
-              obj[Symbol.for("drizzle:Name")] || obj._?.name || ""
+            const tableName = getTableName(table)
             if (tableName === "document_entities") {
               store.documentEntities[0].class_id =
                 (values.class_id as string | null) ?? null
@@ -580,11 +659,7 @@ describe("cascadeSymbolDelete", () => {
       }),
       delete: (table: unknown) => ({
         where: () => {
-          const obj = table as {
-            [key: symbol]: string
-            _?: { name?: string }
-          }
-          const tableName = obj[Symbol.for("drizzle:Name")] || obj._?.name || ""
+          const tableName = getTableName(table)
           if (tableName === "entity_attribute_values") {
             store.entityAttributeValues = []
           }
@@ -607,6 +682,7 @@ describe("cascadeSymbolDelete", () => {
         { id: "fact-1", relation_type_id: "works_for" },
         { id: "fact-2", relation_type_id: "other_rel" },
       ],
+      factRelationAttributeValues: [],
       ontologyCompetencyQuestions: [
         {
           id: "cq-1",
@@ -626,19 +702,30 @@ describe("cascadeSymbolDelete", () => {
 
     const mockTx: DbTransaction = {
       select: () => ({
-        from: () => ({
-          where: () => Promise.resolve([{ id: "cq-1" }]),
+        from: (table: unknown) => ({
+          where: () => {
+            const tableName = getTableName(table)
+            if (tableName === "extraction_runs") {
+              return Promise.resolve(
+                store.extractionRuns.map((r) => ({ id: r.id }))
+              )
+            }
+            if (tableName === "facts") {
+              return Promise.resolve(store.facts.map((f) => ({ id: f.id })))
+            }
+            if (tableName === "ontology_competency_questions") {
+              return Promise.resolve(
+                store.ontologyCompetencyQuestions.map((q) => ({ id: q.id }))
+              )
+            }
+            return Promise.resolve([])
+          },
         }),
       }),
       update: (table: unknown) => ({
         set: (values: Record<string, unknown>) => ({
           where: () => {
-            const obj = table as {
-              [key: symbol]: string
-              _?: { name?: string }
-            }
-            const tableName =
-              obj[Symbol.for("drizzle:Name")] || obj._?.name || ""
+            const tableName = getTableName(table)
             if (tableName === "ontology_competency_questions") {
               if ("predicate_relation_id" in values) {
                 store.ontologyCompetencyQuestions[0].predicate_relation_id =
@@ -654,11 +741,14 @@ describe("cascadeSymbolDelete", () => {
           },
         }),
       }),
-      delete: () => ({
+      delete: (table: unknown) => ({
         where: () => {
-          store.facts = store.facts.filter(
-            (f) => f.relation_type_id !== "works_for"
-          )
+          const tableName = getTableName(table)
+          if (tableName === "facts") {
+            store.facts = store.facts.filter(
+              (f) => f.relation_type_id !== "works_for"
+            )
+          }
           return Promise.resolve()
         },
       }),
@@ -673,6 +763,132 @@ describe("cascadeSymbolDelete", () => {
       null
     )
     assert.equal(store.ontologyCqTriples[0].predicate_relation_id, null)
+  })
+})
+
+describe("Multi-Ontology Scoping & Data Isolation", () => {
+  it("operations on an ontology with 0 extraction runs or CQs do NOT mutate or delete records of other ontologies", async () => {
+    const otherStore = {
+      documentEntities: [
+        { id: "ent-2", class_id: "Person", extraction_run_id: "run-2" },
+      ],
+      entityAttributeValues: [
+        {
+          id: "eav-2",
+          entity_id: "ent-2",
+          attribute_id: "Person.age",
+          value: "25",
+        },
+      ],
+      facts: [
+        {
+          id: "fact-2",
+          relation_type_id: "works_for",
+          extraction_run_id: "run-2",
+        },
+      ],
+      factRelationAttributeValues: [
+        {
+          id: "frav-2",
+          fact_id: "fact-2",
+          relation_attribute_id: "works_for.since",
+          value: "2021",
+        },
+      ],
+      ontologyCompetencyQuestions: [
+        {
+          id: "cq-2",
+          ontology_id: "ont-2",
+          module_id: "Core",
+          subject_class_id: "Person",
+          predicate_relation_id: "works_for",
+          object_class_id: "Organization",
+        },
+      ],
+      ontologyCqTriples: [
+        {
+          id: "trip-2",
+          cq_id: "cq-2",
+          subject_class_id: "Person",
+          predicate_relation_id: "works_for",
+          object_class_id: "Organization",
+        },
+      ],
+      ontologyCompetencyQuestionModules: [{ cq_id: "cq-2", module_id: "Core" }],
+      extractionRuns: [{ id: "run-2", ontology_id: "ont-2" }],
+    }
+
+    // MockTx queries scoped to ont-1: returns 0 runs and 0 CQs for ont-1
+    const mockTx: DbTransaction = {
+      select: () => ({
+        from: (table: unknown) => ({
+          where: () => {
+            const tableName = getTableName(table)
+            if (tableName === "extraction_runs") {
+              return Promise.resolve([])
+            }
+            if (tableName === "ontology_competency_questions") {
+              return Promise.resolve([])
+            }
+            if (tableName === "document_entities") {
+              return Promise.resolve([])
+            }
+            if (tableName === "facts") {
+              return Promise.resolve([])
+            }
+            return Promise.resolve([])
+          },
+        }),
+      }),
+      update: () => ({
+        set: () => ({
+          where: () => {
+            assert.fail(
+              "Should not execute update for ontology with 0 runs/CQs"
+            )
+          },
+        }),
+      }),
+      delete: () => ({
+        where: () => {
+          assert.fail("Should not execute delete for ontology with 0 runs/CQs")
+        },
+      }),
+    }
+
+    // Attempt renames on ont-1 (with 0 runs and 0 CQs)
+    await cascadeSymbolRename(mockTx, "ont-1", "class", "Person", "Individual")
+    await cascadeSymbolRename(
+      mockTx,
+      "ont-1",
+      "relation",
+      "works_for",
+      "employed_by"
+    )
+    await cascadeSymbolRename(
+      mockTx,
+      "ont-1",
+      "attribute",
+      "Person.age",
+      "Person.years_old"
+    )
+    await cascadeSymbolRename(mockTx, "ont-1", "module", "Core", "BaseDomain")
+
+    // Attempt deletes on ont-1
+    await cascadeSymbolDelete(mockTx, "ont-1", "class", "Person")
+    await cascadeSymbolDelete(mockTx, "ont-1", "relation", "works_for")
+    await cascadeSymbolDelete(mockTx, "ont-1", "attribute", "Person.age")
+    await cascadeSymbolDelete(mockTx, "ont-1", "module", "Core")
+
+    // Verify other ontology's data is 100% untouched
+    assert.equal(otherStore.documentEntities[0].class_id, "Person")
+    assert.equal(otherStore.entityAttributeValues[0].attribute_id, "Person.age")
+    assert.equal(otherStore.facts[0].relation_type_id, "works_for")
+    assert.equal(
+      otherStore.ontologyCompetencyQuestions[0].subject_class_id,
+      "Person"
+    )
+    assert.equal(otherStore.ontologyCqTriples[0].subject_class_id, "Person")
   })
 })
 
@@ -787,28 +1003,28 @@ classes:
         return cb(mockDb)
       },
       select: () => ({
-        from: () => ({
-          where: () =>
-            Promise.resolve([
-              {
-                id: "ont-1",
-                name: "OrgModel",
-                version: "1.0.0",
-                linkml_yaml: initialYaml,
-                ui_layout: initialSnapshot.ui_layout,
-              },
-            ]),
+        from: (table: unknown) => ({
+          where: () => {
+            const tableName = getTableName(table)
+            if (tableName === "ontology_documents") {
+              return Promise.resolve([
+                {
+                  id: "ont-1",
+                  name: "OrgModel",
+                  version: "1.0.0",
+                  linkml_yaml: initialYaml,
+                  ui_layout: initialSnapshot.ui_layout,
+                },
+              ])
+            }
+            return Promise.resolve([])
+          },
         }),
       }),
       update: (table: unknown) => ({
         set: (values: Record<string, unknown>) => ({
           where: () => {
-            const obj = table as {
-              [key: symbol]: string
-              _?: { name?: string }
-            }
-            const tableName =
-              obj[Symbol.for("drizzle:Name")] || obj._?.name || ""
+            const tableName = getTableName(table)
             if (tableName === "ontology_documents") {
               savedRow = values
             }
@@ -850,5 +1066,74 @@ classes:
       (savedRow as Record<string, unknown>).compiled_artifacts !== undefined,
       "Must populate compiled_artifacts"
     )
+  })
+
+  it("saveCanonicalOntology handles mutator returning a replacement draft", async () => {
+    let savedRow: Record<string, unknown> | null = null
+
+    const initialSnapshot: CanonicalOntologySnapshot = {
+      document: { id: "ont-1", name: "OrgModel" },
+      modules: [{ id: "Core", name: "Core" }],
+      classes: [{ id: "Person", name: "Person" }],
+      attributes: [],
+      relations: [],
+      relation_attributes: [],
+    }
+    const initialYaml = snapshotToLinkmlYaml(initialSnapshot)
+
+    const mockDb: DbClient = {
+      transaction: async <T>(cb: (tx: DbTransaction) => Promise<T>) => {
+        return cb(mockDb)
+      },
+      select: () => ({
+        from: (table: unknown) => ({
+          where: () => {
+            const tableName = getTableName(table)
+            if (tableName === "ontology_documents") {
+              return Promise.resolve([
+                {
+                  id: "ont-1",
+                  name: "OrgModel",
+                  version: "1.0.0",
+                  linkml_yaml: initialYaml,
+                  ui_layout: { classPositions: {}, moduleLayouts: {} },
+                },
+              ])
+            }
+            return Promise.resolve([])
+          },
+        }),
+      }),
+      update: (table: unknown) => ({
+        set: (values: Record<string, unknown>) => ({
+          where: () => {
+            const tableName = getTableName(table)
+            if (tableName === "ontology_documents") {
+              savedRow = values
+            }
+            return Promise.resolve()
+          },
+        }),
+      }),
+      delete: () => ({
+        where: () => Promise.resolve(),
+      }),
+    }
+
+    const updated = await saveCanonicalOntology(
+      "ont-1",
+      (draft) => {
+        return {
+          ...draft,
+          classes: [{ id: "Human", name: "Human" }],
+        }
+      },
+      { db: mockDb }
+    )
+
+    assert.equal(updated.classes[0].id, "Human")
+    assert.ok(savedRow, "Must save updated row")
+    const yaml = (savedRow as unknown as Record<string, unknown>).linkml_yaml
+    assert.ok(typeof yaml === "string" && yaml.includes("Human:"))
   })
 })

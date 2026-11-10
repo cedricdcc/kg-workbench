@@ -8,6 +8,8 @@ import {
   cascadeSymbolRename,
   diffLinkmlSnapshots,
   type DbTransaction,
+  type DiffLinkmlOptions,
+  type SymbolKind,
 } from "./symbol-cascade"
 import type {
   CanonicalOntologySnapshot,
@@ -21,6 +23,21 @@ export interface DbClient extends DbTransaction {
 export interface SaveCanonicalOntologyOptions {
   recompile?: boolean
   db?: DbClient
+  diffOptions?: DiffLinkmlOptions
+}
+
+const RENAME_ORDER: Record<SymbolKind, number> = {
+  attribute: 1,
+  relation: 2,
+  class: 3,
+  module: 4,
+}
+
+const DELETE_ORDER: Record<SymbolKind, number> = {
+  attribute: 1,
+  relation: 2,
+  class: 3,
+  module: 4,
 }
 
 /**
@@ -89,7 +106,12 @@ export async function loadCanonicalOntology(
  */
 export async function saveCanonicalOntology(
   ontologyId: string,
-  mutator: (draft: CanonicalOntologySnapshot) => void | Promise<void>,
+  mutator: (
+    draft: CanonicalOntologySnapshot
+  ) =>
+    | void
+    | CanonicalOntologySnapshot
+    | Promise<void | CanonicalOntologySnapshot>,
   options?: SaveCanonicalOntologyOptions
 ): Promise<CanonicalOntologySnapshot> {
   const database = (options?.db ?? getDb()) as unknown as DbClient
@@ -98,13 +120,19 @@ export async function saveCanonicalOntology(
     tx: DbTransaction
   ): Promise<CanonicalOntologySnapshot> => {
     const before = await loadCanonicalOntology(ontologyId, tx as DbClient)
-    const draft: CanonicalOntologySnapshot = structuredClone(before)
-    await mutator(draft)
+    let draft: CanonicalOntologySnapshot = structuredClone(before)
+    const mutated = await mutator(draft)
+    if (mutated) {
+      draft = mutated
+    }
 
-    const diff = diffLinkmlSnapshots(before, draft)
+    const diff = diffLinkmlSnapshots(before, draft, options?.diffOptions)
 
-    // Run cascade renames
-    for (const rename of diff.renames) {
+    // Run cascade renames in deterministic dependency order: attributes first, then relations, classes, modules
+    const sortedRenames = [...diff.renames].sort(
+      (a, b) => (RENAME_ORDER[a.kind] ?? 99) - (RENAME_ORDER[b.kind] ?? 99)
+    )
+    for (const rename of sortedRenames) {
       await cascadeSymbolRename(
         tx,
         ontologyId,
@@ -114,8 +142,11 @@ export async function saveCanonicalOntology(
       )
     }
 
-    // Run cascade deletions
-    for (const deletion of diff.deletions) {
+    // Run cascade deletions in deterministic dependency order: attributes first, then relations, classes, modules
+    const sortedDeletions = [...diff.deletions].sort(
+      (a, b) => (DELETE_ORDER[a.kind] ?? 99) - (DELETE_ORDER[b.kind] ?? 99)
+    )
+    for (const deletion of sortedDeletions) {
       await cascadeSymbolDelete(tx, ontologyId, deletion.kind, deletion.key)
     }
 
