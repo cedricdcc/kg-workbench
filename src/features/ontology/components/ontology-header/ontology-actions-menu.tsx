@@ -4,6 +4,7 @@ import { type ChangeEvent, type RefObject } from "react"
 import {
   BookMarked,
   ChevronDown,
+  Code2,
   Download,
   FileCode,
   FileJson,
@@ -41,6 +42,7 @@ export interface OntologyActionsMenuProps {
   onProfileTabular?: () => void
   onOpenOntologyDetails: () => void
   onOpenVocabularies: () => void
+  onOpenCompilerStudio?: () => void
   onDelete: () => void
   onFileChange: (e: ChangeEvent<HTMLInputElement>) => void
   onTurtleFileChange?: (e: ChangeEvent<HTMLInputElement>) => void
@@ -62,6 +64,7 @@ export function OntologyActionsMenu({
   onProfileTabular,
   onOpenOntologyDetails,
   onOpenVocabularies,
+  onOpenCompilerStudio,
   onDelete,
   onFileChange,
   onTurtleFileChange,
@@ -173,6 +176,15 @@ export function OntologyActionsMenu({
               <BookMarked className="mr-2 h-4 w-4" />
               Reference Vocabularies
             </DropdownMenuItem>
+            {onOpenCompilerStudio && (
+              <DropdownMenuItem
+                disabled={!hasCurrentDocument}
+                onClick={onOpenCompilerStudio}
+              >
+                <Code2 className="mr-2 h-4 w-4 text-primary" />
+                LinkML &amp; Code Compiler Studio...
+              </DropdownMenuItem>
+            )}
             <DropdownMenuItem
               className="text-muted-foreground focus:text-foreground"
               onClick={onOpenImportFormat}

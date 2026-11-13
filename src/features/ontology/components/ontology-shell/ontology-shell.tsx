@@ -71,6 +71,7 @@ import type {
   ArchivedDatasetSource,
 } from "@/features/tabular/types"
 import { ReferenceVocabulariesDialog } from "../reference-vocabularies-dialog/reference-vocabularies-dialog"
+import { CompilerStudioDialog } from "../compiler-studio-dialog/compiler-studio-dialog"
 import {
   runOntologyLinter,
   type OntologyDefect,
@@ -169,6 +170,7 @@ export function OntologyShell({
   const [selectedReferenceTerm, setSelectedReferenceTerm] =
     useState<SelectedReferenceTerm | null>(null)
   const [referenceDialogOpen, setReferenceDialogOpen] = useState(false)
+  const [compilerStudioOpen, setCompilerStudioOpen] = useState(false)
 
   const { data: referenceVocabularies = [] } = useQuery({
     queryKey: ["reference-ontologies"],
@@ -732,6 +734,7 @@ export function OntologyShell({
         cqCount={cqs.length}
         onOpenOntologyDetails={() => openOntologyDetails("overview")}
         onOpenVocabularies={() => setReferenceDialogOpen(true)}
+        onOpenCompilerStudio={() => setCompilerStudioOpen(true)}
         issuesCounts={issuesCounts}
         onOpenIssuesSheet={() => setIssuesSheetOpen(true)}
       />
@@ -928,6 +931,13 @@ export function OntologyShell({
       <ReferenceVocabulariesDialog
         open={referenceDialogOpen}
         onOpenChange={setReferenceDialogOpen}
+      />
+
+      <CompilerStudioDialog
+        open={compilerStudioOpen}
+        onOpenChange={setCompilerStudioOpen}
+        ontologyId={currentDocument.id}
+        ontologyName={currentDocument.name}
       />
 
       <OntologyIssuesSheet
