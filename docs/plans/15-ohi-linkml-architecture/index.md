@@ -25,10 +25,10 @@ The work is divided into **5 self-contained, sequentially executable phases** so
   - Slice 3.2: Implement transactional symbol cascade service (`cascadeSymbolRename`, `cascadeSymbolDelete`, `diffLinkmlAstSymbols`) `done`
   - Slice 3.3: Refactor ontology server queries (`src/features/ontology/server/queries/*`) to read from `linkml_yaml` + `ui_layout` `done`
   - Slice 3.4: Refactor ontology & tabular server write actions (`src/features/ontology/server/actions/*`, `commit-dataset-mapping.ts`) `done`
-- [Phase 4 - Workbench UI: LinkML & Code Compiler Studio + `ohi.dev` Dependency Browser](./04-phase-4-workbench-ui-and-compiler-studio.md) `open`
-  - Slice 4.1: Build `/src/features/ontology/components/compiler-studio-dialog` (SHACL, RDFS, OWL, Pydantic `.py`, LinkML YAML, `ohi.lock.json`) `open`
-  - Slice 4.2: Build `/src/features/ontology/components/standards-browser` for `ohi.dev` package search, transitive tree & SHA-256 lock status `open`
-  - Slice 4.3: Integrate `ohi` lockfile drift & LinkML lint warnings into `/src/features/ontology/components/ontology-issues-sheet` `open`
+- [Phase 4 - Workbench UI: LinkML & Code Compiler Studio + `ohi.dev` Dependency Browser](./04-phase-4-workbench-ui-and-compiler-studio.md) `done`
+  - Slice 4.1: Build `/src/features/ontology/components/compiler-studio-dialog` (SHACL, RDFS, OWL, Pydantic `.py`, LinkML YAML, `ohi.lock.json`) `done`
+  - Slice 4.2: Build `/src/features/ontology/components/standards-browser` for `ohi.dev` package search, transitive tree & SHA-256 lock status `done`
+  - Slice 4.3: Integrate `ohi` lockfile drift & LinkML lint warnings into `/src/features/ontology/components/ontology-issues-sheet` `done`
 - [Phase 5 - Pydantic-Guided Extraction, RDFS/SHACL Validation & W3C `PROV-O` Bundle Export](./05-phase-5-pydantic-shacl-rdfs-extraction-and-provo.md) `open`
   - Slice 5.1: Pass compiled `pydantic_code`, `json_schema`, `shacl_ttl`, `rdfs_ttl`, and `ohi_lockfile` in extraction jobs `open`
   - Slice 5.2: Dynamic Pydantic v2 model loader & structured multi-provider LLM extraction in `services/internal-extractor` `open`
