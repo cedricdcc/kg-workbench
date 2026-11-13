@@ -50,6 +50,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { getReferenceOntologies } from "@/features/ontology/server/queries/reference-vocabularies"
 import { ReferenceBrowser } from "../reference-browser/reference-browser"
+import { StandardsBrowser } from "../standards-browser/standards-browser"
 import {
   ReferenceTermDetail,
   type SelectedReferenceTerm,
@@ -816,6 +817,12 @@ export function OntologyShell({
                       setSelectedReferenceTerm(term)
                       setIsDetailCollapsed(false)
                     }}
+                  />
+                }
+                standardsBrowser={
+                  <StandardsBrowser
+                    ontologyId={currentDocument.id}
+                    onOpenManage={() => setReferenceDialogOpen(true)}
                   />
                 }
                 reasonerBrowser={
