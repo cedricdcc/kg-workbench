@@ -410,7 +410,11 @@ export function OntologyShell({
   async function handleQuickFix(defect: OntologyDefect) {
     try {
       if (defect.quickFixType === "clear_parent") {
-        await updateClass(defect.targetId, { parentClassId: null })
+        await updateClass(
+          defect.targetId,
+          { parentClassId: null },
+          currentDocument.id
+        )
         toast.success(`Cleared parent link on "${defect.targetName}"`)
         router.refresh()
         queryClient.invalidateQueries({
@@ -420,7 +424,7 @@ export function OntologyShell({
           queryKey: ["ontology-defect-suppressions", currentDocument.id],
         })
       } else if (defect.quickFixType === "delete_relation") {
-        await deleteRelation(defect.targetId)
+        await deleteRelation(defect.targetId, currentDocument.id)
         if (selectedEntityId === defect.targetId) {
           setSelectedEntityId(null)
           setSelectedEntityKind(null)

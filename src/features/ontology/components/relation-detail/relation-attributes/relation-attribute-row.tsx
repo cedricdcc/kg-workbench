@@ -32,11 +32,13 @@ import {
 } from "@/features/ontology/utils/data-types"
 
 interface RelationAttributeRowProps {
+  ontologyId: string
   attribute: OntologyRelationAttribute
   onOpenMetadata: (attribute: OntologyRelationAttribute) => void
 }
 
 export function RelationAttributeRow({
+  ontologyId,
   attribute,
   onOpenMetadata,
 }: RelationAttributeRowProps) {
@@ -52,12 +54,16 @@ export function RelationAttributeRow({
   function handleSave() {
     setEditing(false)
     startTransition(async () => {
-      await updateRelationAttribute(attribute.id, {
-        name: draft.name,
-        dataType: draft.dataType,
-        required: draft.required,
-        description: draft.description,
-      })
+      await updateRelationAttribute(
+        attribute.id,
+        {
+          name: draft.name,
+          dataType: draft.dataType,
+          required: draft.required,
+          description: draft.description,
+        },
+        ontologyId
+      )
     })
   }
 
@@ -73,7 +79,7 @@ export function RelationAttributeRow({
 
   function handleDelete() {
     startTransition(async () => {
-      await deleteRelationAttribute(attribute.id)
+      await deleteRelationAttribute(attribute.id, ontologyId)
     })
   }
 

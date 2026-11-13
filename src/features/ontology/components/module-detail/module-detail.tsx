@@ -78,7 +78,8 @@ export function ModuleDetail({
                 name: "name",
                 label: "Name",
                 canonicalValue: module.name,
-                onSaveCanonical: (name) => updateModule(module.id, { name }),
+                onSaveCanonical: (name) =>
+                  updateModule(module.id, { name }, ontologyId),
               },
               {
                 name: "description",
@@ -87,7 +88,7 @@ export function ModuleDetail({
                 multiline: true,
                 placeholder: "No description",
                 onSaveCanonical: (description) =>
-                  updateModule(module.id, { description }),
+                  updateModule(module.id, { description }, ontologyId),
               },
             ]}
           />

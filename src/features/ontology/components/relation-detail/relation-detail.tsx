@@ -80,21 +80,25 @@ export function RelationDetail({
 
   function handleDomainChange(classId: string) {
     startTransition(async () => {
-      await updateRelation(relation.id, { domainClassId: classId })
+      await updateRelation(relation.id, { domainClassId: classId }, ontologyId)
     })
   }
 
   function handleRangeChange(classId: string) {
     startTransition(async () => {
-      await updateRelation(relation.id, { rangeClassId: classId })
+      await updateRelation(relation.id, { rangeClassId: classId }, ontologyId)
     })
   }
 
   function handleCardinalityChange(value: string) {
     startTransition(async () => {
-      await updateRelation(relation.id, {
-        cardinality: value === "__none__" ? null : value,
-      })
+      await updateRelation(
+        relation.id,
+        {
+          cardinality: value === "__none__" ? null : value,
+        },
+        ontologyId
+      )
     })
   }
 
@@ -191,7 +195,7 @@ export function RelationDetail({
                   label: "Name",
                   canonicalValue: relation.name,
                   onSaveCanonical: (name) =>
-                    updateRelation(relation.id, { name }),
+                    updateRelation(relation.id, { name }, ontologyId),
                 },
                 {
                   name: "description",
@@ -200,7 +204,7 @@ export function RelationDetail({
                   multiline: true,
                   placeholder: "No description",
                   onSaveCanonical: (description) =>
-                    updateRelation(relation.id, { description }),
+                    updateRelation(relation.id, { description }, ontologyId),
                 },
                 {
                   name: "inverseName",
@@ -208,9 +212,13 @@ export function RelationDetail({
                   canonicalValue: relation.inverse_name ?? "",
                   placeholder: "No inverse name",
                   onSaveCanonical: (inverseName) =>
-                    updateRelation(relation.id, {
-                      inverseName: inverseName || null,
-                    }),
+                    updateRelation(
+                      relation.id,
+                      {
+                        inverseName: inverseName || null,
+                      },
+                      ontologyId
+                    ),
                 },
               ]}
             />
@@ -247,7 +255,11 @@ export function RelationDetail({
             instanceCandidateLabel="Allowed predicate"
             candidatePluralLabel="allowed predicates"
             onInstancePolicyChange={(nextPolicy) =>
-              updateRelation(relation.id, { instancePolicy: nextPolicy })
+              updateRelation(
+                relation.id,
+                { instancePolicy: nextPolicy },
+                ontologyId
+              )
             }
           />
         </TabsContent>
@@ -284,7 +296,7 @@ export function RelationDetail({
           ontologyId,
         }}
         onConfirmDelete={async () => {
-          await deleteRelation(relation.id)
+          await deleteRelation(relation.id, ontologyId)
         }}
       />
     </>

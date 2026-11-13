@@ -103,19 +103,27 @@ export function SemanticAlignmentsCard({
     try {
       const newName = candidate.curie || candidate.label
       if (entityType === "class") {
-        await updateClass(entityId, {
-          name: newName,
-          ...(candidate.description
-            ? { description: candidate.description }
-            : {}),
-        })
+        await updateClass(
+          entityId,
+          {
+            name: newName,
+            ...(candidate.description
+              ? { description: candidate.description }
+              : {}),
+          },
+          ontologyId
+        )
       } else {
-        await updateRelation(entityId, {
-          name: newName,
-          ...(candidate.description
-            ? { description: candidate.description }
-            : {}),
-        })
+        await updateRelation(
+          entityId,
+          {
+            name: newName,
+            ...(candidate.description
+              ? { description: candidate.description }
+              : {}),
+          },
+          ontologyId
+        )
       }
       toast.success(`Adopted standard term "${candidate.curie}"`)
       await queryClient.invalidateQueries()

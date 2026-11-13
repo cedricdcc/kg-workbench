@@ -56,8 +56,12 @@ export function AttributeMetadataSheet({
                     canonicalValue: attribute.name,
                     onSaveCanonical: (name) =>
                       target.type === "attribute"
-                        ? updateAttribute(attribute.id, { name })
-                        : updateRelationAttribute(attribute.id, { name }),
+                        ? updateAttribute(attribute.id, { name }, ontologyId)
+                        : updateRelationAttribute(
+                            attribute.id,
+                            { name },
+                            ontologyId
+                          ),
                   },
                   {
                     name: "description",
@@ -67,10 +71,18 @@ export function AttributeMetadataSheet({
                     placeholder: "No description",
                     onSaveCanonical: (description) =>
                       target.type === "attribute"
-                        ? updateAttribute(attribute.id, { description })
-                        : updateRelationAttribute(attribute.id, {
-                            description,
-                          }),
+                        ? updateAttribute(
+                            attribute.id,
+                            { description },
+                            ontologyId
+                          )
+                        : updateRelationAttribute(
+                            attribute.id,
+                            {
+                              description,
+                            },
+                            ontologyId
+                          ),
                   },
                 ]}
               />

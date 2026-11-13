@@ -145,7 +145,8 @@ export function ClassDetail({
                   name: "name",
                   label: "Name",
                   canonicalValue: cls.name,
-                  onSaveCanonical: (name) => updateClass(cls.id, { name }),
+                  onSaveCanonical: (name) =>
+                    updateClass(cls.id, { name }, ontologyId),
                 },
                 {
                   name: "description",
@@ -154,7 +155,7 @@ export function ClassDetail({
                   multiline: true,
                   placeholder: "No description",
                   onSaveCanonical: (description) =>
-                    updateClass(cls.id, { description }),
+                    updateClass(cls.id, { description }, ontologyId),
                 },
               ]}
             />
@@ -189,7 +190,7 @@ export function ClassDetail({
             instanceCandidateLabel="Allowed instance"
             candidatePluralLabel="allowed instances"
             onInstancePolicyChange={(nextPolicy) =>
-              updateClass(cls.id, { instancePolicy: nextPolicy })
+              updateClass(cls.id, { instancePolicy: nextPolicy }, ontologyId)
             }
           />
         </TabsContent>
@@ -238,7 +239,7 @@ export function ClassDetail({
           ontologyId,
         }}
         onConfirmDelete={async () => {
-          await deleteClass(cls.id)
+          await deleteClass(cls.id, ontologyId)
         }}
       />
     </>

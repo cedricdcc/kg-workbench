@@ -72,13 +72,17 @@ export function RelationAttributes({
         -1
       ) + 1
     startTransition(async () => {
-      await createRelationAttribute(relationId, {
-        name: draft.name.trim(),
-        dataType: draft.dataType,
-        required: draft.required,
-        description: draft.description.trim(),
-        sortOrder: nextSortOrder,
-      })
+      await createRelationAttribute(
+        relationId,
+        {
+          name: draft.name.trim(),
+          dataType: draft.dataType,
+          required: draft.required,
+          description: draft.description.trim(),
+          sortOrder: nextSortOrder,
+        },
+        ontologyId
+      )
       setDraft({
         name: "",
         dataType: DEFAULT_ONTOLOGY_DATA_TYPE,
@@ -120,6 +124,7 @@ export function RelationAttributes({
           {attributes.map((attribute) => (
             <RelationAttributeRow
               key={attribute.id}
+              ontologyId={ontologyId}
               attribute={attribute}
               onOpenMetadata={setMetadataAttribute}
             />

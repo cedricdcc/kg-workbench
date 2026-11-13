@@ -74,12 +74,16 @@ export function AttributeTable({
   function handleAdd() {
     if (!draft.name.trim()) return
     startTransition(async () => {
-      await addAttribute(classId, {
-        name: draft.name.trim(),
-        dataType: draft.dataType,
-        required: draft.required,
-        description: draft.description.trim(),
-      })
+      await addAttribute(
+        classId,
+        {
+          name: draft.name.trim(),
+          dataType: draft.dataType,
+          required: draft.required,
+          description: draft.description.trim(),
+        },
+        ontologyId
+      )
       setDraft({
         name: "",
         dataType: DEFAULT_ONTOLOGY_DATA_TYPE,
@@ -119,6 +123,7 @@ export function AttributeTable({
           {attributes.map((attr) => (
             <AttributeRow
               key={attr.id}
+              ontologyId={ontologyId}
               attribute={attr}
               onOpenMetadata={setMetadataAttribute}
             />

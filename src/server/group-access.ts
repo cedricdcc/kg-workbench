@@ -116,15 +116,56 @@ export async function assertDocumentAccess(
   return documentId
 }
 
+const UUID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+function isUuid(value: string): boolean {
+  return UUID_REGEX.test(value.trim())
+}
+
+function doesOntologyDocMatchSymbol(
+  row: { linkml_yaml: string | null; ui_layout: unknown },
+  symbolId: string
+): boolean {
+  if (row.linkml_yaml) {
+    if (row.linkml_yaml.includes(symbolId)) {
+      return true
+    }
+    const dotIndex = symbolId.indexOf(".")
+    if (dotIndex > 0) {
+      const parentKey = symbolId.slice(0, dotIndex)
+      const memberKey = symbolId.slice(dotIndex + 1)
+      if (
+        parentKey &&
+        memberKey &&
+        row.linkml_yaml.includes(parentKey) &&
+        row.linkml_yaml.includes(memberKey)
+      ) {
+        return true
+      }
+    }
+  }
+  if (row.ui_layout) {
+    const layoutStr = JSON.stringify(row.ui_layout)
+    if (layoutStr.includes(symbolId)) {
+      return true
+    }
+  }
+  return false
+}
+
 async function resolveOntologyIdForRecord(
   recordType: OntologyScopedRecord,
   id: string,
   db: ServerDb
 ): Promise<string | null> {
   if (recordType === "ontology_documents") {
-    return id
+    return isUuid(id) ? id : null
   }
   if (recordType === "ontology_competency_questions") {
+    if (!isUuid(id)) {
+      return null
+    }
     const [row] = await db
       .select({ ontology_id: ontologyCompetencyQuestions.ontology_id })
       .from(ontologyCompetencyQuestions)
@@ -133,38 +174,36 @@ async function resolveOntologyIdForRecord(
     return row?.ontology_id ?? null
   }
 
-  // Check if id directly matches an ontology document
-  const [directDoc] = await db
-    .select({ id: ontologyDocuments.id })
-    .from(ontologyDocuments)
-    .where(eq(ontologyDocuments.id, id))
-    .limit(1)
-  if (directDoc) {
-    return directDoc.id
+  // Only query PostgreSQL uuid columns when id is a valid UUID; LinkML symbols are strings like "Observatory" or "Observatory.age".
+  if (isUuid(id)) {
+    const [directDoc] = await db
+      .select({ id: ontologyDocuments.id })
+      .from(ontologyDocuments)
+      .where(eq(ontologyDocuments.id, id))
+      .limit(1)
+    if (directDoc) {
+      return directDoc.id
+    }
   }
 
-  // Otherwise, search ontology documents where linkml_yaml or ui_layout contains the symbol key
+  // Otherwise, search ontology documents in the current group where linkml_yaml or ui_layout contains the symbol key.
+  const groupKey = await getCurrentGroupKeyOrThrow()
   const docs = (await db
     .select({
       id: ontologyDocuments.id,
       linkml_yaml: ontologyDocuments.linkml_yaml,
       ui_layout: ontologyDocuments.ui_layout,
     })
-    .from(ontologyDocuments)) as Array<{
+    .from(ontologyDocuments)
+    .where(eq(ontologyDocuments.group_key, groupKey))) as Array<{
     id: string
     linkml_yaml: string | null
     ui_layout: unknown
   }>
 
   for (const row of docs) {
-    if (row.linkml_yaml && row.linkml_yaml.includes(id)) {
+    if (doesOntologyDocMatchSymbol(row, id)) {
       return row.id
-    }
-    if (row.ui_layout) {
-      const layoutStr = JSON.stringify(row.ui_layout)
-      if (layoutStr.includes(id)) {
-        return row.id
-      }
     }
   }
 
@@ -252,14 +291,16 @@ export async function assertOntologyRecordAccess(
   const targetOntologyId =
     ontologyId ?? (await resolveOntologyIdForRecord(recordType, id, db))
   if (!targetOntologyId) {
-    const [doc] = await db
-      .select({ id: ontologyDocuments.id })
-      .from(ontologyDocuments)
-      .where(eq(ontologyDocuments.id, id))
-      .limit(1)
-    if (doc) {
-      await assertOntologyDocumentAccess(doc.id, db)
-      return doc.id
+    if (isUuid(id)) {
+      const [doc] = await db
+        .select({ id: ontologyDocuments.id })
+        .from(ontologyDocuments)
+        .where(eq(ontologyDocuments.id, id))
+        .limit(1)
+      if (doc) {
+        await assertOntologyDocumentAccess(doc.id, db)
+        return doc.id
+      }
     }
     throwAccessDenied(
       "Ontology record is not accessible for the current group."
