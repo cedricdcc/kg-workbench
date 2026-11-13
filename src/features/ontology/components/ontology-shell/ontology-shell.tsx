@@ -82,6 +82,8 @@ import { toggleDefectSuppression } from "@/features/ontology/server/actions/defe
 import { updateClass } from "@/features/ontology/server/actions/classes"
 import { deleteRelation } from "@/features/ontology/server/actions/relations"
 import { runFullOntologyAnalysis } from "@/features/ontology/server/actions/ontology-analysis"
+import { getOntologyDiagnosticsAction } from "@/features/ontology/server/actions/ontology-diagnostics"
+import { syncOhiLockfileAction } from "@/features/ontology/server/actions/ohi-packages"
 import { addReferenceOntology } from "@/features/ontology/server/actions/reference-vocabularies"
 import type { RecommendedVocabulary } from "@/features/ontology/server/services/ontology-analysis/analyze-ontology"
 import { OntologyIssuesSheet } from "../ontology-issues"
@@ -348,14 +350,28 @@ export function OntologyShell({
     enabled: issuesSheetOpen && Boolean(currentDocument.id),
   })
 
+  const { data: diagnosticsData } = useQuery({
+    queryKey: ["ontology-diagnostics", currentDocument.id],
+    queryFn: () => getOntologyDiagnosticsAction(currentDocument.id),
+    enabled: Boolean(currentDocument.id),
+  })
+
   const suppressedSet = useMemo(() => new Set(suppressions), [suppressions])
   const defectsReport = useMemo(() => {
     return runOntologyLinter({
       classes,
       relations,
       suppressedIds: suppressedSet,
+      linkmlLintIssues: diagnosticsData?.lintIssues,
+      ohiLockVerification: diagnosticsData?.lockVerification,
     })
-  }, [classes, relations, suppressedSet])
+  }, [
+    classes,
+    relations,
+    suppressedSet,
+    diagnosticsData?.lintIssues,
+    diagnosticsData?.lockVerification,
+  ])
 
   const issuesCounts = useMemo(
     () => ({
@@ -417,6 +433,24 @@ export function OntologyShell({
         queryClient.invalidateQueries({
           queryKey: ["ontology-defect-suppressions", currentDocument.id],
         })
+      } else if (defect.quickFixType === "ohi_sync") {
+        await syncOhiLockfileAction(currentDocument.id)
+        toast.success("Synchronized ohi.lock.json lockfile")
+        router.refresh()
+        await Promise.all([
+          queryClient.invalidateQueries({
+            queryKey: ["ontology-diagnostics", currentDocument.id],
+          }),
+          queryClient.invalidateQueries({
+            queryKey: ["ohi-packages", currentDocument.id],
+          }),
+          queryClient.invalidateQueries({
+            queryKey: ["ohi-package-state", currentDocument.id],
+          }),
+          queryClient.invalidateQueries({
+            queryKey: ["reference-ontologies"],
+          }),
+        ])
       }
     } catch {
       toast.error("Failed to apply quick fix")
@@ -958,7 +992,7 @@ export function OntologyShell({
         onSelectEntity={(id, kind) => {
           if (kind === "class") {
             handleSelectClass(id)
-          } else {
+          } else if (kind === "relation") {
             handleSelectRelation(id)
           }
         }}
