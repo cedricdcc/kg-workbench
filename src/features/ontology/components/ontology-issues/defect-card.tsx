@@ -19,7 +19,7 @@ export interface DefectCardProps {
   isSuppressed?: boolean
   isSelected?: boolean
   onCardClick?: () => void
-  onSelectEntity: (id: string, kind: "class" | "relation") => void
+  onSelectEntity: (id: string, kind: "class" | "relation" | "ontology") => void
   onSuppress: (defectId: string) => void
   onRestore: (defectId: string) => void
   onQuickFix?: (defect: OntologyDefect) => void
@@ -70,6 +70,22 @@ export function DefectCard({
         </div>
 
         <div className="flex items-center gap-1.5">
+          {defect.source === "linkml" && (
+            <Badge
+              variant="outline"
+              className="px-1.5 py-0 font-mono text-[10px] tracking-wide text-muted-foreground"
+            >
+              LinkML
+            </Badge>
+          )}
+          {defect.source === "ohi" && (
+            <Badge
+              variant="outline"
+              className="px-1.5 py-0 font-mono text-[10px] tracking-wide text-muted-foreground"
+            >
+              ohi.dev
+            </Badge>
+          )}
           {defect.oopsPitfallId && (
             <Badge
               variant="outline"
@@ -107,15 +123,18 @@ export function DefectCard({
 
       <div className="mt-3 flex items-center justify-between border-t pt-2.5">
         <div className="flex items-center gap-1.5">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 gap-1 px-2 text-[11px]"
-            onClick={() => onSelectEntity(defect.targetId, defect.targetType)}
-          >
-            <Eye className="size-3" />
-            View
-          </Button>
+          {(defect.targetType === "class" ||
+            defect.targetType === "relation") && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 gap-1 px-2 text-[11px]"
+              onClick={() => onSelectEntity(defect.targetId, defect.targetType)}
+            >
+              <Eye className="size-3" />
+              View
+            </Button>
+          )}
 
           {defect.quickFixType && onQuickFix && !isSuppressed && (
             <Button

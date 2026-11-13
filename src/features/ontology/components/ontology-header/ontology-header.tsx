@@ -8,6 +8,7 @@ import { CreateOntologyDialog } from "@/features/ontology/components/dialogs/cre
 import { ExportOntologyDialog } from "@/features/ontology/components/export-ontology-dialog/export-ontology-dialog"
 import { ImportFormatDialog } from "@/features/ontology/components/import-format-dialog/import-format-dialog"
 import { ReferenceVocabulariesDialog } from "@/features/ontology/components/reference-vocabularies-dialog/reference-vocabularies-dialog"
+import { CompilerStudioDialog } from "@/features/ontology/components/compiler-studio-dialog/compiler-studio-dialog"
 import { ReasonerReportModal } from "../reasoner-modal/reasoner-report-modal"
 import { useReasonerJob } from "../../hooks/use-reasoner-job"
 import {
@@ -62,6 +63,7 @@ export interface OntologyHeaderProps {
   cqCount?: number
   onOpenOntologyDetails?: () => void
   onOpenVocabularies?: () => void
+  onOpenCompilerStudio?: () => void
   issuesCounts?: IssuesCounts
   onOpenIssuesSheet?: () => void
   defectsReport?: OntologyDefectReport
@@ -82,6 +84,7 @@ export function OntologyHeader({
   cqCount = 0,
   onOpenOntologyDetails,
   onOpenVocabularies,
+  onOpenCompilerStudio,
   issuesCounts,
   onOpenIssuesSheet,
   defectsReport,
@@ -98,6 +101,7 @@ export function OntologyHeader({
   const [exportOpen, setExportOpen] = useState(false)
   const [importFormatOpen, setImportFormatOpen] = useState(false)
   const [vocabulariesOpen, setVocabulariesOpen] = useState(false)
+  const [compilerStudioOpen, setCompilerStudioOpen] = useState(false)
   const [exportMode, setExportMode] = useState<ExportOntologyMode>("json")
   const [isDeleting, setIsDeleting] = useState(false)
   const [reasonerModalOpen, setReasonerModalOpen] = useState(false)
@@ -362,6 +366,14 @@ export function OntologyHeader({
     }
   }
 
+  function handleOpenCompilerStudio() {
+    if (onOpenCompilerStudio) {
+      onOpenCompilerStudio()
+    } else {
+      setCompilerStudioOpen(true)
+    }
+  }
+
   const activeCounts =
     issuesCounts ??
     (defectsReport
@@ -402,6 +414,7 @@ export function OntologyHeader({
         onProfileTabular={handleOpenTabularPicker}
         onOpenOntologyDetails={() => onOpenOntologyDetails?.()}
         onOpenVocabularies={handleOpenVocabularies}
+        onOpenCompilerStudio={handleOpenCompilerStudio}
         onDelete={() => setDeleteOpen(true)}
         onFileChange={handleFileChange}
         onTurtleFileChange={handleTurtleFileChange}
@@ -508,6 +521,13 @@ export function OntologyHeader({
       <ReferenceVocabulariesDialog
         open={vocabulariesOpen}
         onOpenChange={setVocabulariesOpen}
+      />
+
+      <CompilerStudioDialog
+        open={compilerStudioOpen}
+        onOpenChange={setCompilerStudioOpen}
+        ontologyId={currentDocument?.id ?? null}
+        ontologyName={currentDocument?.name}
       />
     </div>
   )
