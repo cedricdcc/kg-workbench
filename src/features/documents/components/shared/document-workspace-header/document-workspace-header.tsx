@@ -1,7 +1,10 @@
 "use client"
 
+import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
+import { Download } from "lucide-react"
 
+import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import {
   useDocumentsWorkspace,
@@ -11,6 +14,7 @@ import {
   fetchDocumentWithSections,
   getExtractionRuns,
 } from "../../../server/queries"
+import { ExportKgBundleDialog } from "../../export-kg-bundle-dialog/export-kg-bundle-dialog"
 import { DocStatusBadge } from "../doc-status-badge"
 import { ExtractionRunMetadataBadges } from "../extraction-run-metadata-badges"
 
@@ -21,6 +25,7 @@ const VIEW_MODE_LABELS: Record<ViewMode, string> = {
 }
 
 export function DocumentWorkspaceHeader() {
+  const [exportDialogOpen, setExportDialogOpen] = useState(false)
   const {
     selectedDocumentId: documentId,
     viewMode,
@@ -56,6 +61,17 @@ export function DocumentWorkspaceHeader() {
         </div>
 
         <div className="flex shrink-0 items-center gap-2 justify-self-end">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={!documentId}
+            onClick={() => setExportDialogOpen(true)}
+            className="h-9 gap-1.5 text-xs"
+          >
+            <Download className="size-3.5" />
+            Export KG Bundle
+          </Button>
           <div className="flex h-9 overflow-hidden rounded-md border border-input bg-background text-xs">
             {(["reader", "graph", "table"] as const).map((mode) => (
               <button
@@ -77,6 +93,11 @@ export function DocumentWorkspaceHeader() {
           </div>
         </div>
       </div>
+      <ExportKgBundleDialog
+        documentId={documentId}
+        open={exportDialogOpen}
+        onOpenChange={setExportDialogOpen}
+      />
     </div>
   )
 }
