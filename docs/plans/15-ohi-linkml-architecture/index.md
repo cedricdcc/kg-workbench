@@ -29,11 +29,11 @@ The work is divided into **5 self-contained, sequentially executable phases** so
   - Slice 4.1: Build `/src/features/ontology/components/compiler-studio-dialog` (SHACL, RDFS, OWL, Pydantic `.py`, LinkML YAML, `ohi.lock.json`) `done`
   - Slice 4.2: Build `/src/features/ontology/components/standards-browser` for `ohi.dev` package search, transitive tree & SHA-256 lock status `done`
   - Slice 4.3: Integrate `ohi` lockfile drift & LinkML lint warnings into `/src/features/ontology/components/ontology-issues-sheet` `done`
-- [Phase 5 - Pydantic-Guided Extraction, RDFS/SHACL Validation & W3C `PROV-O` Bundle Export](./05-phase-5-pydantic-shacl-rdfs-extraction-and-provo.md) `open`
-  - Slice 5.1: Pass compiled `pydantic_code`, `json_schema`, `shacl_ttl`, `rdfs_ttl`, and `ohi_lockfile` in extraction jobs `open`
-  - Slice 5.2: Dynamic Pydantic v2 model loader & structured multi-provider LLM extraction in `services/internal-extractor` `open`
-  - Slice 5.3: RDFS entailment & SHACL validation integration in `services/reasoner` and in-app validator `open`
-  - Slice 5.4: W3C `PROV-O` (`w3c/prov-o@2013`) + SHACL + RDFS + Pydantic `.py` Knowledge Graph bundle exporter & UI dialog `open`
+- [Phase 5 - Pydantic-Guided Extraction, RDFS/SHACL Validation & W3C `PROV-O` Bundle Export](./05-phase-5-pydantic-shacl-rdfs-extraction-and-provo.md) `done`
+  - Slice 5.1: Pass compiled `pydantic_code`, `json_schema`, `shacl_ttl`, `rdfs_ttl`, and `ohi_lockfile` in extraction jobs `done`
+  - Slice 5.2: Dynamic Pydantic v2 model loader & structured multi-provider LLM extraction in `services/internal-extractor` `done`
+  - Slice 5.3: RDFS entailment & SHACL validation integration in `services/reasoner` and in-app validator `done`
+  - Slice 5.4: W3C `PROV-O` (`w3c/prov-o@2013`) + SHACL + RDFS + Pydantic `.py` Knowledge Graph bundle exporter & UI dialog `done`
 
 ---
 
