@@ -16,6 +16,28 @@ import {
   ontologyCqTriples,
 } from "@/server/db/schema"
 
+import type { AnyDbClient } from "../linkml/document-store"
+import type { DbTransaction } from "../linkml/symbol-cascade"
+
+export interface CQMutationOptions {
+  tx?: DbTransaction
+  db?: AnyDbClient
+}
+
+type DrizzleDb = ReturnType<typeof getDb>
+
+function resolveExecutor(options?: CQMutationOptions): DrizzleDb {
+  return (options?.tx ?? options?.db ?? getDb()) as DrizzleDb
+}
+
+function safeRevalidateOntologyRoot() {
+  try {
+    revalidatePath(routes.ontology.root)
+  } catch {
+    // Non-Next environment (e.g. unit tests or standalone scripts)
+  }
+}
+
 export interface CQTripleInput {
   subjectClassId?: string | null
   predicateRelationId?: string | null
@@ -38,10 +60,11 @@ export async function createCQ(
     objectExampleId?: string | null
     sortOrder?: number
     triples?: CQTripleInput[]
-  }
+  },
+  options?: CQMutationOptions
 ): Promise<OntologyCompetencyQuestion> {
-  const db = getDb()
-  await assertOntologyDocumentAccess(ontologyId, db)
+  const executor = resolveExecutor(options)
+  await assertOntologyDocumentAccess(ontologyId, executor)
 
   const firstTriple = data.triples?.[0]
   const subjectClassId =
@@ -50,7 +73,7 @@ export async function createCQ(
     data.predicateRelationId ?? firstTriple?.predicateRelationId ?? null
   const objectClassId = data.objectClassId ?? firstTriple?.objectClassId ?? null
 
-  const row = await db.transaction(async (tx) => {
+  const insertInTx = async (tx: DrizzleDb) => {
     const [inserted] = await tx
       .insert(ontologyCompetencyQuestions)
       .values({
@@ -84,9 +107,13 @@ export async function createCQ(
     }
 
     return inserted
-  })
+  }
 
-  revalidatePath(routes.ontology.root)
+  const row = options?.tx
+    ? await insertInTx(executor)
+    : await executor.transaction((tx) => insertInTx(tx as unknown as DrizzleDb))
+
+  safeRevalidateOntologyRoot()
   return row
 }
 
@@ -101,11 +128,16 @@ export async function updateCQ(
     predicateExampleId?: string | null
     objectExampleId?: string | null
     sortOrder?: number
-  }
+  },
+  options?: CQMutationOptions
 ): Promise<OntologyCompetencyQuestion> {
-  const db = getDb()
-  await assertOntologyRecordAccess("ontology_competency_questions", id, db)
-  const [row] = await db
+  const executor = resolveExecutor(options)
+  await assertOntologyRecordAccess(
+    "ontology_competency_questions",
+    id,
+    executor
+  )
+  const [row] = await executor
     .update(ontologyCompetencyQuestions)
     .set({
       ...(data.question !== undefined && { question: data.question }),
@@ -132,52 +164,69 @@ export async function updateCQ(
     .where(eq(ontologyCompetencyQuestions.id, id))
     .returning()
   if (!row) throw new Error("Competency question was not found.")
-  revalidatePath(routes.ontology.root)
+  safeRevalidateOntologyRoot()
   return row
 }
 
-export async function deleteCQ(id: string): Promise<void> {
-  const db = getDb()
-  await assertOntologyRecordAccess("ontology_competency_questions", id, db)
-  await db
+export async function deleteCQ(
+  id: string,
+  options?: CQMutationOptions
+): Promise<void> {
+  const executor = resolveExecutor(options)
+  await assertOntologyRecordAccess(
+    "ontology_competency_questions",
+    id,
+    executor
+  )
+  await executor
     .delete(ontologyCompetencyQuestions)
     .where(eq(ontologyCompetencyQuestions.id, id))
-  revalidatePath(routes.ontology.root)
+  safeRevalidateOntologyRoot()
 }
 
 export async function setCQModules(
   cqId: string,
-  moduleIds: string[]
+  moduleIds: string[],
+  options?: CQMutationOptions
 ): Promise<void> {
-  const db = getDb()
-  await assertOntologyRecordAccess("ontology_competency_questions", cqId, db)
+  const executor = resolveExecutor(options)
+  await assertOntologyRecordAccess(
+    "ontology_competency_questions",
+    cqId,
+    executor
+  )
   await Promise.all(
     moduleIds.map((moduleId) =>
-      assertOntologyRecordAccess("ontology_modules", moduleId, db)
+      assertOntologyRecordAccess("ontology_modules", moduleId, executor)
     )
   )
-  await db
+  await executor
     .delete(ontologyCompetencyQuestionModules)
     .where(eq(ontologyCompetencyQuestionModules.cq_id, cqId))
 
   if (moduleIds.length > 0) {
-    await db
+    await executor
       .insert(ontologyCompetencyQuestionModules)
       .values(
         moduleIds.map((moduleId) => ({ cq_id: cqId, module_id: moduleId }))
       )
   }
-  revalidatePath(routes.ontology.root)
+  safeRevalidateOntologyRoot()
 }
 
 export async function updateCQTriples(
   cqId: string,
-  triples: CQTripleInput[]
+  triples: CQTripleInput[],
+  options?: CQMutationOptions
 ): Promise<void> {
-  const db = getDb()
-  await assertOntologyRecordAccess("ontology_competency_questions", cqId, db)
+  const executor = resolveExecutor(options)
+  await assertOntologyRecordAccess(
+    "ontology_competency_questions",
+    cqId,
+    executor
+  )
 
-  await db.transaction(async (tx) => {
+  const updateInTx = async (tx: DrizzleDb) => {
     // 1. Delete previous triples for this CQ
     await tx.delete(ontologyCqTriples).where(eq(ontologyCqTriples.cq_id, cqId))
 
@@ -210,7 +259,13 @@ export async function updateCQTriples(
         object_example_id: first?.objectExampleId ?? null,
       })
       .where(eq(ontologyCompetencyQuestions.id, cqId))
-  })
+  }
 
-  revalidatePath(routes.ontology.root)
+  if (options?.tx) {
+    await updateInTx(executor)
+  } else {
+    await executor.transaction((tx) => updateInTx(tx as unknown as DrizzleDb))
+  }
+
+  safeRevalidateOntologyRoot()
 }
