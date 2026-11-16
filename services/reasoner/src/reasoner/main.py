@@ -43,6 +43,10 @@ class ValidateShaclRequest(BaseModel):
     data_graph: str = Field(description="RDF data graph in Turtle format")
     shapes_graph: str = Field(description="SHACL shapes graph in Turtle format")
     inference: str = Field(default="rdfs", description="Inference type: 'rdfs', 'owlrl', 'none'")
+    rdfs_ttl: str | None = Field(
+        default=None,
+        description="Optional RDFS ontology graph in Turtle format for entailment",
+    )
 
 
 class ValidateShaclResponse(BaseModel):
@@ -76,6 +80,7 @@ def validate_shacl(req: ValidateShaclRequest) -> dict[str, Any]:
             data_graph_ttl=req.data_graph,
             shapes_graph_ttl=req.shapes_graph,
             inference=req.inference,
+            rdfs_ttl=req.rdfs_ttl,
         )
         return report
     except Exception as exc:

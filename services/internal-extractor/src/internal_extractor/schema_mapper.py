@@ -1,3 +1,4 @@
+import json
 from typing import Any
 
 from neo4j_graphrag.experimental.components.schema import GraphSchema
@@ -9,9 +10,25 @@ def description_or_fallback(value: str | None, fallback: str) -> str:
     return value or fallback
 
 
+def _parse_json_schema_defs(raw_json_schema: str | None) -> dict[str, dict[str, Any]]:
+    if not raw_json_schema:
+        return {}
+    try:
+        parsed = json.loads(raw_json_schema)
+    except json.JSONDecodeError:
+        return {}
+    if not isinstance(parsed, dict):
+        return {}
+    defs = parsed.get("$defs") or parsed.get("definitions") or {}
+    return defs if isinstance(defs, dict) else {}
+
+
 def to_graph_schema(request: ExtractionRequest) -> GraphSchema:
+    json_defs = _parse_json_schema_defs(request.json_schema)
     node_types = []
     for node in request.extraction_schema.nodeTypes:
+        class_def = json_defs.get(node.label, {})
+        class_props = class_def.get("properties", {}) if isinstance(class_def, dict) else {}
         properties = list(node.properties)
         if not any(prop.name == "entity_text" for prop in properties):
             properties.insert(
@@ -27,10 +44,13 @@ def to_graph_schema(request: ExtractionRequest) -> GraphSchema:
                 ),
             )
 
+        node_description = node.description or (
+            class_def.get("description") if isinstance(class_def, dict) else None
+        )
         node_type: dict[str, Any] = {
             "label": node.label,
             "description": description_or_fallback(
-                node.description, f"Ontology class {node.label}."
+                node_description, f"Ontology class {node.label}."
             ),
         }
         if properties:
@@ -39,7 +59,13 @@ def to_graph_schema(request: ExtractionRequest) -> GraphSchema:
                     "name": prop.name,
                     "type": prop.type,
                     "description": description_or_fallback(
-                        prop.description, f"Ontology attribute {prop.name}."
+                        prop.description
+                        or (
+                            class_props.get(prop.name, {}).get("description")
+                            if isinstance(class_props.get(prop.name), dict)
+                            else None
+                        ),
+                        f"Ontology attribute {prop.name}.",
                     ),
                 }
                 for prop in properties

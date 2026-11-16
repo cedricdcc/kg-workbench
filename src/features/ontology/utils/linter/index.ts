@@ -1,3 +1,5 @@
+import type { LinkmlLintIssue } from "@/features/ontology/server/linkml/types"
+import type { OhiLockVerificationReport } from "@/features/ontology/server/ohi/lockfile-verifier"
 import type { OntologyClassWithAttributes } from "@/features/ontology/server/queries"
 import type { OntologyRelation } from "@/domain/ontology"
 import type {
@@ -13,20 +15,29 @@ import {
   checkInverseRelations,
   checkMetadataCompleteness,
 } from "./rules"
+import {
+  mapLinkmlLintIssuesToDefects,
+  mapOhiLockfileDriftToDefects,
+} from "./linkml-and-ohi-defects"
 
 export * from "./types"
 export * from "./rules"
+export * from "./linkml-and-ohi-defects"
 
 export interface RunOntologyLinterParams {
   classes: OntologyClassWithAttributes[]
   relations: OntologyRelation[]
   suppressedIds?: Set<string>
+  linkmlLintIssues?: LinkmlLintIssue[]
+  ohiLockVerification?: OhiLockVerificationReport | null
 }
 
 export function runOntologyLinter({
   classes,
   relations,
   suppressedIds = new Set<string>(),
+  linkmlLintIssues = [],
+  ohiLockVerification = null,
 }: RunOntologyLinterParams): OntologyDefectReport {
   const rawDefects: OntologyDefect[] = [
     ...checkSubclassCycles(classes),
@@ -36,6 +47,8 @@ export function runOntologyLinter({
     ...checkCompetingPatterns(classes),
     ...checkInverseRelations(relations),
     ...checkMetadataCompleteness(classes, relations),
+    ...mapLinkmlLintIssuesToDefects(linkmlLintIssues, classes, relations),
+    ...mapOhiLockfileDriftToDefects(ohiLockVerification),
   ]
 
   const activeDefects: OntologyDefect[] = []

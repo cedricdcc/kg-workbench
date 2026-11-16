@@ -33,11 +33,16 @@ import {
 import { cn } from "@/lib/utils"
 
 interface AttributeRowProps {
+  ontologyId: string
   attribute: OntologyAttribute
   onOpenMetadata: (attribute: OntologyAttribute) => void
 }
 
-export function AttributeRow({ attribute, onOpenMetadata }: AttributeRowProps) {
+export function AttributeRow({
+  ontologyId,
+  attribute,
+  onOpenMetadata,
+}: AttributeRowProps) {
   const [editing, setEditing] = useState(false)
   const [isPending, startTransition] = useTransition()
   const [draft, setDraft] = useState({
@@ -50,12 +55,16 @@ export function AttributeRow({ attribute, onOpenMetadata }: AttributeRowProps) {
   function handleSave() {
     setEditing(false)
     startTransition(async () => {
-      await updateAttribute(attribute.id, {
-        name: draft.name,
-        dataType: draft.dataType,
-        required: draft.required,
-        description: draft.description,
-      })
+      await updateAttribute(
+        attribute.id,
+        {
+          name: draft.name,
+          dataType: draft.dataType,
+          required: draft.required,
+          description: draft.description,
+        },
+        ontologyId
+      )
     })
   }
 
@@ -71,7 +80,7 @@ export function AttributeRow({ attribute, onOpenMetadata }: AttributeRowProps) {
 
   function handleDelete() {
     startTransition(async () => {
-      await deleteAttribute(attribute.id)
+      await deleteAttribute(attribute.id, ontologyId)
     })
   }
 

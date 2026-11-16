@@ -1,4 +1,4 @@
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -46,6 +46,13 @@ class ExtractionRequest(BaseModel):
     apiKey: str | None = None
     file: ExtractionFile
     extraction_schema: ExtractionSchema = Field(alias="schema")
+    linkml_yaml: str | None = None
+    pydantic_code: str | None = None
+    json_schema: str | None = None
+    shacl_ttl: str | None = None
+    rdfs_ttl: str | None = None
+    ohi_lockfile: dict[str, Any] | None = None
+    ontology_sha256: str | None = None
 
 
 class ExtractionResponse(BaseModel):

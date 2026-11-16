@@ -51,6 +51,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { getReferenceOntologies } from "@/features/ontology/server/queries/reference-vocabularies"
 import { ReferenceBrowser } from "../reference-browser/reference-browser"
+import { StandardsBrowser } from "../standards-browser/standards-browser"
 import {
   ReferenceTermDetail,
   type SelectedReferenceTerm,
@@ -72,6 +73,7 @@ import type {
   ArchivedDatasetSource,
 } from "@/features/tabular/types"
 import { ReferenceVocabulariesDialog } from "../reference-vocabularies-dialog/reference-vocabularies-dialog"
+import { CompilerStudioDialog } from "../compiler-studio-dialog/compiler-studio-dialog"
 import {
   runOntologyLinter,
   type OntologyDefect,
@@ -81,6 +83,8 @@ import { toggleDefectSuppression } from "@/features/ontology/server/actions/defe
 import { updateClass } from "@/features/ontology/server/actions/classes"
 import { deleteRelation } from "@/features/ontology/server/actions/relations"
 import { runFullOntologyAnalysis } from "@/features/ontology/server/actions/ontology-analysis"
+import { getOntologyDiagnosticsAction } from "@/features/ontology/server/actions/ontology-diagnostics"
+import { syncOhiLockfileAction } from "@/features/ontology/server/actions/ohi-packages"
 import { addReferenceOntology } from "@/features/ontology/server/actions/reference-vocabularies"
 import type { RecommendedVocabulary } from "@/features/ontology/server/services/ontology-analysis/analyze-ontology"
 import { OntologyIssuesSheet } from "../ontology-issues"
@@ -172,6 +176,7 @@ export function OntologyShell({
   const [selectedReferenceTerm, setSelectedReferenceTerm] =
     useState<SelectedReferenceTerm | null>(null)
   const [referenceDialogOpen, setReferenceDialogOpen] = useState(false)
+  const [compilerStudioOpen, setCompilerStudioOpen] = useState(false)
 
   const lastFingerprintRef = useRef<string | null>(null)
   const isCheckingFingerprintRef = useRef(false)
@@ -439,14 +444,28 @@ export function OntologyShell({
     enabled: issuesSheetOpen && Boolean(currentDocument.id),
   })
 
+  const { data: diagnosticsData } = useQuery({
+    queryKey: ["ontology-diagnostics", currentDocument.id],
+    queryFn: () => getOntologyDiagnosticsAction(currentDocument.id),
+    enabled: Boolean(currentDocument.id),
+  })
+
   const suppressedSet = useMemo(() => new Set(suppressions), [suppressions])
   const defectsReport = useMemo(() => {
     return runOntologyLinter({
       classes,
       relations,
       suppressedIds: suppressedSet,
+      linkmlLintIssues: diagnosticsData?.lintIssues,
+      ohiLockVerification: diagnosticsData?.lockVerification,
     })
-  }, [classes, relations, suppressedSet])
+  }, [
+    classes,
+    relations,
+    suppressedSet,
+    diagnosticsData?.lintIssues,
+    diagnosticsData?.lockVerification,
+  ])
 
   const issuesCounts = useMemo(
     () => ({
@@ -485,7 +504,11 @@ export function OntologyShell({
   async function handleQuickFix(defect: OntologyDefect) {
     try {
       if (defect.quickFixType === "clear_parent") {
-        await updateClass(defect.targetId, { parentClassId: null })
+        await updateClass(
+          defect.targetId,
+          { parentClassId: null },
+          currentDocument.id
+        )
         toast.success(`Cleared parent link on "${defect.targetName}"`)
         router.refresh()
         queryClient.invalidateQueries({
@@ -495,7 +518,7 @@ export function OntologyShell({
           queryKey: ["ontology-defect-suppressions", currentDocument.id],
         })
       } else if (defect.quickFixType === "delete_relation") {
-        await deleteRelation(defect.targetId)
+        await deleteRelation(defect.targetId, currentDocument.id)
         if (selectedEntityId === defect.targetId) {
           setSelectedEntityId(null)
           setSelectedEntityKind(null)
@@ -508,6 +531,24 @@ export function OntologyShell({
         queryClient.invalidateQueries({
           queryKey: ["ontology-defect-suppressions", currentDocument.id],
         })
+      } else if (defect.quickFixType === "ohi_sync") {
+        await syncOhiLockfileAction(currentDocument.id)
+        toast.success("Synchronized ohi.lock.json lockfile")
+        router.refresh()
+        await Promise.all([
+          queryClient.invalidateQueries({
+            queryKey: ["ontology-diagnostics", currentDocument.id],
+          }),
+          queryClient.invalidateQueries({
+            queryKey: ["ohi-packages", currentDocument.id],
+          }),
+          queryClient.invalidateQueries({
+            queryKey: ["ohi-package-state", currentDocument.id],
+          }),
+          queryClient.invalidateQueries({
+            queryKey: ["reference-ontologies"],
+          }),
+        ])
       }
     } catch {
       toast.error("Failed to apply quick fix")
@@ -829,6 +870,7 @@ export function OntologyShell({
         cqCount={cqs.length}
         onOpenOntologyDetails={() => openOntologyDetails("overview")}
         onOpenVocabularies={() => setReferenceDialogOpen(true)}
+        onOpenCompilerStudio={() => setCompilerStudioOpen(true)}
         issuesCounts={issuesCounts}
         onOpenIssuesSheet={() => setIssuesSheetOpen(true)}
         assistantOpen={
@@ -915,6 +957,12 @@ export function OntologyShell({
                       setRightPanelMode("details")
                       setIsDetailCollapsed(false)
                     }}
+                  />
+                }
+                standardsBrowser={
+                  <StandardsBrowser
+                    ontologyId={currentDocument.id}
+                    onOpenManage={() => setReferenceDialogOpen(true)}
                   />
                 }
                 reasonerBrowser={
@@ -1042,6 +1090,13 @@ export function OntologyShell({
         onOpenChange={setReferenceDialogOpen}
       />
 
+      <CompilerStudioDialog
+        open={compilerStudioOpen}
+        onOpenChange={setCompilerStudioOpen}
+        ontologyId={currentDocument.id}
+        ontologyName={currentDocument.name}
+      />
+
       <OntologyIssuesSheet
         open={issuesSheetOpen}
         onOpenChange={setIssuesSheetOpen}
@@ -1053,7 +1108,7 @@ export function OntologyShell({
         onSelectEntity={(id, kind) => {
           if (kind === "class") {
             handleSelectClass(id)
-          } else {
+          } else if (kind === "relation") {
             handleSelectRelation(id)
           }
         }}

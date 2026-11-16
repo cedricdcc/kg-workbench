@@ -49,6 +49,39 @@ export const externalExtractionRequestSchema = {
       description:
         "Ontology payload serialized in the canonical KG Workbench ontology import format.",
     },
+    linkml_yaml: {
+      type: "string",
+      description: "Canonical LinkML YAML schema for the ontology.",
+    },
+    pydantic_code: {
+      type: "string",
+      description:
+        "Compiled Pydantic v2 Python module source generated from the LinkML schema.",
+    },
+    json_schema: {
+      type: "string",
+      description:
+        "Compiled JSON Schema string generated from the LinkML schema.",
+    },
+    shacl_ttl: {
+      type: "string",
+      description:
+        "Compiled SHACL shapes in Turtle format generated from the LinkML schema.",
+    },
+    rdfs_ttl: {
+      type: "string",
+      description:
+        "Compiled RDFS schema in Turtle format generated from the LinkML schema.",
+    },
+    ohi_lockfile: {
+      type: ["object", "null"],
+      description:
+        "Resolved OHI v2 lockfile provenance snapshot, or null when no OHI dependencies are locked.",
+    },
+    ontology_sha256: {
+      type: "string",
+      description: "SHA-256 hex digest of the canonical LinkML YAML source.",
+    },
   },
 } as const
 

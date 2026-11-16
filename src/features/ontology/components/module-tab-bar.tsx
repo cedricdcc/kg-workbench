@@ -149,7 +149,7 @@ export function ModuleTabBar({
 
     setPendingAction("delete")
     try {
-      await deleteModule(moduleForDelete.id)
+      await deleteModule(moduleForDelete.id, ontologyId)
       if (activeModuleId === moduleForDelete.id) {
         onModuleChange(null)
       }

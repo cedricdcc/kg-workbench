@@ -12,7 +12,125 @@ import {
   facts,
 } from "@/server/db/schema"
 import { loadCanonicalOntology } from "@/features/ontology/server/linkml/document-store"
+import type { CanonicalOntologySnapshot } from "@/features/ontology/server/linkml/types"
+
 const norm = (value: string) => value.trim().toLowerCase()
+
+export type OntologySymbolLookup = {
+  classIdByKey: Map<string, string>
+  classNameById: Map<string, string>
+  relationIdByExactName: Map<string, string>
+  relationIdByKey: Map<string, string>
+  attributeIdsByClassId: Map<string, Map<string, string>>
+}
+
+/**
+ * Builds an in-memory lookup table for resolving LinkML symbol keys
+ * (`classKey`, `relationKey`, `"ClassKey.attrName"`, or `attrName`) and
+ * legacy display names to canonical ontology UUIDs.
+ */
+export function buildOntologySymbolLookup(
+  snapshot: CanonicalOntologySnapshot
+): OntologySymbolLookup {
+  const classes = snapshot.classes ?? []
+  const relations = snapshot.relations ?? []
+  const attributes = snapshot.attributes ?? []
+
+  const classIdByKey = new Map<string, string>()
+  const classNameById = new Map<string, string>()
+  for (const cls of classes) {
+    classNameById.set(cls.id, cls.name)
+    classIdByKey.set(norm(cls.name), cls.id)
+    classIdByKey.set(cls.id, cls.id)
+  }
+
+  const relationIdByExactName = new Map<string, string>()
+  const relationIdByKey = new Map<string, string>()
+  for (const rel of relations) {
+    relationIdByExactName.set(rel.name, rel.id)
+    relationIdByKey.set(norm(rel.name), rel.id)
+    relationIdByKey.set(rel.id, rel.id)
+  }
+
+  const attributeIdsByClassId = new Map<string, Map<string, string>>()
+  for (const attribute of attributes) {
+    const values =
+      attributeIdsByClassId.get(attribute.class_id) ??
+      new Map<string, string>()
+    const attrKey = norm(attribute.name)
+    values.set(attrKey, attribute.id)
+    const className = classNameById.get(attribute.class_id)
+    if (className) {
+      values.set(`${norm(className)}.${attrKey}`, attribute.id)
+    }
+    attributeIdsByClassId.set(attribute.class_id, values)
+  }
+
+  return {
+    classIdByKey,
+    classNameById,
+    relationIdByExactName,
+    relationIdByKey,
+    attributeIdsByClassId,
+  }
+}
+
+export function resolveClassId(
+  lookup: OntologySymbolLookup,
+  classKey: string | null | undefined
+): string | null {
+  if (!classKey) return null
+  const trimmed = classKey.trim()
+  if (!trimmed) return null
+  return lookup.classIdByKey.get(norm(trimmed)) ?? lookup.classIdByKey.get(trimmed) ?? null
+}
+
+export function resolveRelationId(
+  lookup: OntologySymbolLookup,
+  relationKey: string | null | undefined
+): string | null {
+  if (!relationKey) return null
+  const trimmed = relationKey.trim()
+  if (!trimmed) return null
+  return (
+    lookup.relationIdByExactName.get(trimmed) ??
+    lookup.relationIdByKey.get(norm(trimmed)) ??
+    lookup.relationIdByKey.get(trimmed) ??
+    null
+  )
+}
+
+export function resolveAttributeId(
+  lookup: OntologySymbolLookup,
+  classId: string | null | undefined,
+  attributeKey: string | null | undefined
+): string | null {
+  if (!classId || !attributeKey) return null
+  const trimmed = attributeKey.trim()
+  if (!trimmed) return null
+  return lookup.attributeIdsByClassId.get(classId)?.get(norm(trimmed)) ?? null
+}
+
+export function resolveSymbolIds(
+  lookup: OntologySymbolLookup,
+  keys: {
+    classKey?: string | null
+    relationKey?: string | null
+    attributeKey?: string | null
+  }
+): {
+  classId: string | null
+  relationId: string | null
+  attributeId: string | null
+} {
+  const classId = resolveClassId(lookup, keys.classKey)
+  return {
+    classId,
+    relationId: resolveRelationId(lookup, keys.relationKey),
+    attributeId: resolveAttributeId(lookup, classId, keys.attributeKey),
+  }
+}
+
 export async function persistExtractionResults(
   runId: string,
   results: ExtractionResultsResponse,
@@ -27,20 +145,7 @@ export async function persistExtractionResults(
   if (!run?.ontology_id)
     throw new Error("Extraction run has no associated ontology")
   const snapshot = await loadCanonicalOntology(run.ontology_id, db)
-  const classes = snapshot.classes ?? []
-  const relations = snapshot.relations ?? []
-  const attributes = snapshot.attributes ?? []
-
-  const classIdByName = new Map(classes.map((row) => [norm(row.name), row.id])),
-    classNameById = new Map(classes.map((row) => [row.id, row.name])),
-    relationIdByName = new Map(relations.map((row) => [row.name, row.id]))
-  const attributeIds = new Map<string, Map<string, string>>()
-  for (const attribute of attributes) {
-    const values =
-      attributeIds.get(attribute.class_id) ?? new Map<string, string>()
-    values.set(norm(attribute.name), attribute.id)
-    attributeIds.set(attribute.class_id, values)
-  }
+  const symbolLookup = buildOntologySymbolLookup(snapshot)
   const inferredClass = new Map<string, string>()
   for (const fact of results.facts) {
     if (!inferredClass.has(fact.object_temp_id))
@@ -79,7 +184,7 @@ export async function persistExtractionResults(
   for (const entity of results.entities) {
     const className =
         entity.className?.trim() || inferredClass.get(entity.temp_id)?.trim(),
-      classId = className ? (classIdByName.get(norm(className)) ?? null) : null
+      classId = resolveClassId(symbolLookup, className)
     const [existing] = await db
       .select({ id: documentEntities.id, class_id: documentEntities.class_id })
       .from(documentEntities)
@@ -101,7 +206,7 @@ export async function persistExtractionResults(
           .where(eq(documentEntities.id, entityId))
       else if (existing.class_id && classId && existing.class_id !== classId)
         console.warn(
-          `Conflicting classes for entity "${entity.text}": keeping "${classNameById.get(existing.class_id) ?? existing.class_id}" instead of "${className}"`
+          `Conflicting classes for entity "${entity.text}": keeping "${symbolLookup.classNameById.get(existing.class_id) ?? existing.class_id}" instead of "${className}"`
         )
       persistedClassId = existing.class_id ?? classId
     } else {
@@ -125,9 +230,11 @@ export async function persistExtractionResults(
       continue
     }
     for (const attribute of entity.attributes) {
-      const id = attributeIds
-        .get(persistedClassId)
-        ?.get(norm(attribute.attribute_name))
+      const id = resolveAttributeId(
+        symbolLookup,
+        persistedClassId,
+        attribute.attribute_name
+      )
       if (!id) {
         console.warn(
           `Unrecognized attribute "${attribute.attribute_name}" for entity "${entity.text}" - skipping`
@@ -186,7 +293,7 @@ export async function persistExtractionResults(
         object_text: textByTempId.get(fact.object_temp_id) ?? "",
         subject_entity_id: entityIds.get(fact.subject_temp_id) ?? null,
         object_entity_id: entityIds.get(fact.object_temp_id) ?? null,
-        relation_type_id: relationIdByName.get(fact.relationName) ?? null,
+        relation_type_id: resolveRelationId(symbolLookup, fact.relationName),
         confidence: fact.confidence,
         is_cross_chapter: fact.isCrossChapter ?? false,
         primary_anchor_id: anchorId,

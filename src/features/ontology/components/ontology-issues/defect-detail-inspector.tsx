@@ -6,6 +6,7 @@ import {
   ArrowRight,
   CheckCircle2,
   ExternalLink,
+  FileCode2,
   Info,
   Layers,
   RotateCcw,
@@ -21,7 +22,7 @@ import type { OntologyDefect } from "@/features/ontology/utils/linter"
 export interface DefectDetailInspectorProps {
   defect: OntologyDefect | null
   isSuppressed?: boolean
-  onSelectEntity: (id: string, kind: "class" | "relation") => void
+  onSelectEntity: (id: string, kind: "class" | "relation" | "ontology") => void
   onSuppress: (defectId: string) => void
   onRestore: (defectId: string) => void
   onQuickFix?: (defect: OntologyDefect) => void
@@ -111,6 +112,22 @@ export function DefectDetailInspector({
                 >
                   {defect.severity}
                 </Badge>
+                {defect.source === "linkml" && (
+                  <Badge
+                    variant="secondary"
+                    className="font-mono text-xs font-semibold text-muted-foreground"
+                  >
+                    LinkML
+                  </Badge>
+                )}
+                {defect.source === "ohi" && (
+                  <Badge
+                    variant="secondary"
+                    className="font-mono text-xs font-semibold text-muted-foreground"
+                  >
+                    ohi.dev
+                  </Badge>
+                )}
                 {defect.oopsPitfallId && (
                   <Badge
                     variant="secondary"
@@ -162,8 +179,10 @@ export function DefectDetailInspector({
             <div className="rounded-md bg-background p-1.5 shadow-xs">
               {defect.targetType === "class" ? (
                 <Layers className="size-4 text-primary" />
-              ) : (
+              ) : defect.targetType === "relation" ? (
                 <ArrowRight className="size-4 text-primary" />
+              ) : (
+                <FileCode2 className="size-4 text-primary" />
               )}
             </div>
             <div>
@@ -181,15 +200,18 @@ export function DefectDetailInspector({
             </div>
           </div>
 
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-8 gap-1.5 text-xs font-medium"
-            onClick={() => onSelectEntity(defect.targetId, defect.targetType)}
-          >
-            <ExternalLink className="size-3.5" />
-            Inspect in Graph / Detail
-          </Button>
+          {(defect.targetType === "class" ||
+            defect.targetType === "relation") && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 gap-1.5 text-xs font-medium"
+              onClick={() => onSelectEntity(defect.targetId, defect.targetType)}
+            >
+              <ExternalLink className="size-3.5" />
+              Inspect in Graph / Detail
+            </Button>
+          )}
         </div>
       </div>
 

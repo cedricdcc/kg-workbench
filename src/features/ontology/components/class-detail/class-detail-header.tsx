@@ -53,9 +53,13 @@ export function ClassDetailHeader({
 
   function handleModuleChange(moduleId: string) {
     startTransition(async () => {
-      await updateClass(cls.id, {
-        moduleId: moduleId === "__none__" ? null : moduleId,
-      })
+      await updateClass(
+        cls.id,
+        {
+          moduleId: moduleId === "__none__" ? null : moduleId,
+        },
+        ontologyId
+      )
     })
   }
 
@@ -75,9 +79,13 @@ export function ClassDetailHeader({
     }
 
     startTransition(async () => {
-      await updateClass(cls.id, {
-        parentClassId: targetParentId,
-      })
+      await updateClass(
+        cls.id,
+        {
+          parentClassId: targetParentId,
+        },
+        ontologyId
+      )
     })
   }
 

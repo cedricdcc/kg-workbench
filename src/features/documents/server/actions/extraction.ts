@@ -19,6 +19,7 @@ import {
 } from "@/server/external/extraction-adapter"
 import type {
   ExtractionFile,
+  ExtractionLinkmlArtifacts,
   ExtractorBackend,
   ExternalExtractionRequest,
   ExternalExtractionOptions,
@@ -26,6 +27,7 @@ import type {
   InternalExtractorProvider,
   InternalExtractionRequest,
 } from "@/server/external/extraction-api"
+import type { OhiLockfileV2 } from "@/features/ontology/server/linkml/types"
 import { getDb } from "@/server/database"
 import { documents, extractionRuns } from "@/server/db/schema"
 import { loadCanonicalOntology } from "@/features/ontology/server/linkml/document-store"
@@ -37,6 +39,7 @@ import {
   getOntologyRelations,
 } from "@/features/ontology/server/queries"
 
+import { resolveExtractionOntologyArtifacts } from "./build-extraction-artifacts"
 import { persistExtractionResults } from "./extraction-results-persistence"
 
 const INTERNAL_EXTRACTOR_PROVIDERS = ["openai", "anthropic", "ollama"] as const
@@ -106,6 +109,7 @@ async function buildInternalExtractionOptions({
   file,
   provider,
   apiKey,
+  artifacts,
 }: {
   db: ReturnType<typeof getDb>
   ontologyId: string
@@ -114,6 +118,7 @@ async function buildInternalExtractionOptions({
   file: File
   provider: InternalExtractorProvider
   apiKey?: string
+  artifacts?: ExtractionLinkmlArtifacts | null
 }): Promise<InternalExtractionOptions> {
   if (provider !== "ollama" && !apiKey) {
     throw new Error("An API key is required for the selected provider.")
@@ -217,6 +222,7 @@ async function buildInternalExtractionOptions({
         classById.get(relation.range_class_id)?.name ?? "",
       ]),
     },
+    ...(artifacts ?? {}),
   }
 }
 
@@ -227,6 +233,7 @@ async function buildExternalExtractionRequest({
   file,
   exportLanguage,
   missingTranslationBehavior,
+  artifacts,
 }: {
   documentId: string
   runId: string
@@ -234,6 +241,7 @@ async function buildExternalExtractionRequest({
   file: File
   exportLanguage: string
   missingTranslationBehavior: "fallback" | "strict"
+  artifacts?: ExtractionLinkmlArtifacts | null
 }): Promise<ExternalExtractionRequest> {
   const [document, classes, relations] = await Promise.all([
     getOntologyDocument(ontologyId),
@@ -259,6 +267,7 @@ async function buildExternalExtractionRequest({
     ontologyId,
     file: extractionFile,
     ontology: ontologyExport.payload,
+    ...(artifacts ?? {}),
   }
 }
 
@@ -346,6 +355,11 @@ export async function uploadDocumentAndExtract(
     Object.assign(doc, updated)
   }
 
+  const resolvedArtifacts = await resolveExtractionOntologyArtifacts(
+    ontologyId,
+    db
+  )
+
   const [run] = await db
     .insert(extractionRuns)
     .values({
@@ -359,6 +373,9 @@ export async function uploadDocumentAndExtract(
         extractorBackend === "internal" ? internalProvider : null,
       internal_model_name: extractorBackend === "internal" ? modelName : null,
       external_extractor_url: externalExtractorUrl,
+      ohi_lockfile_snapshot:
+        (resolvedArtifacts?.ohi_lockfile as OhiLockfileV2 | null) ?? null,
+      ontology_sha256: resolvedArtifacts?.ontology_sha256 ?? null,
     })
     .returning()
   if (!run) throw new Error("Failed to create extraction run.")
@@ -380,6 +397,7 @@ export async function uploadDocumentAndExtract(
           file,
           provider: internalProvider,
           apiKey: internalApiKey,
+          artifacts: resolvedArtifacts,
         }),
       })
     } else {
@@ -391,6 +409,7 @@ export async function uploadDocumentAndExtract(
           file,
           exportLanguage: language ?? "en",
           missingTranslationBehavior,
+          artifacts: resolvedArtifacts,
         }),
         extractorBackend,
         {

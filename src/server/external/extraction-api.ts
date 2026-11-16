@@ -28,13 +28,23 @@ export type ExtractionFile = {
   base64: string
 }
 
+export type ExtractionLinkmlArtifacts = {
+  linkml_yaml?: string
+  pydantic_code?: string
+  json_schema?: string
+  shacl_ttl?: string
+  rdfs_ttl?: string
+  ohi_lockfile?: Record<string, unknown> | null
+  ontology_sha256?: string
+}
+
 export type ExternalExtractionRequest = {
   runId: string
   documentId: string
   ontologyId: string
   file: ExtractionFile
   ontology: ImportOntology
-}
+} & ExtractionLinkmlArtifacts
 
 export type ExternalExtractionOptions = {
   baseUrl?: string | null
@@ -70,7 +80,7 @@ export type InternalExtractionOptions = {
   apiKey?: string
   file: ExtractionFile
   schema: InternalExtractionSchema
-}
+} & ExtractionLinkmlArtifacts
 
 export type ExtractionResponse = {
   runId: string

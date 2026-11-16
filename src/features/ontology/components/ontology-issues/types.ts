@@ -17,7 +17,7 @@ export interface OntologyIssuesSheetProps {
   recommendedVocabularies?: RecommendedVocabulary[]
   isLoadingAnalysis?: boolean
   analysisError?: Error | null
-  onSelectEntity: (id: string, kind: "class" | "relation") => void
+  onSelectEntity: (id: string, kind: "class" | "relation" | "ontology") => void
   onSuppress: (defectId: string) => void
   onRestore: (defectId: string) => void
   onQuickFix?: (defect: OntologyDefect) => void

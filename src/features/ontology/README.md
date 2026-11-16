@@ -18,10 +18,13 @@ scope:
   - live endpoint tester workbench with latency diagnostics, response payload inspection, and snapshot persistence
   - zero-cost local vector similarity matching and semantic entity alignment
   - real-time in-memory ontology defect linter and OOPS! pitfall mapping engine
-  - defect suppressions persistence and quick-fix actions (clearing parent cycles, pruning dangling relations)
+  - defect suppressions persistence and quick-fix actions (clearing parent cycles, pruning dangling relations, syncing drifted `ohi.lock.json` lockfiles)
   - contextual defect warning callouts in detail views and visual canvas node badges
   - AI generation guardrails and OWL export pre-flight linter diagnostics notes scaffolding
   - right-hand Ontology Assistant chat panel with staged change previews, blast-radius warnings, atomic apply, and live fingerprint sync
+  - LinkML Compiler Studio (`compiler-studio-dialog/`) for raw LinkML YAML editing, symbol cascade preview, and compiled artifact inspection (SHACL, RDFS, OWL, Pydantic, JSON Schema, ER Diagram)
+  - `ohi.dev` Package & Dependency Browser (`standards-browser/`) for searching, previewing dependency trees, installing/removing packages, and verifying/syncing `ohi.lock.json`
+  - LinkML compiler `lint_issues` and `ohi.lock.json` SHA-256 drift diagnostics integrated into `ontology-issues/`
 entry_points:
   - path: src/app/ontology/page.tsx
     purpose: Server route that resolves the active ontology document and initial data.
@@ -33,7 +36,7 @@ server_entry_points:
   - path: src/features/ontology/server/queries/
     purpose: Focused read layer and client-callable query functions for ontology documents, structure, metadata, reference ontologies, and saved layout state.
   - path: src/features/ontology/server/actions/
-    purpose: Focused write actions for ontology CRUD, JSON import/export, module transfer, visual layout persistence, atomic class reconciliation, and reference vocabularies sync.
+    purpose: Focused write actions for ontology CRUD, JSON import/export, module transfer, visual layout persistence, atomic class reconciliation, reference vocabularies sync, Compiler Studio (`compiler-studio.ts`), `ohi.dev` package management (`ohi-packages.ts`), and LinkML/`ohi` diagnostics (`ontology-diagnostics.ts`).
   - path: src/features/ontology/server/blast-radius/
     purpose: Pre-flight blast radius calculation engine, dependency graph traversal, and deterministic risk scoring matrix (0-100 severity).
   - path: src/features/ontology/server/shacl/
@@ -41,13 +44,13 @@ server_entry_points:
   - path: src/features/ontology/server/linkml/
     purpose: Canonical LinkML runtime loader, TypeScript types, AST mapper, compiler, and symbol cascade service.
   - path: src/features/ontology/server/ohi/
-    purpose: ohi.yaml package manifest parser, serializer, ohi.lock.json v2 cryptographic types, and catalog package manager.
+    purpose: ohi.yaml package manifest parser, serializer, ohi.lock.json v2 cryptographic types, lockfile verifier, and catalog package manager (`package-manager.ts`).
   - path: src/features/ontology/server/actions/generate-ontology.ts
     purpose: AI-assisted ontology draft generation from competency questions with local vector grounding, contextual expansion, and transactional persistence.
   - path: src/features/ontology/server/services/ai-relation-reconciliation.ts
     purpose: On-demand AI relation reconciliation and property remapping suggestion service using Gemini.
   - path: src/features/ontology/utils/linter/
-    purpose: Pure TypeScript defect linter rule engine, OOPS! pitfall taxonomy, and in-memory health analysis.
+    purpose: Pure TypeScript defect linter rule engine, OOPS! pitfall taxonomy, LinkML & `ohi` drift mappers (`linkml-and-ohi-defects.ts`), and in-memory health analysis.
   - path: src/app/api/mcp/route.ts
     purpose: Stateless Streamable HTTP MCP server exposing the 28 shared Ontology Tool Engine tools with Bearer token auth.
 update_this_readme_when:
@@ -103,9 +106,11 @@ update_this_readme_when:
 8. `selection.ts` resolves class/relation selections, while `OntologyShell` also tracks explicit module overview selection.
 9. `detail-panel-shell.tsx` hosts tabbed class, relation, or module detail views (with metadata editors for translations, notes, examples, instance rules, relation attributes, and contextual defect callout banners) alongside a `Details | Assistant` mode toggle for `ontology-assistant-panel.tsx`. Both panels remain mounted so chat history and pending proposals survive mode switches and `router.refresh()` on external MCP edits (polled via `/api/ontology/[id]/fingerprint` on window focus and every 10s while visible).
 10. Server actions persist ontology structure changes, CQ mappings and module associations, metadata rows, saved visual layout state, JSON round-trips, and OWL export generation.
-11. `ontology-issues-pill.tsx` displays concrete typed issue counts (`Error`, `Warning`, `Suggestion`, `Clean`) with zero arbitrary health percentages. Clicking opens `ontology-issues-sheet.tsx` (slide-over drawer with tabs for Structural Defects & Quick-Fixes, Semantic Redundancy Clusters, and Standard Vocabulary Recommendations with 1-click import).
-12. Pre-flight Blast Radius dialog (`BlastRadiusModal`) intercepts class and relation deletion in `ClassDetail` and `RelationDetail`, rendering severity level, broken CQ list, orphaned subclasses, and requiring explicit acknowledgment for critical impact.
-13. OWL export runs pre-flight validation and injects linter diagnostic notes into the exported ontology comments.
+11. `ontology-issues-pill.tsx` displays concrete typed issue counts (`Error`, `Warning`, `Suggestion`, `Clean`) with zero arbitrary health percentages. Clicking opens `ontology-issues-sheet.tsx` (slide-over drawer with tabs for Structural Defects & Quick-Fixes — including LinkML compiler `lint_issues` and `ohi.lock.json` SHA-256 drift with 1-click `ohi sync` — Semantic Redundancy Clusters, and Standard Vocabulary Recommendations with 1-click import).
+12. `CompilerStudioDialog` (`compiler-studio-dialog/`) provides a raw LinkML YAML editor with live compilation, symbol cascade impact confirmation, and read-only inspection of compiled SHACL, RDFS, OWL, Pydantic, JSON Schema, ER Diagram, `ohi.yaml`, and `ohi.lock.json`.
+13. `StandardsBrowser` (`standards-browser/`) provides `ohi.dev` package search, dependency tree preview, `ohi.lock.json` verification/sync, and imported reference term browsing.
+14. Pre-flight Blast Radius dialog (`BlastRadiusModal`) intercepts class and relation deletion in `ClassDetail` and `RelationDetail`, rendering severity level, broken CQ list, orphaned subclasses, and requiring explicit acknowledgment for critical impact.
+15. OWL export runs pre-flight validation and injects linter diagnostic notes into the exported ontology comments.
 
 ## Constraints
 

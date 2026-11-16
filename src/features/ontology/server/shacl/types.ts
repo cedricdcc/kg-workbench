@@ -37,4 +37,6 @@ export interface CandidateTriple {
 export interface ValidateTriplesInput {
   triples: CandidateTriple[]
   ontology: ImportOntology
+  rdfsTtl?: string
+  shaclTtl?: string
 }

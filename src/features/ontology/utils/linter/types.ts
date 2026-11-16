@@ -11,18 +11,21 @@ export type OntologyDefectKind =
   | "inverse_inconsistent"
   | "missing_description"
   | "class_without_attributes"
+  | "linkml_lint_issue"
+  | "ohi_lockfile_drift"
 
 export type QuickFixType =
   | "clear_parent"
   | "delete_relation"
   | "focus_description"
   | "open_attributes"
+  | "ohi_sync"
 
 export interface OntologyDefect {
   id: string
   kind: OntologyDefectKind
   severity: OntologyDefectSeverity
-  targetType: "class" | "relation"
+  targetType: "class" | "relation" | "ontology"
   targetId: string
   targetName: string
   title: string
@@ -30,6 +33,8 @@ export interface OntologyDefect {
   suggestedAction?: string
   oopsPitfallId?: string
   quickFixType?: QuickFixType
+  source?: "structural" | "linkml" | "ohi"
+  element?: string
 }
 
 export interface OntologyDefectReport {

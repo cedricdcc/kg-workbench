@@ -15,7 +15,7 @@ import { DefectDetailInspector } from "./defect-detail-inspector"
 export interface StructuralDefectsTabProps {
   report: OntologyDefectReport
   isFullscreen?: boolean
-  onSelectEntity: (id: string, kind: "class" | "relation") => void
+  onSelectEntity: (id: string, kind: "class" | "relation" | "ontology") => void
   onSuppress: (defectId: string) => void
   onRestore: (defectId: string) => void
   onQuickFix?: (defect: OntologyDefect) => void
