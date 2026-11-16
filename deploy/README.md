@@ -69,3 +69,49 @@ adapter.
 
 Supabase Studio is optional in the `supabase` provider and is started with the
 Compose `admin` profile when needed.
+
+## MCP Server Setup (Antigravity)
+
+The `app` container exposes a Streamable HTTP MCP server at `/api/mcp` for external AI assistants (such as Antigravity) to inspect, validate, and edit ontologies.
+
+1. **Generate and set a bearer token** in `deploy/.env.server` (or `.env.local` for local `pnpm dev`):
+
+   ```bash
+   # Linux / macOS
+   echo "KG_MCP_TOKEN=$(openssl rand -hex 32)" >> deploy/.env.server
+   echo "KG_MCP_GROUP_KEY=shared" >> deploy/.env.server
+   ```
+
+   ```powershell
+   # Windows PowerShell
+   $token = -join ((1..32) | ForEach-Object { '{0:x2}' -f (Get-Random -Maximum 256) })
+   Add-Content -Path deploy/.env.server -Value "`nKG_MCP_TOKEN=$token`nKG_MCP_GROUP_KEY=shared"
+   ```
+
+2. **Rebuild or restart `app`** so the container picks up `KG_MCP_TOKEN`:
+
+   ```bash
+   docker compose --env-file deploy/.env.server -f deploy/compose.yaml -f deploy/providers/postgres.yaml --profile full up -d --build app
+   ```
+
+3. **Add `kg-workbench` to Antigravity's `mcp_config.json`** (e.g. `~/.gemini/antigravity/mcp_config.json`):
+
+   ```json
+   {
+     "mcpServers": {
+       "kg-workbench": {
+         "serverUrl": "http://localhost:3010/api/mcp",
+         "headers": {
+           "Authorization": "Bearer <KG_MCP_TOKEN>",
+           "x-kg-group-key": "shared"
+         }
+       }
+     }
+   }
+   ```
+
+   Adjust `3010` if `APP_PORT` is customized, and set `x-kg-group-key` to the target access group when `APP_ACCESS_GROUPS` is enabled.
+
+4. **Verify connectivity:**
+   - Unauthenticated `POST http://localhost:3010/api/mcp` should return `401`.
+   - Authenticated `POST` with `{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}` should return `200` and list the 28 ontology tools (see `src/features/ontology/README.md` for the full tool catalog).
