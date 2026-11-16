@@ -23,6 +23,8 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
   if (
     pathname.startsWith("/_next") ||
     pathname === "/favicon.ico" ||
+    pathname === "/api/mcp" ||
+    pathname.startsWith("/api/mcp/") ||
     isPublicAsset(pathname)
   ) {
     return NextResponse.next()

@@ -26,6 +26,7 @@ export type AnyDbClient = DbClient | ReturnType<typeof getDb>
 export interface SaveCanonicalOntologyOptions {
   recompile?: boolean
   db?: AnyDbClient
+  tx?: DbTransaction
   diffOptions?: DiffLinkmlOptions
 }
 
@@ -199,6 +200,10 @@ export async function saveCanonicalOntology(
       .where(eq(ontologyDocuments.id, ontologyId))
 
     return draft
+  }
+
+  if (options?.tx) {
+    return await executeInTx(options.tx)
   }
 
   if (typeof database.transaction === "function") {

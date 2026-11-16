@@ -1,5 +1,6 @@
 import "server-only"
 
+import { AsyncLocalStorage } from "node:async_hooks"
 import { and, eq, inArray } from "drizzle-orm"
 import { cookies } from "next/headers"
 
@@ -52,11 +53,29 @@ type DocumentScopedRecord =
   | "facts"
   | "fact_relation_attribute_values"
 
+const groupKeyStorage = new AsyncLocalStorage<string>()
+
+export function runWithGroupKey<T>(
+  groupKey: string,
+  fn: () => Promise<T>
+): Promise<T> {
+  return groupKeyStorage.run(groupKey, fn)
+}
+
 function throwAccessDenied(message: string): never {
   throw new Error(message)
 }
 
 export async function getCurrentGroupOrThrow(): Promise<AppAccessGroup> {
+  const alsGroupKey = groupKeyStorage.getStore()
+  if (alsGroupKey) {
+    return {
+      key: alsGroupKey,
+      name: alsGroupKey,
+      password: "",
+    }
+  }
+
   let cookieVal: string | undefined
   let groupVal: string | undefined
   try {
