@@ -21,6 +21,7 @@ scope:
   - defect suppressions persistence and quick-fix actions (clearing parent cycles, pruning dangling relations)
   - contextual defect warning callouts in detail views and visual canvas node badges
   - AI generation guardrails and OWL export pre-flight linter diagnostics notes scaffolding
+  - right-hand Ontology Assistant chat panel with staged change previews, blast-radius warnings, atomic apply, and live fingerprint sync
 entry_points:
   - path: src/app/ontology/page.tsx
     purpose: Server route that resolves the active ontology document and initial data.
@@ -100,7 +101,7 @@ update_this_readme_when:
 6. `ontology-header.tsx` consolidates 4 landmarks (`DocumentSelector`, expanded `ontology-actions-menu.tsx`, `ontology-issues-pill.tsx`, and `ontology-view-toggle.tsx`), providing 3-way mode switching between Schema, Questions, and Visual Canvas.
 7. `cq-workbench.tsx` hosts the Competency Question Workbench with real-time coverage progress bar, text search with keyword highlighting, module & coverage filters, and concept mapping inspector with `ClassPicker` and `RelationPicker`.
 8. `selection.ts` resolves class/relation selections, while `OntologyShell` also tracks explicit module overview selection.
-9. `detail-panel-shell.tsx` hosts tabbed class, relation, or module detail views with metadata editors for translations, notes, examples, instance rules, relation attributes, and contextual defect callout banners.
+9. `detail-panel-shell.tsx` hosts tabbed class, relation, or module detail views (with metadata editors for translations, notes, examples, instance rules, relation attributes, and contextual defect callout banners) alongside a `Details | Assistant` mode toggle for `ontology-assistant-panel.tsx`. Both panels remain mounted so chat history and pending proposals survive mode switches and `router.refresh()` on external MCP edits (polled via `/api/ontology/[id]/fingerprint` on window focus and every 10s while visible).
 10. Server actions persist ontology structure changes, CQ mappings and module associations, metadata rows, saved visual layout state, JSON round-trips, and OWL export generation.
 11. `ontology-issues-pill.tsx` displays concrete typed issue counts (`Error`, `Warning`, `Suggestion`, `Clean`) with zero arbitrary health percentages. Clicking opens `ontology-issues-sheet.tsx` (slide-over drawer with tabs for Structural Defects & Quick-Fixes, Semantic Redundancy Clusters, and Standard Vocabulary Recommendations with 1-click import).
 12. Pre-flight Blast Radius dialog (`BlastRadiusModal`) intercepts class and relation deletion in `ClassDetail` and `RelationDetail`, rendering severity level, broken CQ list, orphaned subclasses, and requiring explicit acknowledgment for critical impact.

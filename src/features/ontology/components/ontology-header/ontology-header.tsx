@@ -2,7 +2,10 @@
 
 import { useEffect, useRef, useState, type ChangeEvent } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
+import { Sparkles } from "lucide-react"
 import { toast } from "sonner"
+
+import { Button } from "@/components/ui/button"
 
 import { CreateOntologyDialog } from "@/features/ontology/components/dialogs/create-ontology-dialog"
 import { ExportOntologyDialog } from "@/features/ontology/components/export-ontology-dialog/export-ontology-dialog"
@@ -66,6 +69,8 @@ export interface OntologyHeaderProps {
   onOpenIssuesSheet?: () => void
   defectsReport?: OntologyDefectReport
   onOpenDefectsSheet?: () => void
+  assistantOpen?: boolean
+  onToggleAssistant?: () => void
 }
 
 export function OntologyHeader({
@@ -86,6 +91,8 @@ export function OntologyHeader({
   onOpenIssuesSheet,
   defectsReport,
   onOpenDefectsSheet,
+  assistantOpen = false,
+  onToggleAssistant,
 }: OntologyHeaderProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -106,7 +113,8 @@ export function OntologyHeader({
   const [reasonerOfflineMsg, setReasonerOfflineMsg] = useState("")
   const [reasonerComposeCmd, setReasonerComposeCmd] = useState("")
   const [activeJobId, setActiveJobId] = useState<string | null>(null)
-  const [reasonerResult, setReasonerResult] = useState<ReasonerResultPayload | null>(null)
+  const [reasonerResult, setReasonerResult] =
+    useState<ReasonerResultPayload | null>(null)
 
   const { data: polledJob } = useReasonerJob(activeJobId)
 
@@ -124,7 +132,9 @@ export function OntologyHeader({
   const isPolledLoading =
     reasonerLoading ||
     (activeJobId !== null &&
-      (!polledJob || polledJob.status === "pending" || polledJob.status === "claimed"))
+      (!polledJob ||
+        polledJob.status === "pending" ||
+        polledJob.status === "claimed"))
 
   const reasonerErrorMessage =
     polledJob?.status === "failed"
@@ -145,8 +155,11 @@ export function OntologyHeader({
   const [tabularOffline, setTabularOffline] = useState(false)
   const [tabularOfflineMsg, setTabularOfflineMsg] = useState("")
   const [tabularComposeCmd, setTabularComposeCmd] = useState("")
-  const [activeTabularJobId, setActiveTabularJobId] = useState<string | null>(null)
-  const [tabularResult, setTabularResult] = useState<TabularProfileResult | null>(null)
+  const [activeTabularJobId, setActiveTabularJobId] = useState<string | null>(
+    null
+  )
+  const [tabularResult, setTabularResult] =
+    useState<TabularProfileResult | null>(null)
 
   const { data: polledTabularJob } = useTabularJob(activeTabularJobId)
 
@@ -222,7 +235,9 @@ export function OntologyHeader({
       }
     } catch (err) {
       setTabularLoading(false)
-      toast.error(err instanceof Error ? err.message : "Failed to run tabular profiling")
+      toast.error(
+        err instanceof Error ? err.message : "Failed to run tabular profiling"
+      )
     } finally {
       if (tabularFileRef.current) {
         tabularFileRef.current.value = ""
@@ -263,7 +278,9 @@ export function OntologyHeader({
       }
     } catch (err) {
       setReasonerLoading(false)
-      toast.error(err instanceof Error ? err.message : "Failed to run reasoning")
+      toast.error(
+        err instanceof Error ? err.message : "Failed to run reasoning"
+      )
     }
   }
 
@@ -431,6 +448,21 @@ export function OntologyHeader({
           }
         }}
       />
+
+      {onToggleAssistant && (
+        <Button
+          type="button"
+          variant={assistantOpen ? "secondary" : "outline"}
+          size="sm"
+          disabled={!hasCurrentDocument}
+          onClick={onToggleAssistant}
+          className="h-8 gap-1.5 px-2.5 text-xs"
+          aria-pressed={assistantOpen}
+        >
+          <Sparkles className="h-3.5 w-3.5 text-primary" />
+          <span>Assistant</span>
+        </Button>
+      )}
 
       {/* Dialogs spawned from actions */}
       <CreateOntologyDialog

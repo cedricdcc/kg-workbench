@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useRef, useState, useEffect } from "react"
+import { useCallback, useMemo, useRef, useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { usePathname, useSearchParams } from "next/navigation"
 
@@ -31,7 +31,8 @@ import type { EntityType } from "../entity-type-tabs"
 import { ModuleDetail } from "../module-detail/module-detail"
 import { OntologyDetailsDialog } from "../ontology-details-dialog/ontology-details-dialog"
 import type { OntologyDetailsTab } from "../ontology-details-dialog/types"
-import { DetailPanelShell } from "./detail-panel-shell"
+import { DetailPanelShell, type DetailPanelMode } from "./detail-panel-shell"
+import { OntologyAssistantPanel } from "../ontology-assistant/ontology-assistant-panel"
 import { LeftBrowserPanel } from "./left-browser-panel"
 import { CqWorkbench } from "../cq-workbench"
 import {
@@ -160,6 +161,8 @@ export function OntologyShell({
     string | null
   >(null)
   const [isDetailCollapsed, setIsDetailCollapsed] = useState(false)
+  const [rightPanelMode, setRightPanelMode] =
+    useState<DetailPanelMode>("details")
   const [detailsOpen, setDetailsOpen] = useState(false)
   const [detailsTab, setDetailsTab] = useState<OntologyDetailsTab>("overview")
   const [cqCreateModuleId, setCqCreateModuleId] = useState<string | null>(null)
@@ -169,6 +172,97 @@ export function OntologyShell({
   const [selectedReferenceTerm, setSelectedReferenceTerm] =
     useState<SelectedReferenceTerm | null>(null)
   const [referenceDialogOpen, setReferenceDialogOpen] = useState(false)
+
+  const lastFingerprintRef = useRef<string | null>(null)
+  const isCheckingFingerprintRef = useRef(false)
+
+  const fetchFingerprint = useCallback(
+    async (ontologyId: string): Promise<string | null> => {
+      try {
+        const res = await fetch(
+          `/api/ontology/${encodeURIComponent(ontologyId)}/fingerprint`,
+          { cache: "no-store" }
+        )
+        if (!res.ok) return null
+        const data = (await res.json()) as { fingerprint?: string }
+        return typeof data.fingerprint === "string" ? data.fingerprint : null
+      } catch {
+        return null
+      }
+    },
+    []
+  )
+
+  const syncFingerprint = useCallback(
+    async (options?: { silent?: boolean }) => {
+      if (isCheckingFingerprintRef.current) return
+      isCheckingFingerprintRef.current = true
+      try {
+        const nextFingerprint = await fetchFingerprint(currentDocument.id)
+        if (!nextFingerprint) return
+
+        if (lastFingerprintRef.current === null) {
+          lastFingerprintRef.current = nextFingerprint
+          return
+        }
+
+        if (lastFingerprintRef.current !== nextFingerprint) {
+          lastFingerprintRef.current = nextFingerprint
+          if (!options?.silent) {
+            router.refresh()
+            toast.info("Ontology updated externally")
+          }
+        }
+      } finally {
+        isCheckingFingerprintRef.current = false
+      }
+    },
+    [currentDocument.id, fetchFingerprint, router]
+  )
+
+  useEffect(() => {
+    lastFingerprintRef.current = null
+    void syncFingerprint({ silent: true })
+
+    function handleFocus() {
+      void syncFingerprint()
+    }
+
+    window.addEventListener("focus", handleFocus)
+    const intervalId = window.setInterval(() => {
+      if (document.visibilityState === "visible") {
+        void syncFingerprint()
+      }
+    }, 10_000)
+
+    return () => {
+      window.removeEventListener("focus", handleFocus)
+      window.clearInterval(intervalId)
+    }
+  }, [currentDocument.id, syncFingerprint])
+
+  const handleAssistantAppliedChanges = useCallback(async () => {
+    const nextFingerprint = await fetchFingerprint(currentDocument.id)
+    if (nextFingerprint) {
+      lastFingerprintRef.current = nextFingerprint
+    }
+    router.refresh()
+  }, [currentDocument.id, fetchFingerprint, router])
+
+  function handleToggleAssistant() {
+    if (viewMode === "questions") {
+      handleViewModeChange("schema")
+      setRightPanelMode("assistant")
+      setIsDetailCollapsed(false)
+      return
+    }
+    if (rightPanelMode === "assistant" && !(isVisual && isDetailCollapsed)) {
+      setRightPanelMode("details")
+    } else {
+      setRightPanelMode("assistant")
+      setIsDetailCollapsed(false)
+    }
+  }
 
   const { data: referenceVocabularies = [] } = useQuery({
     queryKey: ["reference-ontologies"],
@@ -546,6 +640,7 @@ export function OntologyShell({
     setSelectedModuleDetailId(null)
     setSelectedEntityKind("class")
     setSelectedEntityId(id)
+    setRightPanelMode("details")
     setIsDetailCollapsed(false)
   }
 
@@ -554,6 +649,7 @@ export function OntologyShell({
     setSelectedModuleDetailId(null)
     setSelectedEntityKind("relation")
     setSelectedEntityId(id)
+    setRightPanelMode("details")
     setIsDetailCollapsed(false)
   }
 
@@ -563,6 +659,7 @@ export function OntologyShell({
     setSelectedEntityKind(null)
     setSelectedEntityId(null)
     setSelectedModuleDetailId(moduleId)
+    setRightPanelMode("details")
     setIsDetailCollapsed(false)
   }
 
@@ -734,6 +831,10 @@ export function OntologyShell({
         onOpenVocabularies={() => setReferenceDialogOpen(true)}
         issuesCounts={issuesCounts}
         onOpenIssuesSheet={() => setIssuesSheetOpen(true)}
+        assistantOpen={
+          rightPanelMode === "assistant" && !(isVisual && isDetailCollapsed)
+        }
+        onToggleAssistant={handleToggleAssistant}
       />
       <ModuleTabBar
         modules={currentDocument.modules}
@@ -811,6 +912,7 @@ export function OntologyShell({
                       setSelectedEntityId(null)
                       setSelectedModuleDetailId(null)
                       setSelectedReferenceTerm(term)
+                      setRightPanelMode("details")
                       setIsDetailCollapsed(false)
                     }}
                   />
@@ -896,6 +998,16 @@ export function OntologyShell({
               isCollapsed={isVisual && isDetailCollapsed}
               onCollapse={() => setIsDetailCollapsed(true)}
               onExpand={() => setIsDetailCollapsed(false)}
+              activeMode={rightPanelMode}
+              onModeChange={setRightPanelMode}
+              assistantContent={
+                <OntologyAssistantPanel
+                  key={currentDocument.id}
+                  ontologyId={currentDocument.id}
+                  ontologyName={currentDocument.name}
+                  onAppliedChanges={handleAssistantAppliedChanges}
+                />
+              }
             >
               {detailContent}
             </DetailPanelShell>
