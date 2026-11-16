@@ -47,6 +47,8 @@ server_entry_points:
     purpose: On-demand AI relation reconciliation and property remapping suggestion service using Gemini.
   - path: src/features/ontology/utils/linter/
     purpose: Pure TypeScript defect linter rule engine, OOPS! pitfall taxonomy, and in-memory health analysis.
+  - path: src/app/api/mcp/route.ts
+    purpose: Stateless Streamable HTTP MCP server exposing the 28 shared Ontology Tool Engine tools with Bearer token auth.
 update_this_readme_when:
   - route composition changes
   - shell or canvas flow changes
@@ -108,3 +110,26 @@ update_this_readme_when:
 
 - when a component needs subcomponents, prefer a folder like `components/<name>/<name>.tsx` for new work and keep related parts in separate files
 - all server reads and writes in this feature must stay scoped to the current access group via the root `ontology document`
+
+## External MCP Server (`/api/mcp`)
+
+The ontology feature's 28 shared tools (`src/features/ontology/server/assistant-tools/registry.ts`) are exposed over Streamable HTTP at `/api/mcp` (`POST`, `GET`, `DELETE`) via `@modelcontextprotocol/sdk`.
+
+- **Authentication:** Requires `Authorization: Bearer <KG_MCP_TOKEN>` (fails closed with `401` if `KG_MCP_TOKEN` is unset).
+- **Group scoping:** Reads `x-kg-group-key` header, falling back to `KG_MCP_GROUP_KEY` or `"shared"`.
+
+Example Antigravity `mcp_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "kg-workbench-ontology": {
+      "serverUrl": "http://localhost:3010/api/mcp",
+      "headers": {
+        "Authorization": "Bearer ${KG_MCP_TOKEN}",
+        "x-kg-group-key": "shared"
+      }
+    }
+  }
+}
+```

@@ -27,6 +27,8 @@ services:
       NEXT_PUBLIC_USE_MOCKS: ${NEXT_PUBLIC_USE_MOCKS:-true}
       VLLM_BASE_URL: ${VLLM_BASE_URL:-}
       VLLM_API_KEY: ${VLLM_API_KEY:-}
+      KG_MCP_TOKEN: ${KG_MCP_TOKEN:-}
+      KG_MCP_GROUP_KEY: ${KG_MCP_GROUP_KEY:-shared}
     extra_hosts:
       - host.docker.internal:host-gateway
     ports:
